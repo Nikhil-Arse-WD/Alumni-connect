@@ -25,7 +25,7 @@ import {
   View,
 } from "react-native";
 
-import Header from "../components/Header";
+
 
 const { width } =
   Dimensions.get("window");
@@ -40,7 +40,7 @@ const isDesktop =
   width >= 1100;
 
 const API =
-  "http://192.168.29.217:2000";
+  "http://10.232.80.175:2000";
 
 export default function App() {
     const [currentTime, setCurrentTime] =
@@ -475,7 +475,7 @@ useEffect(() => {
     <SafeAreaView
       style={styles.container}
     >
-      <Header />
+    
 
       <StatusBar
         backgroundColor="#0F172A"
@@ -489,9 +489,9 @@ useEffect(() => {
       >
         {/* HERO */}
         <LinearGradient
-  colors={["#0f172a", "#1e3a8a"]}
+    colors={["#312EBA", "#5B21B6", "#EC1D8F"]}
   start={{ x: 0, y: 0 }}
-  end={{ x: 1, y: 1 }}
+  end={{ x: 1, y: 0}}
   style={styles.topSection}
 >
   <Text style={styles.heading}>Alumni Events</Text>
@@ -728,15 +728,7 @@ useEffect(() => {
               />
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.shareBtn}
-            >
-              <Ionicons
-                name="share-social-outline"
-                size={22}
-                color="#fff"
-              />
-            </TouchableOpacity>
+           
 
           </View>
         </View>
@@ -1291,12 +1283,13 @@ const styles =
         alignItems: "center",
       },
       searchDropdown: {
-        marginTop: 10,           // ← sirf yeh, koi position nahi
+        marginTop: 10,
         backgroundColor: "#fff",
         borderRadius: 18,
         overflow: "hidden",
         borderWidth: 1,
         borderColor: "#E2E8F0",
+
       },
       dropdownHeader: {
         flexDirection: "row",
@@ -1306,12 +1299,8 @@ const styles =
         borderBottomWidth: 1,
         borderBottomColor: "#F1F5F9",
       },
-      dropdownHeaderLeft: {
-        fontSize: 11, fontWeight: "700", color: "#94A3B8", letterSpacing: 0.5,
-      },
-      dropdownHeaderRight: {
-        fontSize: 11, fontWeight: "600", color: "#94A3B8",
-      },
+      dropdownHeaderLeft: { fontSize: 11, fontWeight: "700", color: "#94A3B8" },
+      dropdownHeaderRight: { fontSize: 11, fontWeight: "600", color: "#94A3B8" },
       dropdownItem: {
         flexDirection: "row",
         alignItems: "center",
@@ -1319,33 +1308,36 @@ const styles =
         gap: 12,
         borderBottomWidth: 1,
         borderBottomColor: "#F8FAFC",
+        width:"100%"
       },
+      dropdownInfo: { flex: 1 },
+      dropdownTitle: { fontSize: 14, fontWeight: "700", color: "#0F172A" },
+      dropdownMeta: { fontSize: 12, color: "#64748B", marginTop: 2 },
+      dropdownBadge: {
+        backgroundColor: "#EDE9FE",
+        paddingHorizontal: 9,
+        paddingVertical: 3,
+        borderRadius: 20,
+      },
+      dropdownBadgeText: { fontSize: 10, fontWeight: "700", color: "#6D28D9" },
+      noResultText: {
+        color: "#94A3B8",
+        fontSize: 14,
+        marginTop: 8,
+        fontWeight: "600",
+      },
+    
+     
+     
       dropdownThumb: {
         width: 46, height: 40,
         borderRadius: 10,
       },
-      dropdownInfo: {
-        flex: 1,
-      },
-      dropdownTitle: {
-        fontSize: 14, fontWeight: "700", color: "#0F172A",
-      },
-      dropdownMeta: {
-        fontSize: 12, color: "#64748B", marginTop: 2,
-      },
-      dropdownBadge: {
-        paddingHorizontal: 8, paddingVertical: 3,
-        borderRadius: 20,
-      },
+     
+     
       dropdownUpcoming: { backgroundColor: "#EEF2FF" },
       dropdownCompleted: { backgroundColor: "#F1F5F9" },
-      dropdownBadgeText: {
-        fontSize: 10, fontWeight: "700",
-      },
-      noResultText: {
-        color: "#94A3B8", fontSize: 14,
-        marginTop: 8, fontWeight: "600",
-      },
+      
     rsvpCardModern: {
         backgroundColor: "#fff",
         borderRadius: 22,
@@ -1492,26 +1484,16 @@ const styles =
         paddingHorizontal: 18,
         paddingTop: 20,
         paddingBottom: 28,
-      
-        
-        borderTopWidth: 3,
-        borderTopColor: "#f59e0b",
-      
         elevation: 10,
       
-        shadowColor: "#000",
-        shadowOffset: {
-          width: 0,
-          height: 6,
-        },
-        shadowOpacity: 0.25,
-        shadowRadius: 10,
+        alignItems: Platform.OS === "web" ?"center":"flex-start",
       },
       
       heading: {
-        fontSize: 30,
+        fontSize: Platform.OS === "web" ?42:30,
         fontWeight: "800",
         color: "#fff",
+        textAlign:Platform.OS === "web" ?"center":"left"
       },
       
       subHeading: {
@@ -1519,15 +1501,31 @@ const styles =
         color: "#cbd5e1",
         marginTop: 5,
         marginBottom: 20,
+        textAlign:Platform.OS === "web" ?"center":"left"
       },
       
       searchBox: {
-        backgroundColor: "#fff",
-        borderRadius: 18,
-        flexDirection: "row",
-        alignItems: "center",
-        paddingHorizontal: 14,
-        height: 56,
+        width: Platform.OS === "web" ? "78%" : "100%",
+    height: 58,
+  
+    backgroundColor: "#fff",
+    borderRadius: 18,
+  
+    flexDirection: "row",
+    alignItems: "center",
+  
+    paddingHorizontal: 14,
+  
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 6,
+    },
+  
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+  
+    elevation: 5,
       },
       
       searchInput: {
@@ -1535,12 +1533,13 @@ const styles =
         paddingHorizontal: 10,
         fontSize: 15,
         color: "#111",
-      },
+        outlineStyle: "none" 
+      }as any,
     hero: {
       width: isDesktop
         ? "85%"
         : "100%",
-      alignSelf: "center",
+      alignSelf:  Platform.OS === "web" ?"center":"flex-start",
       paddingHorizontal: 20,
       paddingTop: 20,
       paddingBottom: 10,
@@ -1565,9 +1564,8 @@ const styles =
     searchWrapper: {
       flexDirection: "row",
       alignItems: "center",
-      width: isDesktop
-        ? "85%"
-        : "100%",
+  
+        width: Platform.OS === "web" ? "100%" : "100%",
       alignSelf: "center",
       paddingHorizontal: 20,
       marginTop: 18,

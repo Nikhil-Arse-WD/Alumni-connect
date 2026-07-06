@@ -8,14 +8,23 @@ import {
     StyleSheet,
     Text,
     TextInput,
+    Platform,
     TouchableOpacity,
     View,
 } from "react-native";
 
-import Header from "../components/Header";
 
-const API_URL = "http://192.168.29.217:2000/member";
+import { LinearGradient } from "expo-linear-gradient";
+const API_URL = "http://10.232.80.175:2000/member";
 
+
+export const showAlert = (title: string, message: string) => {
+  if (Platform.OS === "web") {
+    window.alert(`${title}\n${message}`);
+  } else {
+    Alert.alert(title, message);
+  }
+};
 export default function EditProfileScreen() {
   const router = useRouter();
   const { email } = useLocalSearchParams<{ email: string }>();
@@ -73,16 +82,13 @@ export default function EditProfileScreen() {
         formData
       );
 
-      Alert.alert(
-        "Success",
-        "Profile updated successfully"
-      );
-
+      showAlert("Success ✅", "Profile updated successfully");
       router.back();
 
     } catch (err) {
       console.log(err);
-      Alert.alert("Error", "Update failed");
+      
+      showAlert("Error", "Update failed");
     } finally {
       setSaving(false);
     }
@@ -100,17 +106,22 @@ export default function EditProfileScreen() {
   return (
     <View style={styles.container}>
 
-      <Header />
+
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContainer}
       >
-
+<LinearGradient
+    colors={["#312EBA", "#5B21B6", "#EC1D8F"]}
+  start={{ x: 0, y: 0 }}
+  end={{ x: 1, y: 0}}
+  style={styles.topSection}
+>
         <Text style={styles.heading}>
           Edit Profile
         </Text>
-
+</LinearGradient>
         {/* Full Name */}
         <View style={styles.inputBox}>
           <Text style={styles.label}>Full Name</Text>
@@ -255,7 +266,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   scrollContainer: {
-    padding: 18,
+    //padding: 18,
     paddingBottom: 100,
   },
 
@@ -266,21 +277,32 @@ const styles = StyleSheet.create({
   },
 
   heading: {
-    fontSize: 26,
+    
+    fontSize: Platform.OS === "web" ?35:30,
     fontWeight: "700",
-    color: "#222",
-    marginBottom: 20,
+    color: "#fff",
+    marginBottom: 10,
   },
-
+  topSection: {
+    marginTop: 0,
+    paddingHorizontal: 18,
+    paddingBottom: 20,
+    elevation: 10,
+  color:"#fff",
+    alignItems: Platform.OS === "web" ?"center":"flex-start",
+  },
+  
   inputBox: {
     marginBottom: 16,
   },
 
   label: {
+    marginTop:30,
     fontSize: 14,
     color: "#666",
     marginBottom: 8,
     fontWeight: "600",
+    marginHorizontal:Platform.OS === "web" ? 46:19,
   },
 
   input: {
@@ -289,6 +311,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 15,
+
+    marginHorizontal:Platform.OS === "web" ? 46:19,
     borderWidth: 1,
     borderColor: "#e4e7ec",
   },
@@ -298,13 +322,17 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: "center",
     flex: 1,
+    marginBottom: 28,
     marginRight: 10,
+    marginHorizontal:Platform.OS === "web" ? 46:19,
   },
   
   backBtn: {
     backgroundColor: "#444",
+    marginHorizontal:Platform.OS === "web" ? 46:19,
     paddingVertical: 16,
     borderRadius: 16,
+    marginBottom: 28,
     alignItems: "center",
     flex: 1,
   },

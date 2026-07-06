@@ -17,10 +17,10 @@ import {
 } from "react-native";
 
 import Footer from "../components/Footer";
-import Header from "../components/Header";
+
 const isWeb = Platform.OS === "web";
 const API_URL =
-  "http://192.168.29.217:2000/member";
+  "http://10.232.80.175:2000/member";
 
 export default function AlumniProfileScreen() {
 
@@ -190,12 +190,14 @@ export default function AlumniProfileScreen() {
       }
     >
 
-      <Header />
+     
 
       {/* TOP PROFILE SECTION */}
 
       <LinearGradient
-        colors={["#0f172a", "#1e3a8a"]}
+        colors={["#312EBA", "#5B21B6", "#EC1D8F"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
         style={styles.topSection}
       >
 
@@ -206,7 +208,7 @@ export default function AlumniProfileScreen() {
             <Image
               source={{
                 uri:
-                  `http://192.168.29.217:2000/uploads/${user.profile_photo}`,
+                  `http://10.232.80.175:2000/uploads/${user.profile_photo}`,
               }}
               style={
                 styles.largeImage
@@ -507,9 +509,10 @@ export default function AlumniProfileScreen() {
 
       </TouchableOpacity>
 
+    
       <Footer />
-
     </ScrollView>
+    
   );
 }
 
@@ -522,6 +525,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#eef2f7",
+    marginBottom:Platform.OS === "web" ?0:50
   },
 
   loader: {
@@ -619,11 +623,12 @@ const styles = StyleSheet.create({
 
   card: {
     backgroundColor: "#fff",
-    marginHorizontal: 16,
+   // marginHorizontal: 16,
     marginBottom: 18,
     padding: 20,
     borderRadius: 22,
     elevation: 4,
+    marginHorizontal:Platform.OS === "web" ? 46:19,
   },
 
   sectionTitle: {
@@ -653,11 +658,11 @@ const styles = StyleSheet.create({
 
   logoutBtn: {
     backgroundColor: "#ff3b30",
-    marginHorizontal: 16,
+   //marginHorizontal: 16,
     marginBottom: 30,
     paddingVertical: 16,
     borderRadius: 18,
-
+    marginHorizontal:Platform.OS === "web" ? 46:19,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",

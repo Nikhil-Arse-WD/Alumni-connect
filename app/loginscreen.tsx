@@ -16,6 +16,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  Image,
   TouchableOpacity,
   useWindowDimensions,
   View,
@@ -24,10 +25,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const USER_API =
-  "http://192.168.29.217:2000/login";
+  "http://10.232.80.175:2000/login";
 
 const ADMIN_API =
-  "http://192.168.29.217:2000/admin/login";
+  "http://10.232.80.175:2000/admin/login";
 
 function FormContent({
   form,
@@ -249,82 +250,63 @@ export default function LoginScreen() {
       ...form,
       [key]: value,
     });
-
-  const handleLogin = async () => {
-    if (
-      !form.email ||
-      !form.password
-    ) {
-      Alert.alert(
-        "Error",
-        "Enter email & password",
-      );
-
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      const API =
-        selectedRole === "admin"
-          ? ADMIN_API
-          : USER_API;
-
-      const res = await axios.post(
-        API,
-        {
-          email: form.email,
-          password: form.password,
-        },
-      );
-
-      if (!res.data.success) {
-        Alert.alert(
-          "Error",
-          res.data.message,
-        );
-
+    const showAlert = (
+      title: string,
+      message: string
+    ) => {
+      if (Platform.OS === "web") {
+        window.alert(`${title}\n${message}`);
+      } else {
+        Alert.alert(title, message);
+      }
+    };
+    const handleLogin = async () => {
+      if (!form.email || !form.password) {
+        showAlert("Error ❌ ", "Enter email & password");
         return;
       }
-
-      const data =
-        selectedRole === "admin"
-          ? res.data.admin
-          : res.data.user;
-
-      await AsyncStorage.setItem(
-        "user",
-        JSON.stringify(data),
-      );
-
-      await AsyncStorage.setItem(
-        "token",
-        res.data.token,
-      );
-
-      Alert.alert(
-        "Success",
-        "Login Successful 🚀",
-      );
-
-      router.replace(
-        selectedRole === "admin"
-          ? "/admin/dashboard"
-          : "/(tab)",
-      );
-    } catch (error: any) {
-      Alert.alert(
-        "Error",
-        error?.response?.data
-          ?.message ||
-          "Login Failed",
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
+    
+      try {
+        setLoading(true);
+        const API = selectedRole === "admin" ? ADMIN_API : USER_API;
+        const res = await axios.post(API, { email: form.email, password: form.password });
+    
+        if (!res.data.success) {
+          showAlert(
+            "Error ❌ ",
+            res.data.message
+          );
+          return;
+        }
+    
+        const data = selectedRole === "admin" ? res.data.admin : res.data.user;
+    
+        // ✅ Admin aur user ke liye alag keys
+        if (selectedRole === "admin") {
+          await AsyncStorage.setItem("admin", JSON.stringify(data));
+        } else {
+          await AsyncStorage.setItem("user", JSON.stringify(data));
+        }
+    
+        await AsyncStorage.setItem("token", res.data.token);
+        await AsyncStorage.setItem("userEmail", data.email);
+    
+        showAlert(
+          "Success ✅",
+          "Login Successful 🚀"
+        );
+        router.replace(selectedRole === "admin" ? "/admin/dashboard" : "/(tab)");
+    
+      } catch (error: any) {
+        showAlert(
+          "Error ❌ ",
+          error?.response?.data?.message ||
+            "Login Failed"
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
   // ================= WEB =================
 
   if (isWeb) {
@@ -363,11 +345,12 @@ export default function LoginScreen() {
                   styles.leftIconBg
                 }
               >
-                <Ionicons
-                  name="school"
-                  size={64}
-                  color="#fff"
-                />
+                 <Image
+          source={require("../assets/Alumni_Pics/logo.png")}
+          style={
+            styles.leftIconBg
+          }
+        />
               </View>
 
               <Text
@@ -375,7 +358,7 @@ export default function LoginScreen() {
                   styles.webTitle
                 }
               >
-                Alumni Portal
+               SVIMAA Connect
               </Text>
 
               <Text
@@ -406,7 +389,7 @@ export default function LoginScreen() {
               </View>
 
               <Text style={styles.title}>
-                Welcome Back 👋
+                Welcome Back 
               </Text>
 
               <Text
@@ -471,23 +454,24 @@ export default function LoginScreen() {
               styles.mobileAvatar
             }
           >
-            <Ionicons
-              name="school"
-              size={48}
-              color="#4C6FFF"
-            />
+            <Image
+          source={require("../assets/Alumni_Pics/logo.png")}
+          style={
+            styles.mobileAvatar
+          }
+        />
           </View>
 
           <Text
             style={styles.mobileTitle}
           >
-            Alumni Portal
+          SVIMAA Connect
           </Text>
 
           <Text
             style={styles.mobileSub}
           >
-            Welcome Back 👋
+            Welcome Back 
           </Text>
         </View>
 
@@ -562,11 +546,9 @@ const styles = StyleSheet.create({
   },
 
   leftIconBg: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor:
-      "rgba(255,255,255,0.15)",
+    width: 130,
+    height: 130,
+    borderRadius: 100,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 24,
@@ -632,10 +614,9 @@ const styles = StyleSheet.create({
   },
 
   mobileAvatar: {
-    width: 96,
-    height: 96,
+    width: 98,
+    height: 98,
     borderRadius: 48,
-    backgroundColor: "#fff",
     justifyContent: "center",
     alignItems: "center",
     elevation: 6,
@@ -718,7 +699,8 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     fontSize: 15,
     color: "#1E1B4B",
-  },
+    outlineStyle: "none" 
+  }as any,
 
   loginButton: {
     backgroundColor: "#4C6FFF",

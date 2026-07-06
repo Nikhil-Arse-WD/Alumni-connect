@@ -6,12 +6,13 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+
   TouchableOpacity,
   View
 } from "react-native";
 import { WebView } from "react-native-webview";
 
-export default function FooterScreen() {
+export default function Footer() {
   return (
     <ScrollView style={styles.container}>
 
@@ -140,7 +141,8 @@ export default function FooterScreen() {
 const styles = StyleSheet.create({
 
   container: {
-    backgroundColor: "#f5f7fb"
+    backgroundColor: "#f5f7fb",
+    marginBottom: Platform.OS === "web" ?0:50,
   },
 
   footer: {

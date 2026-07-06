@@ -25,9 +25,9 @@ import Animated, {
   withRepeat,
   withTiming,
 } from "react-native-reanimated";
-import Header from "../components/Header";
 
-const API_URL = "http://192.168.29.217:2000";
+
+const API_URL = "http://10.232.80.175:2000";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface UserType {
@@ -451,7 +451,7 @@ export default function JobBoardScreen() {
 
   return (
     <View style={styles.container}>
-      <Header />
+    
 
       <FlatList
         data={filteredJobs}
@@ -465,9 +465,9 @@ export default function JobBoardScreen() {
           <>
             {/* ── HERO ── */}
             <LinearGradient
-              colors={["#0f172a", "#1e3a8a"]}
+             colors={["#312EBA", "#5B21B6", "#EC1D8F"]}
               start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
+              end={{ x: 1, y: 0 }}
               style={styles.header}
             >
               <View style={styles.topHeaderRow}>
@@ -980,20 +980,19 @@ const styles = StyleSheet.create({
 
   // HEADER
   header: {
-    paddingHorizontal: 18,
+    paddingHorizontal: Platform.OS === "web" ? 60:20,
     paddingTop: 20,
     paddingBottom: 28,
    
-    borderTopWidth: 3,
-    borderTopColor: "#f59e0b",
+   
   },
   topHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
+   
   },
-  heading: { color: "#fff", fontSize: 30, fontWeight: "800" },
-  subHeading: { color: "#cbd5e1", marginTop: 5, marginBottom: 16, fontSize: 15 },
+  heading: { color: "#fff",  fontSize: Platform.OS === "web" ? 42 : 30, fontWeight: "800" ,textAlign:  Platform.OS === "web" ?"center":"left",},
+  subHeading: { color: "#cbd5e1", marginTop: 5, marginBottom: 16, fontSize: 15,textAlign:  Platform.OS === "web" ?"center":"left", },
   postMiniBtn: {
     backgroundColor: "#4f46e5",
     flexDirection: "row",
@@ -1015,26 +1014,41 @@ const styles = StyleSheet.create({
   statsRow: { flexDirection: "row", gap: 8, marginBottom: 16 },
   statBox: {
     flex: 1,
+  
     backgroundColor: "rgba(255,255,255,0.1)",
     borderRadius: 14,
     paddingVertical: 10,
     alignItems: "center",
   },
   statNum: { color: "#fff", fontSize: 18, fontWeight: "800" },
-  statLbl: { color: "#94a3b8", fontSize: 10, marginTop: 2 },
+  statLbl: { color: "#fff", fontSize: 10, marginTop: 2 },
 
   // SEARCH
   searchRow: { flexDirection: "row", gap: 10, alignItems: "center" },
   searchBox: {
-    flex: 1,
+    width: Platform.OS === "web" ? "95%" : "85%",
+    height: 58,
+  
     backgroundColor: "#fff",
-    borderRadius: 16,
+    borderRadius: 18,
+  
     flexDirection: "row",
     alignItems: "center",
+  
     paddingHorizontal: 14,
-    height: 54,
+  
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 6,
+    },
+  
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+  
+    elevation: 5,
   },
-  searchInput: { flex: 1, marginLeft: 10, fontSize: 15, color: "#111827" },
+  searchInput: { flex: 1, marginLeft: 10, fontSize: 15, color: "#111827",outlineStyle: "none"  }as any,
   clearBtn: {
     width: 26,
     height: 26,
@@ -1174,10 +1188,10 @@ const styles = StyleSheet.create({
   // JOB CARD
   card: {
     backgroundColor: "#fff",
-    marginHorizontal: 16,
+    marginHorizontal: Platform.OS === "web" ?30:20,
     marginTop: 16,
     borderRadius: 22,
-    padding: 18,
+    padding: 19,
     elevation: 3,
     overflow: "hidden",
   },

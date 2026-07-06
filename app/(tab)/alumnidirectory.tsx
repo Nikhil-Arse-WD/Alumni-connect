@@ -1,3 +1,7 @@
+// ======================================================
+// AlumniDirectoryScreen.tsx
+// ======================================================
+
 import { Ionicons } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
 import axios from "axios";
@@ -15,81 +19,217 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from "react-native";
 
-import Header from "../components/Header";
+const API_URL = "http://10.232.80.175:2000/alumni";
 
-const API_URL = "http://192.168.29.217:2000/alumni";
+// ── Programme groups (same as register) ─────────────────────────────────────
+const PROGRAMME_GROUPS = [
+  {
+    group: "Management",
+    items: [
+      { label: "MBA", value: "MBA" },
+      { label: "BBA", value: "BBA" },
+    ],
+  },
+  {
+    group: "Sciences",
+    items: [
+      { label: "MCA",       value: "MCA"     },
+      { label: "BCA",       value: "BCA"     },
+      { label: "M.Sc",      value: "M.Sc"    },
+      { label: "B.Sc (CS)", value: "B.Sc CS" },
+      { label: "B.Sc (BI)", value: "B.Sc BI" },
+      { label: "B.Sc (BT)", value: "B.Sc BT" },
+      { label: "B.Sc (MB)", value: "B.Sc MB" },
+    ],
+  },
+];
 
-// =============================================
-// FILTER DROPDOWN — web: <select>, mobile: Picker
-// =============================================
-function FilterDropdown({ label, value, onChange, options }: {
+// Flat list for mobile Picker (with disabled group headers)
+type ProgrammeItem = { label: string; value: string; disabled?: boolean };
+const PROGRAMME_FLAT: ProgrammeItem[] = PROGRAMME_GROUPS.flatMap(g => [
+  { label: `── ${g.group} ──`, value: `_h_${g.group}`, disabled: true },
+  ...g.items,
+]);
+
+// ======================================================
+// AVATAR HELPERS
+// ======================================================
+const AVATAR_COLORS = ["#6D28D9","#2563EB","#10B981","#F97316","#EC4899"];
+const getAvatarColor = (name = "") => AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length];
+const getInitials = (name = "") =>
+  name.split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase();
+
+// ======================================================
+// FILTER DROPDOWN — with grouped Programme support
+// ======================================================
+function FilterDropdown({
+  label, value, onChange, options, grouped = false,
+}: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   options: { label: string; value: string }[];
+  grouped?: boolean;
 }) {
   if (Platform.OS === "web") {
     return (
       <View style={styles.dropdownBox}>
+        {/* Inject CSS once to fix optgroup color in all selects */}
+        {typeof document !== "undefined" && (() => {
+          const id = "optgroup-fix-style";
+          if (!document.getElementById(id)) {
+            const s = document.createElement("style");
+            s.id = id;
+            s.textContent = `
+              .alumni-filter-select option { color: #111 !important; background: #fff !important; }
+              .alumni-filter-select optgroup { color: #5B21B6 !important; background: #fff !important; font-weight: 700 !important; font-style: normal !important; }
+            `;
+            document.head.appendChild(s);
+          }
+          return null;
+        })()}
         <select
+          className="alumni-filter-select"
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={e => onChange(e.target.value)}
           style={{
-            width: "100%",
-            height: 48,
-            border: "none",
-            background: "transparent",
-            fontSize: 14,
-            color: value ? "#0f172a" : "#64748b",
-            paddingLeft: 12,
-            paddingRight: 8,
-            cursor: "pointer",
-            outline: "none",
-            appearance: "auto",
+            width: "100%", height: 58, border: "none",
+            background: "transparent", paddingLeft: 12,
+            fontSize: 14, color: "#fff", outline: "none",
           }}
         >
-          <option value="">{label}</option>
-          {options.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
+          <option value="" style={{ color: "#111", background: "#fff" }}>
+            {label}
+          </option>
+
+          {grouped ? (
+            PROGRAMME_GROUPS.map(g => (
+              <optgroup key={g.group} label={g.group}>
+                {g.items.map(i => (
+                  <option key={i.value} value={i.value}>{i.label}</option>
+                ))}
+              </optgroup>
+            ))
+          ) : (
+            options.map(o => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))
+          )}
         </select>
       </View>
     );
   }
 
-  // Mobile — original Picker
+  // ── Mobile ──
   return (
     <View style={styles.dropdownBox}>
       <Picker
         selectedValue={value}
-        style={styles.picker}
-        onValueChange={onChange}
+        onValueChange={v => {
+          if (grouped && String(v).startsWith("_h_")) return;
+          onChange(v);
+        }}
+        dropdownIconColor="#fff"
+        style={{ color: "#fff" }}
       >
         <Picker.Item label={label} value="" />
-        {options.map((o) => (
-          <Picker.Item key={o.value} label={o.label} value={o.value} />
-        ))}
+        {grouped
+          ? PROGRAMME_FLAT.map(i => (
+              <Picker.Item
+                key={i.value}
+                label={i.label}
+                value={i.value}
+                enabled={i.disabled !== true}
+                color={i.disabled === true ? "#94A3B8" : "#111"}
+              />
+            ))
+          : options.map(o => (
+              <Picker.Item key={o.value} label={o.label} value={o.value} />
+            ))
+        }
       </Picker>
     </View>
   );
 }
 
-// =============================================
+// ======================================================
+// ALUMNI CARD
+// ======================================================
+function AlumniCard({ item, onPress, cardWidth }: { item: any; onPress: () => void; cardWidth?: number }) {
+  return (
+    <TouchableOpacity activeOpacity={0.92} onPress={onPress}
+      style={[styles.card, cardWidth ? { width: cardWidth } : null]}>
+      <View style={styles.cardTop}>
+        <View style={styles.userRow}>
+          {item.profile_photo ? (
+            <Image
+              source={{ uri: `http://10.232.80.175:2000/uploads/${item.profile_photo}` }}
+              style={styles.avatarImage} contentFit="cover" />
+          ) : (
+            <LinearGradient colors={[getAvatarColor(item.full_name), "#8B5CF6"]} style={styles.avatar}>
+              <Text style={styles.avatarText}>{getInitials(item.full_name)}</Text>
+            </LinearGradient>
+          )}
+          <View style={{ flex: 1 }}>
+            <Text style={styles.name} numberOfLines={1}>{item.full_name}</Text>
+            <Text style={styles.role}>{item.designation || "Software Engineer"}</Text>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.tagRow}>
+        <View style={styles.programTag}><Text style={styles.programText}>{item.programme}</Text></View>
+        <View style={styles.batchTag}><Text style={styles.batchText}>{item.batch_year}</Text></View>
+      </View>
+
+      <View style={styles.infoSection}>
+        <View style={styles.infoRow}>
+          <Ionicons name="location-outline" size={15} color="#64748B" />
+          <Text style={styles.infoText}>{item.city || "Indore"}</Text>
+        </View>
+        <View style={styles.infoRow}>
+          <Ionicons name="briefcase-outline" size={15} color="#64748B" />
+          <Text style={styles.infoText}>{item.organisation || "Infosys"}</Text>
+        </View>
+      </View>
+
+      <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={{ marginTop: 24 }}>
+        <LinearGradient colors={["#5B3DF5", "#7C3AED"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.connectButton}>
+          <Ionicons name="person-outline" size={16} color="#fff" />
+          <Text style={styles.connectText}>View Profile</Text>
+        </LinearGradient>
+      </TouchableOpacity>
+    </TouchableOpacity>
+  );
+}
+
+// ======================================================
 // MAIN SCREEN
-// =============================================
+// ======================================================
 export default function AlumniDirectoryScreen() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const [showFilters, setShowFilters] = useState(false);
+  const isMobile = width < 700;
+  const shouldShowFilters = Platform.OS === "web" ? true : showFilters;
 
-  const [alumni, setAlumni] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const GAP          = 18;
+  const SIDE_PADDING = isMobile ? 16 : 12;
+  const numColumns   = width >= 1300 ? 4 : width >= 1100 ? 3 : width >= 700 ? 2 : 1;
+  const totalGap     = GAP * (numColumns - 1);
+  const containerWidth = width * 0.94;
+  const cardWidth = (containerWidth - SIDE_PADDING * 2 - totalGap) / numColumns;
+
+  const [alumni,     setAlumni]     = useState<any[]>([]);
+  const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-
-  const [search, setSearch]       = useState("");
-  const [programme, setProgramme] = useState("");
-  const [batchYear, setBatchYear] = useState("");
-  const [city, setCity]           = useState("");
+  const [search,     setSearch]     = useState("");
+  const [programme,  setProgramme]  = useState("");
+  const [batchYear,  setBatchYear]  = useState("");
+  const [city,       setCity]       = useState("");
 
   const fetchAlumni = async () => {
     try {
@@ -106,290 +246,201 @@ export default function AlumniDirectoryScreen() {
   };
 
   useEffect(() => { fetchAlumni(); }, []);
-
   useEffect(() => {
-    const delay = setTimeout(() => { fetchAlumni(); }, 500);
+    const delay = setTimeout(() => fetchAlumni(), 500);
     return () => clearTimeout(delay);
   }, [search, programme, batchYear, city]);
 
   const onRefresh = () => { setRefreshing(true); fetchAlumni(); };
 
   if (loading) {
-    return (
-      <View style={styles.loader}>
-        <ActivityIndicator size="large" color="#2563eb" />
-      </View>
-    );
+    return <View style={styles.loader}><ActivityIndicator size="large" color="#6D28D9" /></View>;
   }
 
   return (
     <View style={styles.container}>
-      <Header />
-
-      {/* TOP SECTION */}
+      {/* HERO */}
       <LinearGradient
-        colors={["#0f172a", "#1e3a8a"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.topSection}
+        colors={["#312EBA", "#5B21B6", "#EC1D8F"]}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+        style={styles.heroSection}
       >
-        <Text style={styles.heading}>Alumni Directory</Text>
-        <Text style={styles.subHeading}>Connect with alumni network</Text>
+        <View style={styles.heroContent}>
+          <Text style={styles.heroTitle}>Alumni Directory</Text>
+          <Text style={styles.heroSubtitle}>Find and connect with alumni from your network</Text>
 
-        <View style={styles.searchBox}>
-          <Ionicons name="search" size={20} color="#64748b" />
-          <TextInput
-            placeholder="Search alumni..."
-            placeholderTextColor="#94a3b8"
-            style={styles.searchInput}
-            value={search}
-            onChangeText={setSearch}
-          />
-          {search.length > 0 && (
-            <TouchableOpacity onPress={() => setSearch("")}>
-              <Ionicons name="close-circle" size={18} color="#94a3b8" />
-            </TouchableOpacity>
+          {/* SEARCH */}
+          <View style={styles.searchWrapper}>
+            <View style={styles.searchContainer}>
+              <Ionicons name="search" size={20} color="#9CA3AF" />
+              <TextInput
+                placeholder="Search alumni..."
+                placeholderTextColor="#9CA3AF"
+                style={styles.searchInput}
+                value={search}
+                onChangeText={setSearch}
+              />
+              {Platform.OS !== "web" && (
+                <TouchableOpacity style={styles.filterToggleBtn} onPress={() => setShowFilters(!showFilters)}>
+                  <Ionicons name={showFilters ? "close-outline" : "options-outline"} size={22} color="#fff" />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          {/* FILTERS */}
+          {shouldShowFilters && (
+            <View style={styles.filtersRow}>
+              {/* Programme — grouped */}
+              <View style={styles.filterItem}>
+                <FilterDropdown
+                  label="Programme"
+                  value={programme}
+                  onChange={setProgramme}
+                  options={[]}
+                  grouped={true}
+                />
+              </View>
+
+              {/* Batch Year */}
+              <View style={styles.filterItem}>
+                <FilterDropdown
+                  label="Batch"
+                  value={batchYear}
+                  onChange={setBatchYear}
+                  options={Array.from(
+                    { length: new Date().getFullYear() - 1989 + 1 },
+                    (_, i) => { const y = new Date().getFullYear() - i; return { label: String(y), value: String(y) }; }
+                  )}
+                />
+              </View>
+
+              {/* City */}
+              <View style={styles.filterItem}>
+                <FilterDropdown
+                  label="City"
+                  value={city}
+                  onChange={setCity}
+                  options={[
+                    { label: "Indore",    value: "Indore"    },
+                    { label: "Delhi",     value: "Delhi"     },
+                    { label: "Mumbai",    value: "Mumbai"    },
+                    { label: "Bangalore", value: "Bangalore" },
+                  ]}
+                />
+              </View>
+            </View>
           )}
         </View>
       </LinearGradient>
 
-      {/* FILTERS */}
-      <View style={styles.filterContainer}>
-        <FilterDropdown
-          label="Programme"
-          value={programme}
-          onChange={setProgramme}
-          options={[
-            { label: "BCA", value: "BCA" },
-            { label: "MCA", value: "MCA" },
-            { label: "MBA", value: "MBA" },
-            { label: "BBA", value: "BBA" },
-          ]}
-        />
-        <FilterDropdown
-          label="Batch"
-          value={batchYear}
-          onChange={setBatchYear}
-          options={Array.from(
-            { length: new Date().getFullYear() - 1989 + 1 },
-            (_, i) => {
-              const y = new Date().getFullYear() - i;
-              return { label: String(y), value: String(y) };
-            }
+      {/* LIST */}
+      <View style={styles.space}>
+        <FlatList
+          key={numColumns}
+          data={alumni}
+          numColumns={numColumns}
+          keyExtractor={item => item.id.toString()}
+          showsVerticalScrollIndicator={false}
+          removeClippedSubviews={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{
+            paddingHorizontal: SIDE_PADDING,
+            paddingBottom: 120,
+            paddingTop: 12,
+          }}
+          columnWrapperStyle={numColumns > 1 ? { justifyContent: "flex-start", marginBottom: GAP } : undefined}
+          ItemSeparatorComponent={() => <View style={{ height: GAP }} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          renderItem={({ item, index }) => (
+            <View style={{ marginRight: (index + 1) % numColumns === 0 ? 0 : GAP, marginBottom: GAP }}>
+              <AlumniCard
+                item={item}
+                cardWidth={cardWidth}
+                onPress={() => router.push({ pathname: "/alumniprofile", params: { id: item.id } })}
+              />
+            </View>
           )}
-        />
-        <FilterDropdown
-          label="City"
-          value={city}
-          onChange={setCity}
-          options={[
-            { label: "Indore", value: "Indore" },
-            { label: "Bhopal", value: "Bhopal" },
-            { label: "Delhi", value: "Delhi" },
-            { label: "Mumbai", value: "Mumbai" },
-            { label: "Bengaluru", value: "Bengaluru" },
-          ]}
+          ListEmptyComponent={
+            <View style={styles.emptyBox}>
+              <Ionicons name="people-outline" size={70} color="#CBD5E1" />
+              <Text style={styles.emptyText}>No alumni found</Text>
+            </View>
+          }
         />
       </View>
-
-      {/* ACTIVE FILTER CHIPS */}
-      {(programme || batchYear || city) && (
-        <View style={styles.chipRow}>
-          {programme && (
-            <TouchableOpacity style={styles.activeChip} onPress={() => setProgramme("")}>
-              <Text style={styles.activeChipText}>{programme}</Text>
-              <Ionicons name="close" size={12} color="#1d4ed8" />
-            </TouchableOpacity>
-          )}
-          {batchYear && (
-            <TouchableOpacity style={styles.activeChip} onPress={() => setBatchYear("")}>
-              <Text style={styles.activeChipText}>{batchYear}</Text>
-              <Ionicons name="close" size={12} color="#1d4ed8" />
-            </TouchableOpacity>
-          )}
-          {city && (
-            <TouchableOpacity style={styles.activeChip} onPress={() => setCity("")}>
-              <Text style={styles.activeChipText}>{city}</Text>
-              <Ionicons name="close" size={12} color="#1d4ed8" />
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity
-            onPress={() => { setProgramme(""); setBatchYear(""); setCity(""); }}
-          >
-            <Text style={styles.clearAll}>Clear all</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* LIST */}
-      <FlatList
-        data={alumni}
-        keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={styles.listContainer}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            activeOpacity={0.85}
-            style={styles.card}
-            onPress={() => router.push({ pathname: "/alumniprofile", params: { id: item.id } })}
-          >
-            {/* IMAGE */}
-            <View style={styles.imageBox}>
-              {item.profile_photo ? (
-                <Image
-                  source={{ uri: `http://192.168.29.217:2000/uploads/${item.profile_photo}` }}
-                  style={styles.profileImage}
-                  contentFit="cover"
-                />
-              ) : (
-                <Text style={styles.avatarText}>{item.full_name?.charAt(0)}</Text>
-              )}
-            </View>
-
-            {/* INFO */}
-            <View style={styles.info}>
-              <Text style={styles.name}>{item.full_name}</Text>
-              <Text style={styles.role}>{item.designation || "Alumni"}</Text>
-
-              <View style={styles.tagRow}>
-                <View style={styles.tag}>
-                  <Text style={styles.tagText}>🎓 {item.programme}</Text>
-                </View>
-                <View style={styles.tag}>
-                  <Text style={styles.tagText}>📅 {item.batch_year}</Text>
-                </View>
-              </View>
-
-              <Text style={styles.meta}>📍 {item.city}</Text>
-              {item.organisation && (
-                <Text style={styles.meta}>🏢 {item.organisation}</Text>
-              )}
-            </View>
-          </TouchableOpacity>
-        )}
-        ListEmptyComponent={
-          <View style={styles.emptyBox}>
-            <Ionicons name="people-outline" size={70} color="#cbd5e1" />
-            <Text style={styles.emptyText}>No alumni found</Text>
-          </View>
-        }
-      />
     </View>
   );
 }
 
-// =============================================
+// ======================================================
 // STYLES
-// =============================================
+// ======================================================
 const styles = StyleSheet.create({
-  container:  { flex: 1, backgroundColor: "#f1f5f9" },
-  loader:     { flex: 1, justifyContent: "center", alignItems: "center" },
-
-  topSection: {
-    paddingHorizontal: 18,
-    paddingTop: 20,
-    paddingBottom: 28,
-    borderTopWidth: 3,
-    borderTopColor: "#f59e0b",
-    elevation: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
+  container: { flex: 1 },
+  loader:    { flex: 1, justifyContent: "center", alignItems: "center" },
+  space: {
+    flex: 1, width: "94%", alignSelf: "center",
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 36, borderTopRightRadius: 36,
+    marginTop: Platform.OS === "web" ? -160 : -99,
+    paddingTop: 18, borderWidth: 1, borderColor: "#EEF2FF",
+    shadowColor: "#312EBA", shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.08, shadowRadius: 16, elevation: 12,
   },
-
-  heading:    { fontSize: 30, fontWeight: "800", color: "#fff" },
-  subHeading: { fontSize: 15, color: "#cbd5e1", marginTop: 5, marginBottom: 20 },
-
-  searchBox: {
-    backgroundColor: "#fff",
-    borderRadius: 18,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 14,
-    height: 56,
-    gap: 8,
+  heroSection: {
+    overflow: "hidden",
+    paddingTop: Platform.OS === "web" ? 30 : 20,
+    paddingBottom: Platform.OS === "web" ? 190 : 120,
+    paddingHorizontal: Platform.OS === "web" ? 24 : 16,
   },
-  searchInput: { flex: 1, fontSize: 15, color: "#111" },
-
-  // ── Filters ──
-  filterContainer: {
-    flexDirection: "row",
-    paddingHorizontal: 14,
-    marginTop: 16,
-    marginBottom: 8,
-    gap: 8,
+  heroContent:   { alignItems: Platform.OS === "web" ? "center" : "flex-start" },
+  heroTitle:     { color: "#fff", fontSize: Platform.OS === "web" ? 42 : 30, fontWeight: "800", textAlign: Platform.OS === "web" ? "center" : "left" },
+  heroSubtitle:  { color: "rgba(255,255,255,0.82)", fontSize: Platform.OS === "web" ? 16 : 13, marginTop: 8, marginBottom: 24, textAlign: Platform.OS === "web" ? "center" : "left" },
+  searchWrapper: { width: "100%", alignItems: "center" },
+  searchContainer: {
+    width: Platform.OS === "web" ? "78%" : "100%", height: 58,
+    backgroundColor: "#fff", borderRadius: 18,
+    flexDirection: "row", alignItems: "center", paddingHorizontal: 14,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12, shadowRadius: 12, elevation: 5,
   },
-
+  searchInput: { flex: 1, marginLeft: 14, color: "#111827", fontSize: 15, outlineStyle: "none" } as any,
+  filtersRow: {
+    flexDirection: Platform.OS === "web" ? "row" : "column",
+    width: "100%", justifyContent: "center", alignItems: "center",
+    marginTop: 22, gap: 12, paddingHorizontal: 16, flexWrap: "wrap",
+  },
+  filterItem:      { width: Platform.OS === "web" ? 220 : "100%" },
+  filterToggleBtn: { width: 44, height: 44, borderRadius: 14, backgroundColor: "#5B3DF5", justifyContent: "center", alignItems: "center", marginLeft: 10 },
   dropdownBox: {
-    flex: 1,
-    backgroundColor: "#fff",
-    borderRadius: 14,
-    borderWidth: 1.2,
-    borderColor: "#dbeafe",
-    height: 48,
-    justifyContent: "center",
-    overflow: "hidden",
-    elevation: 3,
-    shadowColor: "#1e3a8a",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
+    height: 48, backgroundColor: "rgba(255,255,255,0.10)",
+    borderRadius: 14, borderWidth: 1.5, borderColor: "rgba(255,255,255,0.18)",
+    overflow: "hidden", justifyContent: "center",
   },
-
-  picker: { height: 54, width: "100%", color: "#0f172a" },
-
-  // ── Active chips ──
-  chipRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    paddingHorizontal: 14,
-    gap: 8,
-    marginBottom: 8,
-    alignItems: "center",
-  },
-  activeChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#dbeafe",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
-    gap: 4,
-  },
-  activeChipText: { fontSize: 12, color: "#1d4ed8", fontWeight: "700" },
-  clearAll:       { fontSize: 12, color: "#ef4444", fontWeight: "700" },
-
-  // ── List ──
-  listContainer: { paddingHorizontal: 14, paddingBottom: 100 },
-
   card: {
-    backgroundColor: "#fff",
-    borderRadius: 22,
-    padding: 16,
-    marginBottom: 16,
-    flexDirection: "row",
-    elevation: 3,
+    backgroundColor: "#fff", borderRadius: 22, padding: 16,
+    borderWidth: 1, borderColor: "#EEF2FF",
+    shadowColor: "#000", shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06, shadowRadius: 10, elevation: 3,
   },
-
-  imageBox: {
-    width: 85, height: 85, borderRadius: 42.5,
-    backgroundColor: "#2563eb",
-    justifyContent: "center", alignItems: "center",
-    overflow: "hidden",
-  },
-  profileImage: { width: 85, height: 85, borderRadius: 42.5 },
-  avatarText:   { color: "#fff", fontSize: 30, fontWeight: "700" },
-
-  info:   { flex: 1, marginLeft: 16, justifyContent: "center" },
-  name:   { fontSize: 18, fontWeight: "700", color: "#0f172a", marginBottom: 5 },
-  role:   { fontSize: 14, color: "#2563eb", fontWeight: "600", marginBottom: 10 },
-  meta:   { fontSize: 13, color: "#64748b", marginBottom: 4 },
-
-  tagRow: { flexDirection: "row", marginBottom: 8 },
-  tag:    { backgroundColor: "#dbeafe", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, marginRight: 8 },
-  tagText:{ fontSize: 11, color: "#1d4ed8", fontWeight: "600" },
-
-  emptyBox:  { alignItems: "center", marginTop: 120 },
-  emptyText: { marginTop: 12, color: "#64748b", fontSize: 16, fontWeight: "600" },
+  cardTop:     { marginBottom: 18 },
+  userRow:     { flexDirection: "row", alignItems: "center" },
+  avatar:      { width: Platform.OS === "web" ? 60 : 58, height: Platform.OS === "web" ? 60 : 58, borderRadius: 50, justifyContent: "center", alignItems: "center", marginRight: 12 },
+  avatarImage: { width: Platform.OS === "web" ? 60 : 58, height: Platform.OS === "web" ? 60 : 58, borderRadius: 50, marginRight: 12 },
+  avatarText:  { color: "#fff", fontSize: 20, fontWeight: "800" },
+  name:        { fontSize: Platform.OS === "web" ? 20 : 18, fontWeight: "800", color: "#111827" },
+  role:        { marginTop: 4, fontSize: 14, color: "#64748B" },
+  tagRow:      { flexDirection: "row", gap: 10, marginBottom: 20 },
+  programTag:  { backgroundColor: "#F3E8FF", paddingHorizontal: 14, paddingVertical: 7, borderRadius: 50 },
+  batchTag:    { backgroundColor: "#E0F2FE", paddingHorizontal: 14, paddingVertical: 7, borderRadius: 50 },
+  programText: { color: "#6D28D9", fontWeight: "700", fontSize: 12 },
+  batchText:   { color: "#0369A1", fontWeight: "700", fontSize: 12 },
+  infoSection: { gap: 12 },
+  infoRow:     { flexDirection: "row", alignItems: "center" },
+  infoText:    { marginLeft: 10, color: "#475569", fontSize: 14 },
+  connectButton: { height: 50, borderRadius: 14, flexDirection: "row", alignItems: "center", justifyContent: "center" },
+  connectText:   { color: "#fff", marginLeft: 8, fontWeight: "700", fontSize: 14 },
+  emptyBox:    { alignItems: "center", marginTop: 120 },
+  emptyText:   { marginTop: 12, color: "#64748B", fontSize: 16, fontWeight: "600" },
 });

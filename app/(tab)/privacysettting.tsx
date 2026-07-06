@@ -2,19 +2,28 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
-
 import {
-    Alert,
-    StyleSheet,
-    Switch,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  Platform,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
-import Header from "../components/Header";
 
-const API_URL = "http://192.168.29.217:2000/privacy";
+export const showAlert = (title: string, message: string) => {
+  if (Platform.OS === "web") {
+    window.alert(`${title}\n${message}`);
+  } else {
+    Alert.alert(title, message);
+  }
+};
+
+import { LinearGradient } from "expo-linear-gradient";
+
+const API_URL = "http://10.232.80.175:2000/privacy";
 
 export default function PrivacySettingsScreen() {
  const router = useRouter();
@@ -47,7 +56,7 @@ export default function PrivacySettingsScreen() {
         setEmail(user.email);
 
         setShowEmail(
-          user.show_email === 1
+          user.show_email === 1 || user.show_email === true
         );
 
         setShowMobile(
@@ -86,20 +95,25 @@ export default function PrivacySettingsScreen() {
           show_organisation: showOrganisation,
         }
       );
+      // Yeh naya code axios.put ke baad add kiya
+const userData = await AsyncStorage.getItem("user");
+if (userData) {
+  const user = JSON.parse(userData);
+  await AsyncStorage.setItem("user", JSON.stringify({
+    ...user,
+    show_email:        showEmail        ? 1 : 0,
+    show_mobile:       showMobile       ? 1 : 0,
+    show_organisation: showOrganisation ? 1 : 0,
+  }));
+}
       console.log(res.data);
-      Alert.alert(
-        "Success",
-        "Privacy settings updated"
-      );
-
+      showAlert("Success ✅", "Privacy settings updated");
+      router.back();
     } catch (err) {
 
       console.log(err);
 
-      Alert.alert(
-        "Error",
-        "Update failed"
-      );
+      showAlert("Error", "Update failed");
 
     }
   };
@@ -112,7 +126,12 @@ export default function PrivacySettingsScreen() {
 
     <View style={styles.container}>
 
-      <Header />
+<LinearGradient
+    colors={["#312EBA", "#5B21B6", "#EC1D8F"]}
+  start={{ x: 0, y: 0 }}
+  end={{ x: 1, y: 0}}
+  style={styles.topSection}
+>
 
       <Text style={styles.heading}>
         Privacy Settings
@@ -121,7 +140,7 @@ export default function PrivacySettingsScreen() {
       <Text style={styles.subHeading}>
         Control what other alumni can see
       </Text>
-
+      </LinearGradient>
       {/* EMAIL */}
       <View style={styles.card}>
 
@@ -219,18 +238,29 @@ const styles = StyleSheet.create({
     backgroundColor: "#f5f7fb",
    
   },
-
+  topSection: {
+    paddingHorizontal: 18,
+    
+    paddingBottom: 10,
+    elevation: 10,
+  color:"#fff",
+    alignItems: Platform.OS === "web" ?"center":"flex-start",
+  },
   heading: {
-    fontSize: 28,
+    
+    fontSize: Platform.OS === "web" ?42:30,
     fontWeight: "700",
-    color: "#222",
+    color: "#fff",
     marginTop: 20,
+    textAlign:"center"
   },
 
   subHeading: {
-    color: "#777",
+    color: "#fff",
     marginTop: 6,
     marginBottom: 25,
+    textAlign:"center",
+    fontSize: Platform.OS === "web" ?15:15,
   },
 
   ////////////////////////////////////////////////////////
@@ -238,10 +268,11 @@ const styles = StyleSheet.create({
   ////////////////////////////////////////////////////////
 
   card: {
+    marginTop: 26,
     backgroundColor: "#fff",
     borderRadius: 20,
     padding: 18,
-
+    marginHorizontal:Platform.OS === "web" ? 46:19,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -280,6 +311,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flex: 1,
     marginRight: 10,
+    marginHorizontal: Platform.OS === "web" ? 46:9,
   },
   
   backBtn: {
@@ -288,6 +320,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: "center",
     flex: 1,
+    marginHorizontal: Platform.OS === "web" ? 46:9,
   },
 
   saveText: {

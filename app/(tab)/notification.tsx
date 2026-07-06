@@ -4,9 +4,9 @@ import axios from "axios";
 import React, { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Header from "../components/Header";
 
-const API = "http://192.168.29.217:2000";
+
+const API = "http://10.232.80.175:2000";
 
 const iconMap: any = {
   lecture:    { icon: "mic",           bg: "#EEF2FF", color: "#4F46E5" },
@@ -50,8 +50,8 @@ export default function NotificationsScreen() {
   };
 
   return (
-    <SafeAreaView style={ns.container}>
-      <Header />
+    <View style={ns.container}>
+   
       <View style={ns.topBar}>
         <Text style={ns.title}>Notifications</Text>
         {notifications.some(n => !n.is_read) && (
@@ -83,7 +83,7 @@ export default function NotificationsScreen() {
           })
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 

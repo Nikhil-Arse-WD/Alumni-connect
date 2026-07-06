@@ -30,8 +30,9 @@ const menuItems = [
   { title: "Events",         route: "event",           icon: "calendar-outline" },
   { title: "Discussion Forum",          route: "forum",           icon: "chatbubbles-outline" },
   { title: "Job Board",      route: "jobs",            icon: "briefcase-outline" },
-  { title: "Contributions",  route: "donation",   icon: "heart-outline" },
+  { title: "Giving Back",  route: "donation",   icon: "heart-outline" },
   { title: "Notifications",  route: "notifications",   icon: "notifications-outline" },
+  { title: "Admin Management", route: "add_admin", icon: "shield-checkmark-outline" },
   { title: "Logout",         route: "logout",          icon: "log-out-outline" },
 ];
 export default function Sidebar({

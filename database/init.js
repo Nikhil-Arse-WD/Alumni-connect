@@ -215,20 +215,32 @@ app.post("/forum/create", (req, res) => {
 });
 
 app.get("/forum/posts", (req, res) => {
+  const user_id = req.query.user_id || null;
+  const escapedId = user_id ? db.escape(user_id) : null;
+
   const sql = `
-    SELECT forum_posts.*, alumni_members.full_name, alumni_members.profile_photo,
-      alumni_members.programme, alumni_members.batch_year
+    SELECT 
+      forum_posts.*, 
+      alumni_members.full_name, 
+      alumni_members.profile_photo,
+      alumni_members.programme, 
+      alumni_members.batch_year,
+      ${escapedId
+        ? `(SELECT COUNT(*) FROM forum_likes fl WHERE fl.post_id = forum_posts.id AND fl.user_id = ${escapedId}) AS liked_by_user,
+           (SELECT COUNT(*) FROM forum_reports fr WHERE fr.post_id = forum_posts.id AND fr.reported_by = ${escapedId}) AS reported_by_user`
+        : `0 AS liked_by_user, 0 AS reported_by_user`
+      }
     FROM forum_posts
     JOIN alumni_members ON forum_posts.user_id = alumni_members.id
     WHERE forum_posts.status = 'ACTIVE'
     ORDER BY forum_posts.id DESC
   `;
+
   db.query(sql, (err, result) => {
     if (err) return res.status(500).json({ success: false });
     res.json({ success: true, data: result });
   });
 });
-
 app.post("/forum/like", (req, res) => {
   const { post_id, user_id } = req.body;
   db.query("SELECT * FROM forum_likes WHERE post_id=? AND user_id=?", [post_id, user_id], (err, result) => {
@@ -297,7 +309,6 @@ app.post("/forum/report", (req, res) => {
 // ── FORUM COUNT
 app.get("/forum/count/:userId", (req, res) => {
   const userId = req.params.userId;
-
   db.query(
     `SELECT seen_at FROM forum_user_seen WHERE user_id = ?`,
     [userId],
@@ -496,16 +507,26 @@ app.post("/admin/login", (req, res) => {
     if (!result || result.length === 0) return res.status(401).json({ success: false, message: "Invalid email" });
     const admin = result[0];
     if (password !== admin.password) return res.status(401).json({ success: false, message: "Invalid password" });
-    return res.json({ success: true, message: "Login success", token: "dummy-admin-token", admin: { id: admin.id, name: admin.name, email: admin.email, role: "admin" } });
+    return res.json({
+      success: true,
+      message: "Login success",
+      token: "dummy-admin-token",
+      admin: {
+        id: admin.id,
+        name: admin.name,
+        email: admin.email,
+        role: admin.role,  // ✅ यही fix है
+      },
+    });
   });
 });
 
 app.post("/admin/create-event", uploadEvent.single("cover_photo"), (req, res) => {
-  const { title, description, venue, event_date, event_time, capacity } = req.body;
+  const { title, description, venue, event_date, event_time, capacity,status } = req.body;
   const cover_photo = req.file ? `/uploads/events/${req.file.filename}` : null;
   db.query(
-    "INSERT INTO events (title, description, venue, event_date, event_time, capacity, cover_photo) VALUES (?, ?, ?, ?, ?, ?, ?)",
-    [title, description, venue, event_date, event_time, capacity, cover_photo],
+    "INSERT INTO events (title, description, venue, event_date, event_time, capacity, cover_photo,status) VALUES (?, ?, ?, ?, ?, ?, ?,?)",
+    [title, description, venue, event_date, event_time, capacity, cover_photo,status],
     (err) => {
       if (err) return res.json({ success: false, message: "Database Error" });
       res.json({ success: true, message: "Event Created Successfully", token: "321" });
@@ -908,6 +929,143 @@ app.get("/contributions/community", (req, res) => {
       data: result,
     });
   });
+});
+// =====================================
+// ADMIN MANAGEMENT ROUTES
+// Yeh routes server.js mein add karo
+// existing /admin/login ke neeche
+// =====================================
+
+// GET all admins
+app.get("/admin/admins", (req, res) => {
+  db.query(
+    `SELECT id, name, email, phone, role, last_login, created_at
+     FROM admins ORDER BY id DESC`,
+    (err, result) => {
+      if (err) return res.status(500).json({ success: false });
+      res.json({ success: true, data: result });
+    }
+  );
+});
+
+// POST create admin
+app.post("/admin/admins", async (req, res) => {
+  const { name, email, password, phone, role } = req.body;
+  if (!name || !email || !password)
+    return res.status(400).json({ success: false, message: "Name, email and password required" });
+
+  try {
+   
+    db.query(
+      `INSERT INTO admins (name, email, password, phone, role)
+       VALUES (?, ?, ?, ?, ?)`,
+      [name, email, password, phone || null, role || "admin"],
+      (err) => {
+        if (err) {
+          if (err.code === "ER_DUP_ENTRY")
+            return res.status(409).json({ success: false, message: "Email already exists" });
+          return res.status(500).json({ success: false, message: "Database Error" });
+        }
+        res.json({ success: true, message: "Admin created ✅" });
+      }
+    );
+  } catch {
+    res.status(500).json({ success: false, message: "Server Error" });
+  }
+});
+
+// PUT update admin
+app.put("/admin/admins/:id", async (req, res) => {
+  const { name, email, password, phone, role } = req.body;
+  try {
+    if (password && password.trim()) {
+    //  const hashed = await bcrypt.hash(password, 10);
+      db.query(
+        `UPDATE admins SET name=?, email=?, password=?, phone=?, role=? WHERE id=?`,
+        [name, email, password, phone || null, role, req.params.id],
+        (err) => {
+          if (err) return res.status(500).json({ success: false });
+          res.json({ success: true, message: "Admin updated ✅" });
+        }
+      );
+    } else {
+      db.query(
+        `UPDATE admins SET name=?, email=?, phone=?, role=? WHERE id=?`,
+        [name, email, phone || null, role, req.params.id],
+        (err) => {
+          if (err) return res.status(500).json({ success: false });
+          res.json({ success: true, message: "Admin updated ✅" });
+        }
+      );
+    }
+  } catch {
+    res.status(500).json({ success: false, message: "Server Error" });
+  }
+});
+
+// DELETE admin
+app.delete("/admin/admins/:id", (req, res) => {
+  db.query(`DELETE FROM admins WHERE id = ?`, [req.params.id], (err) => {
+    if (err) return res.status(500).json({ success: false });
+    res.json({ success: true, message: "Admin deleted" });
+  });
+});
+
+app.post("/admin/delete-request", (req, res) => {
+  const { requester_id } = req.body;
+  // Pehle check karo pending request already hai ya nahi
+  db.query(
+    `SELECT * FROM admin_delete_requests WHERE requester_id = ? AND status = 'Pending'`,
+    [requester_id],
+    (err, result) => {
+      if (result && result.length > 0)
+        return res.json({ success: false, message: "Request already pending" });
+      db.query(
+        `INSERT INTO admin_delete_requests (requester_id) VALUES (?)`,
+        [requester_id],
+        (err2) => {
+          if (err2) return res.status(500).json({ success: false });
+          res.json({ success: true, message: "Delete request sent to Super Admin" });
+        }
+      );
+    }
+  );
+});
+
+
+app.get("/admin/delete-requests", (req, res) => {
+  db.query(
+    `SELECT r.*, a.name, a.email, a.role 
+     FROM admin_delete_requests r
+     JOIN admins a ON r.requester_id = a.id
+     WHERE r.status = 'Pending'
+     ORDER BY r.created_at DESC`,
+    (err, result) => {
+      if (err) return res.status(500).json({ success: false });
+      res.json({ success: true, data: result });
+    }
+  );
+});
+
+
+app.put("/admin/delete-request/:id", (req, res) => {
+  const { status, requester_id } = req.body; // status: 'Approved' or 'Rejected'
+  db.query(
+    `UPDATE admin_delete_requests SET status = ? WHERE id = ?`,
+    [status, req.params.id],
+    (err) => {
+      if (err) return res.status(500).json({ success: false });
+      // Agar approved — account delete karo
+      if (status === "Approved") {
+        db.query(`DELETE FROM admins WHERE id = ?`, [requester_id], (err2) => {
+          if (err2) return res.status(500).json({ success: false });
+          res.json({ success: true, message: "Admin deleted after approval" });
+        });
+      } else {
+        res.json({ success: true, message: "Request rejected" });
+      }
+    }
+  );
 });
 // =====================================
 // SERVER

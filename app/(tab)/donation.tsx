@@ -8,9 +8,9 @@ import {
   Platform, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View
 } from "react-native";
-import Header from "../components/Header";
 
-const API = "http://192.168.29.217:2000";
+
+const API = "http://10.232.80.175:2000";
 
 const TABS = [
   "Lecture",
@@ -154,11 +154,14 @@ export default function ContributionsScreen() {
   };
   return (
     <View style={styles.container}>
-      <Header />
+     
       <ScrollView showsVerticalScrollIndicator={false}>
 
         {/* HERO */}
-        <LinearGradient colors={["#0f172a", "#1e3a8a"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+        <LinearGradient colors={["#312EBA", "#5B21B6", "#EC1D8F"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.hero}>
           <Text style={styles.heroTitle}>Giving Back 💛</Text>
           <Text style={styles.heroSub}>Lecture • Mentor • Donate — contribute to your alma mater</Text>
         </LinearGradient>
@@ -571,10 +574,10 @@ const styles = StyleSheet.create({
   hero: {
     paddingHorizontal: 18, paddingTop: 20, paddingBottom: 28,
    
-    borderTopWidth: 3, borderTopColor: "#f59e0b",
+    
   },
-  heroTitle: { color: "#fff", fontSize: 28, fontWeight: "800" },
-  heroSub: { color: "#cbd5e1", fontSize: 14, marginTop: 6 },
+  heroTitle: { color: "#fff",   fontSize: Platform.OS === "web" ?35:30, fontWeight: "800" , textAlign: Platform.OS === "web" ?"center":"left",},
+  heroSub: { color: "#cbd5e1", fontSize: 14, marginTop: 6 ,textAlign: Platform.OS === "web" ?"center":"left"},
   tabsRow: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 4, gap: 10 },
   tabBtn: { backgroundColor: "#E2E8F0", paddingHorizontal: 18, paddingVertical: 11, borderRadius: 14 },
   activeTab: { backgroundColor: "#4F46E5" },
