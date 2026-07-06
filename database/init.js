@@ -14,6 +14,29 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+const rateLimit = require("express-rate-limit");
+
+// General limiter: Max 100 requests per 15 minutes per IP
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, 
+  max: 100,
+  message: "Too many requests from this IP, please try again after 15 minutes"
+});
+
+// Strict limiter specifically for Login and Payment routes to prevent brute-forcing
+const strictLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, 
+  max: 10, // Only 10 attempts allowed
+  message: "Too many attempts, please try again later."
+});
+
+// Apply general limiter to all routes
+app.use(generalLimiter);
+
+// Apply strict limiter to sensitive routes
+app.use("/login", strictLimiter);
+app.use("/admin/login", strictLimiter);
+app.use("/pay/initiate", strictLimiter);
 
 if (!fs.existsSync("uploads")) fs.mkdirSync("uploads");
 if (!fs.existsSync("uploads/events")) fs.mkdirSync("uploads/events", { recursive: true });
@@ -21,33 +44,45 @@ if (!fs.existsSync("uploads/event-gallery")) fs.mkdirSync("uploads/event-gallery
 if (!fs.existsSync("uploads/banners")) fs.mkdirSync("uploads/banners", { recursive: true });
 
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-
+// ── 1. PROFILE PHOTOS STORAGE (UPDATED) ──
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "uploads/"),
-  filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname),
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  },
 });
 const upload = multer({ storage });
 
+// ── 2. EVENT COVER PHOTOS STORAGE (UPDATED) ──
 const eventStorage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "uploads/events"),
-  filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname),
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  },
 });
 const uploadEvent = multer({ storage: eventStorage });
 
+// ── 3. EVENT GALLERY STORAGE (ALREADY GOOD - KEPT CLEAN) ──
 const galleryStorage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "uploads/event-gallery"),
-  filename: (req, file, cb) =>
-    cb(null, Date.now() + "-" + Math.round(Math.random() * 1e9) + path.extname(file.originalname)),
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  },
 });
 const uploadGallery = multer({ storage: galleryStorage });
 
+// ── 4. BANNER AD STORAGE (ALREADY GOOD - KEPT CLEAN) ──
 const bannerStorage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "uploads/banners"),
-  filename: (req, file, cb) =>
-    cb(null, Date.now() + "-" + Math.round(Math.random() * 1e9) + path.extname(file.originalname)),
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  },
 });
 const uploadBanner = multer({ storage: bannerStorage });
-
 // ── Helper: notification insert
 const sendNotification = (alumni_id, title, message, type = "general") => {
   db.query(
@@ -58,13 +93,16 @@ const sendNotification = (alumni_id, title, message, type = "general") => {
 };
 
 // =====================================
-// MYSQL CONNECTION
+// MYSQL CONNECTION for multiple user base 
 // =====================================
-const db = mysql.createConnection({
+const db = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
+  waitForConnections: true,
+  connectionLimit: 10, // Adjust based on your server capacity
+  queueLimit: 0
 });
 
 db.connect((err) => {
