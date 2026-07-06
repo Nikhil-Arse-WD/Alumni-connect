@@ -3,13 +3,13 @@ import axios from "axios";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  Alert,
-  Platform,
-  StyleSheet,
-  Switch,
-  Text,
-  TouchableOpacity,
-  View,
+    Alert,
+    Platform,
+    StyleSheet,
+    Switch,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 
@@ -23,7 +23,7 @@ export const showAlert = (title: string, message: string) => {
 
 import { LinearGradient } from "expo-linear-gradient";
 
-const API_URL = "http://10.232.80.175:2000/privacy";
+const API_URL = "http://10.254.25.118:2000/privacy";
 
 export default function PrivacySettingsScreen() {
  const router = useRouter();

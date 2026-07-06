@@ -1,5 +1,4 @@
 {
-  
   "expo": {
     "name": "Alumni Connect",
     "slug": "svimsaa",
@@ -29,7 +28,6 @@
       },
       "package": "com.anonymous.svimsaa"
     },
-    
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png"
@@ -48,8 +46,8 @@
           }
         }
       ],
-     
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

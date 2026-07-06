@@ -1,3 +1,4 @@
+
 import {
   Ionicons,
   MaterialCommunityIcons,
@@ -10,13 +11,13 @@ import React, { useState } from "react";
 
 import {
   Alert,
+  Image,
   Platform,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TextInput,
-  Image,
   TouchableOpacity,
   useWindowDimensions,
   View,
@@ -24,12 +25,10 @@ import {
 
 import { SafeAreaView } from "react-native-safe-area-context";
 
-const USER_API =
-  "http://10.232.80.175:2000/login";
+const USER_API = process.env.EXPO_PUBLIC_API_BASE + "/login";
 
-const ADMIN_API =
-  "http://10.232.80.175:2000/admin/login";
-
+const ADMIN_API = process.env.EXPO_PUBLIC_API_BASE + "/admin/login";
+  
 function FormContent({
   form,
   handleChange,
@@ -295,8 +294,18 @@ export default function LoginScreen() {
           "Success ✅",
           "Login Successful 🚀"
         );
-        router.replace(selectedRole === "admin" ? "/admin/dashboard" : "/(tab)");
-    
+
+        // ───────────────────────────────────────────────────────────────
+        // First-login password change check (user role only)
+        // is_password_changed === 0  →  force redirect to changepassword
+        // is_password_changed === 1  →  normal flow to home/admin dashboard
+        // ───────────────────────────────────────────────────────────────
+        if (selectedRole === "user" && data.is_password_changed === 0) {
+          router.replace("/change_password");
+        } else {
+          router.replace(selectedRole === "admin" ? "/admin/dashboard" : "/(tab)");
+        }
+ 
       } catch (error: any) {
         showAlert(
           "Error ❌ ",

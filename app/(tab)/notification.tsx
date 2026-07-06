@@ -3,10 +3,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import React, { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 
-const API = "http://10.232.80.175:2000";
+const API = "http://10.254.25.118:2000";
 
 const iconMap: any = {
   lecture:    { icon: "mic",           bg: "#EEF2FF", color: "#4F46E5" },

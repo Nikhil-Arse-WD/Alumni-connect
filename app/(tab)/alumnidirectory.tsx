@@ -10,19 +10,19 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  FlatList,
-  Platform,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-  useWindowDimensions,
+    ActivityIndicator,
+    FlatList,
+    Platform,
+    RefreshControl,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+    useWindowDimensions,
 } from "react-native";
 
-const API_URL = "http://10.232.80.175:2000/alumni";
+const API_URL = "http://10.254.25.118:2000/alumni";
 
 // ── Programme groups (same as register) ─────────────────────────────────────
 const PROGRAMME_GROUPS = [
@@ -166,7 +166,7 @@ function AlumniCard({ item, onPress, cardWidth }: { item: any; onPress: () => vo
         <View style={styles.userRow}>
           {item.profile_photo ? (
             <Image
-              source={{ uri: `http://10.232.80.175:2000/uploads/${item.profile_photo}` }}
+              source={{ uri: `http://10.254.25.118:2000/uploads/${item.profile_photo}` }}
               style={styles.avatarImage} contentFit="cover" />
           ) : (
             <LinearGradient colors={[getAvatarColor(item.full_name), "#8B5CF6"]} style={styles.avatar}>

@@ -1,59 +1,28 @@
-
+import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { LinearGradient } from "expo-linear-gradient";
 import {
-  ActivityIndicator,
-  Alert,
-  Linking,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  Platform,
-  TouchableOpacity,
-  View,
-  useWindowDimensions,
+    ActivityIndicator,
+    Alert,
+    Linking,
+    Platform,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+    useWindowDimensions,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 
-const API_URL = "http://10.232.80.175:2000/alumni/profile";
+const API_URL = "http://10.254.25.118:2000/alumni/profile";
 
 const AVATAR_COLORS = ["#378ADD","#D4537E","#1D9E75","#BA7517","#7F77DD","#D85A30"];
 const getAvatarColor = (name = "") => AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length];
 const getInitials    = (name = "") => name.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase();
-
-// ─── Masking helpers ──────────────────────────────────────────────
-// Email: a***@gmail.com  (show first char + domain)
-const maskEmail = (email: string) => {
-  if (!email) return null;
-  const [local, domain] = email.split("@");
-  if (!domain) return email[0] + "***";
-  const visibleLocal = local.slice(0, Math.min(2, local.length));
-  const maskedLocal  = visibleLocal + "*".repeat(Math.max(3, local.length - visibleLocal.length));
-  return `${maskedLocal}@${domain}`;
-};
-
-// Phone: 98***43210  (show first 2 + last 3 chars)
-const maskPhone = (phone: string) => {
-  if (!phone) return null;
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length < 6) return phone[0] + "***";
-  const start  = digits.slice(0, 2);
-  const end    = digits.slice(-3);
-  const masked = "*".repeat(digits.length - 5);
-  return `${start}${masked}${end}`;
-};
-
-// City: show first word, mask second  (e.g. "New X***")
-const maskCity = (city: string) => {
-  if (!city) return null;
-  const parts = city.trim().split(" ");
-  if (parts.length === 1) return parts[0][0] + "***";
-  return parts[0] + " " + parts[1][0] + "***";
-};
 
 export default function AlumniProfileScreen() {
   const router        = useRouter();
@@ -80,33 +49,22 @@ export default function AlumniProfileScreen() {
   if (!user)   return <View style={styles.loader}><Text>User not found</Text></View>;
 
   // ── Decide what to show ──────────────────────────────────────────
-  // If field is hidden (null/empty from server), show masked placeholder
-  const displayEmail = user.email
-    ? (user.hide_email  ? maskEmail(user.email)  : user.email)
-    : null;
+  // Hidden/masking flags removed — always show actual values when present
+  const emailDisplay  = user.email  ?? "Not provided";
+  const phoneDisplay  = user.mobile ?? "Not provided";
+  const cityDisplay   = user.city
+    ? `${user.city}${user.country ? ", " + user.country : ""}`
+    : "Not provided";
 
-  const displayPhone = user.mobile
-    ? (user.hide_mobile ? maskPhone(user.mobile) : user.mobile)
-    : null;
-
-  const displayCity = user.city
-    ? (user.hide_city   ? maskCity(user.city)    : user.city)
-    : null;
-
-  // If server hides the field entirely (returns null), show generic mask
-  const emailDisplay  = displayEmail  ?? "••••@•••••.com";
-  const phoneDisplay  = displayPhone  ?? "+91 •••• ••••••";
-  const cityDisplay   = displayCity   ?? "•••••, India";
-
-  const isEmailHidden = !user.email   || user.hide_email;
-  const isPhoneHidden = !user.mobile  || user.hide_mobile;
-  const isCityHidden  = !user.city    || user.hide_city;
+  const isEmailHidden = !user.email;
+  const isPhoneHidden = !user.mobile;
+  const isCityHidden  = !user.city;
 
   const handleEmail = () => {
-    if (user.email && !user.hide_email) Linking.openURL(`mailto:${user.email}`);
+    if (user.email) Linking.openURL(`mailto:${user.email}`);
   };
   const handleCall = () => {
-    if (user.mobile && !user.hide_mobile) Linking.openURL(`tel:${user.mobile}`);
+    if (user.mobile) Linking.openURL(`tel:${user.mobile}`);
   };
 
   return (
@@ -132,7 +90,7 @@ export default function AlumniProfileScreen() {
             <View style={[styles.avatarBox, { backgroundColor: getAvatarColor(user.full_name) }]}>
               {user.profile_photo ? (
                 <Image
-                  source={{ uri: `http://192.168.29.217:2000/uploads/${user.profile_photo}` }}
+                  source={{ uri: `http://10.254.25.118:2000/uploads/${user.profile_photo}` }}
                   style={styles.profileImage} contentFit="cover"
                 />
               ) : (
@@ -152,23 +110,34 @@ export default function AlumniProfileScreen() {
                 <Text style={styles.badgeGreenText}>{user.batch_year}</Text>
               </View>
             </View>
-
+            <View  style={styles.aRow} >
+            <TouchableOpacity
+                style={[styles.emailBtn, isEmailHidden && styles.btnDisabled]}
+                onPress={handleEmail}
+              >
+                <Ionicons name={isEmailHidden ? "mail" : "mail"} size={16} color="#fff" />
+                <Text style={styles.emailText}>{isEmailHidden ? "N/A" : "Email"}</Text>
+              </TouchableOpacity>
+              </View>
             <View style={styles.actionRow}>
               <TouchableOpacity
                 style={[styles.primaryBtn, isEmailHidden && styles.btnDisabled]}
-                onPress={handleEmail}
+                onPress={() => Linking.openURL(
+                  `https://wa.me/${user.mobile}`
+                )}
               >
-                <Ionicons name={isEmailHidden ? "mail" : "mail-outline"} size={16} color="#fff" />
-                <Text style={styles.primaryBtnText}>{isEmailHidden ? "Hidden" : "Message"}</Text>
+                <Ionicons name={isEmailHidden ? "mail" : "logo-whatsapp"} size={16} color="#fff" />
+                <Text style={styles.primaryBtnText}>{isEmailHidden ? "N/A" : "Message"}</Text>
               </TouchableOpacity>
 
+              
               <TouchableOpacity
                 style={[styles.secondaryBtn, isPhoneHidden && styles.btnDisabledSecondary]}
                 onPress={handleCall}
               >
-                <Ionicons name={isPhoneHidden ? "call" : "call-outline"} size={16} color={isPhoneHidden ? "#9ca3af" : "#111827"} />
+                <Ionicons name={isPhoneHidden ? "call" : "call-outline"} size={16} color={isPhoneHidden ? "#9ca3af" : "#fff"} />
                 <Text style={[styles.secondaryBtnText, isPhoneHidden && { color: "#9ca3af" }]}>
-                  {isPhoneHidden ? "Hidden" : "Call"}
+                  {isPhoneHidden ? "N/A" : "Call"}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -217,14 +186,8 @@ export default function AlumniProfileScreen() {
                 <View style={styles.contactText}>
                   <View style={styles.contactLabelRow}>
                     <Text style={styles.contactLabel}>Email</Text>
-                    {isEmailHidden && (
-                      <View style={styles.hiddenBadge}>
-                        <Ionicons name="lock-closed" size={9} color="#9ca3af" />
-                        <Text style={styles.hiddenBadgeText}>Private</Text>
-                      </View>
-                    )}
                   </View>
-                  <Text style={[styles.contactValue, isEmailHidden && styles.maskedText]} numberOfLines={1}>
+                  <Text style={styles.contactValue} numberOfLines={1}>
                     {emailDisplay}
                   </Text>
                 </View>
@@ -242,14 +205,8 @@ export default function AlumniProfileScreen() {
                 <View style={styles.contactText}>
                   <View style={styles.contactLabelRow}>
                     <Text style={styles.contactLabel}>Mobile</Text>
-                    {isPhoneHidden && (
-                      <View style={styles.hiddenBadge}>
-                        <Ionicons name="lock-closed" size={9} color="#9ca3af" />
-                        <Text style={styles.hiddenBadgeText}>Private</Text>
-                      </View>
-                    )}
                   </View>
-                  <Text style={[styles.contactValue, isPhoneHidden && styles.maskedText]}>
+                  <Text style={styles.contactValue}>
                     {phoneDisplay}
                   </Text>
                 </View>
@@ -263,15 +220,9 @@ export default function AlumniProfileScreen() {
                 <View style={styles.contactText}>
                   <View style={styles.contactLabelRow}>
                     <Text style={styles.contactLabel}>Location</Text>
-                    {isCityHidden && (
-                      <View style={styles.hiddenBadge}>
-                        <Ionicons name="lock-closed" size={9} color="#9ca3af" />
-                        <Text style={styles.hiddenBadgeText}>Private</Text>
-                      </View>
-                    )}
                   </View>
-                  <Text style={[styles.contactValue, isCityHidden && styles.maskedText]}>
-                    {isCityHidden ? cityDisplay : `${user.city}${user.country ? ", " + user.country : ""}`}
+                  <Text style={styles.contactValue}>
+                    {cityDisplay}
                   </Text>
                 </View>
               </View>
@@ -348,15 +299,20 @@ const styles = StyleSheet.create({
   badgeGreen:    { backgroundColor: "#E1F5EE" },
   badgeGreenText:{ color: "#085041", fontWeight: "700", fontSize: 13 },
 
+  aRow:   { flexDirection: "row", gap: 10, marginTop: 24, width: "50%" },
   actionRow:   { flexDirection: "row", gap: 10, marginTop: 24, width: "100%" },
-  primaryBtn:  { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: "#D4537E", paddingVertical: 13, borderRadius: 14 },
+
+  emailBtn:  { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: "#2563EB", paddingVertical: 13, borderRadius: 14,borderColor: "#2563EB"},
+  emailText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+
+  primaryBtn:  { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: "#25D366", paddingVertical: 13, borderRadius: 14,borderColor: "#25D366" },
   primaryBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
-  secondaryBtn:{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: "#fff", borderWidth: 1, borderColor: "#e5e7eb", paddingVertical: 13, borderRadius: 14 },
-  secondaryBtnText: { color: "#111827", fontWeight: "700", fontSize: 14 },
+  secondaryBtn:{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: "#0A84FF", borderWidth: 1, borderColor: "#0A84FF", paddingVertical: 13, borderRadius: 14 },
+  secondaryBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
   btnDisabled:          { backgroundColor: "#e5e7eb" },
   btnDisabledSecondary: { borderColor: "#e5e7eb", backgroundColor: "#f9fafb" },
 
-  detailsColumn: { flex: 1, gap: 16 },
+  detailsColumn: { flex: 1, gap: 16 , marginBottom: 44},
   infoCard: { backgroundColor: "#fff", borderRadius: 24, padding: 22, borderWidth: 1, borderColor: "rgba(0,0,0,0.05)" },
   sectionLabel: { fontSize: 12, color: "#6b7280", fontWeight: "700", marginBottom: 18, letterSpacing: 0.5 },
   infoGrid:  { gap: 18 },
@@ -371,10 +327,5 @@ const styles = StyleSheet.create({
   contactLabelRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 },
   contactLabel:    { fontSize: 12, color: "#6b7280" },
 
-  hiddenBadge: { flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "#f3f4f6", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
-  hiddenBadgeText: { fontSize: 9, color: "#9ca3af", fontWeight: "600" },
-
   contactValue: { fontSize: 15, color: "#111827", fontWeight: "600" },
-  maskedText:   { color: "#9ca3af", letterSpacing: 1.5, fontFamily: Platform.OS === "ios" ? "Courier" : "monospace" },
 });
-

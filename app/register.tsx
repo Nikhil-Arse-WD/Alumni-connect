@@ -4,47 +4,29 @@ import { Picker } from "@react-native-picker/picker";
 import axios from "axios";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
+import * as ExpoLinking from "expo-linking"; // Safe linking import
 import { useRouter } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
 import React, { useState } from "react";
 import {
-  Alert, Image, Linking, Platform, ScrollView,
-  StyleSheet, Text, TextInput,
-  TouchableOpacity, View,
+  Alert, Image, Modal, Platform, ScrollView,
+  StyleSheet, Text, TextInput, TouchableOpacity, View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-let RazorpayCheckout: any = null;
-if (Platform.OS !== "web") {
-  try {
-    const mod = require("react-native-razorpay");
-    RazorpayCheckout = mod?.default ?? mod;
-    if (typeof RazorpayCheckout?.open !== "function") RazorpayCheckout = null;
-  } catch (e) {
-    console.log("react-native-razorpay not available:", e);
-  }
-}
+// Base API URL dynamically loaded from .env
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE; 
+const MEMBERSHIP_AMOUNT = 1100;
+const isWeb = Platform.OS === "web";
 
-const API_URL           = "http://10.232.80.175:2000/register";
-const RAZORPAY_KEY      = "rzp_test_SyMiNHvIPkKFhI";
-const MEMBERSHIP_AMOUNT = 11000;
-const isWeb             = Platform.OS === "web";
-
-const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+// Generate an array of years from the current year down to 50 years ago
+const currentYear = new Date().getFullYear();
+const YEAR_OPTIONS = Array.from({ length: 50 }, (_, i) => String(currentYear - i));
 
 const isValidEmail  = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
-const isValidMobile = (m: string) => /^[6-9]\d{9}$/.test(m.replace(/[\s\-\+]/g, ""));
+// Validates any number between 7 and 15 digits (standard international length)
+const isValidMobile = (m: string) => /^\d{7,15}$/.test(m.replace(/[\s\-\+]/g, ""));
 
-const loadRazorpayScript = (): Promise<boolean> =>
-  new Promise(resolve => {
-    if ((window as any).Razorpay) return resolve(true);
-    const s = document.createElement("script");
-    s.src = "https://checkout.razorpay.com/v1/checkout.js";
-    s.onload  = () => resolve(true);
-    s.onerror = () => resolve(false);
-    document.body.appendChild(s);
-  });
-
-// ── Programme options — grouped ───────────────────────────────────────────────
 const PROGRAMME_GROUPS = [
   {
     group: "Management",
@@ -67,53 +49,60 @@ const PROGRAMME_GROUPS = [
   },
 ];
 
-// ── Flat list for mobile Picker ───────────────────────────────────────────────
+const INDUSTRY_OPTIONS = [
+  { label: "Information Technology & Services", value: "Information Technology" },
+  { label: "Finance, Banking & Insurance", value: "Finance & Banking" },
+  { label: "Healthcare & Pharmaceuticals", value: "Healthcare & Pharmaceuticals" },
+  { label: "Education & E-Learning", value: "Education" },
+  { label: "Manufacturing & Engineering", value: "Manufacturing & Engineering" },
+  { label: "Real Estate & Construction", value: "Real Estate & Construction" },
+  { label: "Agriculture & Food Production", value: "Agriculture & Food Production" },
+  { label: "Retail & E-Commerce", value: "Retail & E-Commerce" },
+  { label: "Transportation & Logistics", value: "Transportation & Logistics" },
+  { label: "Energy & Utilities", value: "Energy & Utilities" },
+  { label: "Media, Entertainment & Tourism", value: "Media & Entertainment" },
+  { label: "Government & Public Administration", value: "Government" },
+  { label: "Legal & Professional Services", value: "Legal & Professional" },
+];
+
 const PROGRAMME_FLAT = PROGRAMME_GROUPS.flatMap(g => [
   { label: `── ${g.group} ──`, value: `_header_${g.group}`, disabled: true },
   ...g.items,
 ]);
 
-// ─── Web pickers ──────────────────────────────────────────────────────────────
 function WebDatePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const displayVal = value
-    ? (() => { const [y,m,d] = value.split("-"); return `${d} ${MONTHS[parseInt(m)-1]?.slice(0,3)} ${y}`; })()
-    : null;
   return (
-    <View style={{ position: "relative" }}>
-      <View style={[styles.dateBtn, !value && styles.dateBtnEmpty]}>
-        <Text style={value ? styles.dateBtnText : styles.dateBtnPlaceholder}>{displayVal || "Select date"}</Text>
-        <Ionicons name="calendar-outline" size={18} color="#64748B" />
-      </View>
-      {Platform.OS === "web" && (
-        <input type="date" value={value || ""} onChange={e => onChange((e.target as HTMLInputElement).value)}
-          style={{ position:"absolute", inset:0, opacity:0, cursor:"pointer", width:"100%", height:"100%", border:"none", background:"transparent", zIndex:10, fontSize:16 }} />
-      )}
-    </View>
+    <input 
+      type="date" 
+      value={value || ""} 
+      onChange={e => onChange((e.target as HTMLInputElement).value)}
+      style={{ 
+        height: 48, borderRadius: 12, border: "1px solid #E2E8F0", paddingLeft: 12, paddingRight: 12, 
+        backgroundColor: "#F8FAFC", fontSize: 14, color: value ? "#111" : "#94A3B8", width: "100%", 
+        outline: "none", boxSizing: "border-box", fontFamily: "sans-serif"
+      }} 
+    />
   );
 }
 
 function WebYearPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
-    <View style={{ position: "relative" }}>
-      <View style={[styles.dateBtn, !value && styles.dateBtnEmpty]}>
-        <Text style={value ? styles.dateBtnText : styles.dateBtnPlaceholder}>{value || "Select year"}</Text>
-        <Ionicons name="calendar-outline" size={18} color="#64748B" />
-      </View>
-      {Platform.OS === "web" && (
-        <select value={value || ""} onChange={e => onChange((e.target as HTMLSelectElement).value)}
-          style={{ position:"absolute", inset:0, opacity:0, cursor:"pointer", width:"100%", height:"100%", border:"none", background:"transparent", zIndex:10, fontSize:16 }}>
-          <option value="">Select year</option>
-          {Array.from({ length: new Date().getFullYear() - 1989 + 1 }, (_, i) => new Date().getFullYear() - i)
-            .map(year => <option key={year} value={String(year)}>{year}</option>)}
-        </select>
-      )}
-    </View>
+    <select 
+      value={value || ""} 
+      onChange={e => onChange((e.target as HTMLSelectElement).value)}
+      style={{ 
+        height: 48, borderRadius: 12, border: "1px solid #E2E8F0", paddingLeft: 12, paddingRight: 12, 
+        backgroundColor: "#F8FAFC", fontSize: 14, color: value ? "#111" : "#94A3B8", width: "100%", 
+        outline: "none", boxSizing: "border-box", fontFamily: "sans-serif"
+      }}
+    >
+      <option value="">Select year</option>
+      {YEAR_OPTIONS.map(year => <option key={year} value={year}>{year}</option>)}
+    </select>
   );
 }
 
-function MobileDateField({ label, value, onChange, mode = "date" }: {
-  label: string; value: string; onChange: (v: string) => void; mode?: "date" | "year";
-}) {
+function MobileDateField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void; }) {
   const [show, setShow] = useState(false);
   return (
     <Field label={label}>
@@ -125,7 +114,7 @@ function MobileDateField({ label, value, onChange, mode = "date" }: {
         <DateTimePicker value={new Date()} mode="date" display="default"
           onChange={(e, date) => {
             setShow(false);
-            if (date) onChange(mode === "year" ? String(date.getFullYear()) : date.toISOString().split("T")[0]);
+            if (date) onChange(date.toISOString().split("T")[0]);
           }} />
       )}
     </Field>
@@ -205,15 +194,10 @@ function AppPicker({ label, value, onChange, items }: {
   );
 }
 
-// ── Programme Picker — grouped (web: optgroup, mobile: disabled headers) ──────
 function ProgrammePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  // Show label for selected value
-  const selectedLabel = PROGRAMME_FLAT.find(i => i.value === value)?.label ?? "";
-
   return (
     <Field label="Programme">
       {Platform.OS === "web" ? (
-        // Web — native <optgroup> for clean grouping
         <select
           value={value}
           onChange={e => onChange((e.target as HTMLSelectElement).value)}
@@ -229,12 +213,10 @@ function ProgrammePicker({ value, onChange }: { value: string; onChange: (v: str
           ))}
         </select>
       ) : (
-        // Mobile — disabled header items act as visual separators
         <View style={styles.pickerBox}>
           <Picker
             selectedValue={value}
             onValueChange={v => {
-              // Prevent selecting header items
               if (!String(v).startsWith("_header_")) onChange(v);
             }}
           >
@@ -255,38 +237,32 @@ function ProgrammePicker({ value, onChange }: { value: string; onChange: (v: str
   );
 }
 
-function DateField({ label, value, onChange, mode = "date" }: {
-  label: string; value: string; onChange: (v: string) => void; mode?: "date" | "year";
-}) {
-  if (Platform.OS === "web") {
-    return (
-      <Field label={label}>
-        {mode === "year" ? <WebYearPicker value={value} onChange={onChange} /> : <WebDatePicker value={value} onChange={onChange} />}
-      </Field>
-    );
-  }
-  return <MobileDateField label={label} value={value} onChange={onChange} mode={mode} />;
-}
-
+// ── DYNAMIC RESPONSIVE ROW ──
 function Row2({ children }: { children: React.ReactNode }) {
+  const items = React.Children.toArray(children).filter(Boolean);
   return (
     <View style={isWeb ? styles.row2Web : styles.row2Mobile}>
-      {React.Children.map(children, child => (
-        <View style={isWeb ? { flex: 1 } : { width: "100%" }}>{child}</View>
+      {items.map((child, i) => (
+        <View key={i} style={isWeb ? { flex: 1 } : { width: "100%" }}>{child}</View>
       ))}
     </View>
   );
 }
 
-// ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function RegisterScreen() {
   const router = useRouter();
-  const [image,      setImage]      = useState<string | null>(null);
-  const [errors,     setErrors]     = useState<{ email?: string; mobile?: string }>({});
-  const [payLoading, setPayLoading] = useState(false);
+  const [image, setImage] = useState<string | null>(null);
+  const [errors, setErrors] = useState<{ email?: string; mobile?: string }>({});
+  
+  // State to control the Custom Year Picker Modal
+  const [showYearPicker, setShowYearPicker] = useState(false);
+
+  // Unified loading state
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [industrySelection, setIndustrySelection] = useState("");
 
   const [form, setForm] = useState({
-    full_name: "", email: "", mobile: "", gender: "",
+    full_name: "", email: "", mobile: "", country_code: "+91", gender: "",
     dob: "", batch_year: "", programme: "",
     employment_type: "", organisation: "", designation: "",
     years_of_experience: "", industry: "",
@@ -301,6 +277,15 @@ export default function RegisterScreen() {
       setErrors(prev => ({ ...prev, [key]: undefined }));
   };
 
+  const handleIndustryDropdownChange = (value: string) => {
+    setIndustrySelection(value);
+    if (value !== "Other") {
+      set("industry", value);
+    } else {
+      set("industry", ""); 
+    }
+  };
+
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, quality: 0.8,
@@ -310,93 +295,36 @@ export default function RegisterScreen() {
 
   const validate = (): boolean => {
     const e: { email?: string; mobile?: string } = {};
+    if (!form.full_name.trim()) {
+      if (isWeb) window.alert("Full Name is required"); else Alert.alert("Required", "Full Name is required");
+      return false;
+    }
     if (!form.email.trim())               e.email  = "Email is required";
     else if (!isValidEmail(form.email))   e.email  = "Enter a valid email (e.g. rahul@gmail.com)";
     if (!form.mobile.trim())              e.mobile = "Mobile number is required";
-    else if (!isValidMobile(form.mobile)) e.mobile = "Enter valid 10-digit Indian mobile number";
+    else if (!isValidMobile(form.mobile)) e.mobile = "Enter valid mobile number length";
+    
+    if (!form.industry.trim()) {
+      if (isWeb) window.alert("Please specify your industry."); else Alert.alert("Required", "Please specify your industry.");
+      return false;
+    }
+
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
-  const handlePaymentWeb = async () => {
-    const loaded = await loadRazorpayScript();
-    setPayLoading(false);
-    if (!loaded) { window.alert("Razorpay failed to load."); return; }
-    const options: any = {
-      key: RAZORPAY_KEY, amount: MEMBERSHIP_AMOUNT * 100, currency: "INR",
-      name: "SVIMSAA Alumni", description: "Membership Fee ₹" + MEMBERSHIP_AMOUNT,
-      image: "https://cdn-icons-png.flaticon.com/512/3135/3135715.png",
-      prefill: { name: form.full_name, email: form.email, contact: form.mobile },
-      theme: { color: "#5B21B6" },
-      handler: (response: any) => {
-        set("payment_status", "YES");
-        window.alert(`✅ Payment Successful!\nPayment ID: ${response.razorpay_payment_id}`);
-      },
-    };
-    const rzp = new (window as any).Razorpay(options);
-    rzp.on("payment.failed", (r: any) => window.alert(`❌ Payment Failed!\n${r.error.description}`));
-    rzp.open();
-  };
-
-  const handlePaymentMobile = () => {
-    setPayLoading(false);
-    const UPI_ID = "7067236880@ybl";
-    const upiUrl = `upi://pay?pa=${UPI_ID}&pn=SVIMSAA+Alumni&am=${MEMBERSHIP_AMOUNT}&cu=INR&tn=Membership+Fee`;
-    Alert.alert(
-      `Membership Fee ₹${MEMBERSHIP_AMOUNT}`,
-      "Please complete the payment using any UPI application such as Google Pay, PhonePe, or Paytm.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Proceed to Payment",
-          onPress: async () => {
-            try {
-              const supported = await Linking.canOpenURL(upiUrl);
-              if (supported) {
-                await Linking.openURL(upiUrl);
-                setTimeout(() => {
-                  Alert.alert("Payment Confirmation", `Have you successfully paid ₹${MEMBERSHIP_AMOUNT}?`, [
-                    { text: "Not Yet", style: "cancel" },
-                    { text: "Payment Completed", onPress: () => {
-                      set("payment_status", "YES");
-                      Alert.alert("Payment Recorded", "Your payment has been marked successfully.");
-                    }},
-                  ]);
-                }, 3000);
-              } else {
-                Alert.alert("UPI Application Not Found", "Please install Google Pay, PhonePe, or Paytm.");
-              }
-            } catch {
-              Alert.alert("Error", "Unable to open UPI application.");
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  const handlePayment = async () => {
-    if (!form.full_name || !form.email || !form.mobile) {
-      if (isWeb) window.alert("Required Fill Full Name, Email and Mobile first")
-      else Alert.alert("Required", "Fill Full Name, Email and Mobile first");
-      return;
-    }
+  // ── UNIFIED REGISTER & PAY FUNCTION ──
+  const handleRegisterAndPay = async () => {
     if (!validate()) return;
-    setPayLoading(true);
-    if (isWeb) await handlePaymentWeb();
-    else handlePaymentMobile();
-  };
+    setIsSubmitting(true);
 
-  const handleSubmit = async () => {
-    if (!form.full_name) {
-      if (isWeb) window.alert("Please fill Full Name");
-      else Alert.alert("Validation", "Please fill Full Name");
-      return;
-    }
-    if (!validate()) return;
     try {
       const fd = new FormData();
-      Object.entries(form).forEach(([k, v]) => fd.append(k, v));
+      Object.entries(form).forEach(([k, v]) => {
+        if (k === "mobile") fd.append("mobile", `${form.country_code} ${form.mobile}`);
+        else if (k !== "country_code") fd.append(k, v);
+      });
+
       if (image) {
         if (isWeb) {
           const res = await fetch(image); const blob = await res.blob();
@@ -407,17 +335,53 @@ export default function RegisterScreen() {
           fd.append("profile_photo", { uri: image, name: filename, type: match ? `image/${match[1]}` : "image/jpeg" } as any);
         }
       }
-      const res = await axios.post(API_URL, fd, { headers: { "Content-Type": "multipart/form-data" } });
-      if (isWeb) {
-        window.alert(`Registered Successfully!\n\nYour login password:\n${res.data.login_password}`);
-        router.push("/loginscreen");
+
+      await axios.post(`${API_BASE}/register`, fd, { headers: { "Content-Type": "multipart/form-data" } });
+
+      // 1. Generate the Deep Link
+      const returnUrl = ExpoLinking.createURL('/loginscreen');
+
+      // 2. Sanitize Data for Easebuzz
+      const rawPhone = `${form.country_code || "91"}${form.mobile || ""}`;
+      const safePhone = rawPhone.replace(/\D/g, "").slice(0, 15) || "9999999999";
+      const safeName = (form.full_name || "Alumni").trim().replace(/[^a-zA-Z\s]/g, "").slice(0, 50);
+
+      // 3. Initiate Gateway
+      const initRes = await axios.post(`${API_BASE}/pay/initiate`, {
+        amount: typeof MEMBERSHIP_AMOUNT === 'number' ? MEMBERSHIP_AMOUNT : 1100, 
+        firstname: safeName,
+        email: form.email.trim(),
+        phone: safePhone, 
+        productinfo: "Alumni Registration",
+        payment_type: "REG",           
+        reference_id: form.email.trim(),
+        return_url: returnUrl 
+      });
+
+      if (initRes.data && initRes.data.checkout_url) {
+        const checkoutUrl = initRes.data.checkout_url;
+
+        if (isWeb) {
+          window.location.href = checkoutUrl;
+        } else {
+          // 4. Open In-App Browser
+          const browserResult = await WebBrowser.openAuthSessionAsync(checkoutUrl, returnUrl);
+          
+          setIsSubmitting(false);
+
+          if (browserResult.type === 'success') {
+            router.push("/loginscreen");
+          } else {
+            Alert.alert("Payment Incomplete", "It looks like you cancelled the payment. Tap Register & Pay to try again.");
+          }
+        }
       } else {
-        Alert.alert("Registered! ✅", `Your login password:\n\n${res.data.login_password}\n\nPlease save it safely.`,
-          [{ text: "Go to Login", onPress: () => router.push("/loginscreen") }]);
+        throw new Error("Invalid response from payment server.");
       }
     } catch (err: any) {
-      const msg = err?.response?.data?.message || "Registration failed";
-      if (isWeb) window.alert(msg); else Alert.alert("Error", msg);
+      setIsSubmitting(false);
+      const errMsg = err?.response?.data?.message || err?.message || "Registration or Payment Gateway error.";
+      if (isWeb) window.alert(errMsg); else Alert.alert("Error", errMsg);
     }
   };
 
@@ -447,17 +411,43 @@ export default function RegisterScreen() {
               <Input label="Full Name *" placeholder="Rahul Sharma" value={form.full_name} onChange={(t: string) => set("full_name", t)} />
               <Input label="Email *" placeholder="rahul@gmail.com" value={form.email} onChange={(t: string) => set("email", t)} error={errors.email} />
             </Row2>
+            
             <Row2>
-              <Input label="Mobile *" placeholder="98765 43210" value={form.mobile} onChange={(t: string) => set("mobile", t)} keyboardType="phone-pad" error={errors.mobile} />
+              <View style={{ flexDirection: "row", gap: 8, flex: 1 }}>
+                <View style={{ width: 75 }}>
+                  <Input label="Code" value={form.country_code} onChange={(t: string) => set("country_code", t)} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Input label="Mobile *" placeholder="98765 43210" value={form.mobile} onChange={(t: string) => set("mobile", t)} keyboardType="phone-pad" error={errors.mobile} />
+                </View>
+              </View>
               <AppPicker label="Gender" value={form.gender} onChange={v => set("gender", v)}
                 items={[{ label: "Male", value: "Male" }, { label: "Female", value: "Female" }, { label: "Other", value: "Other" }]} />
             </Row2>
-            <Row2>
-              <DateField label="Date of Birth" value={form.dob} onChange={v => set("dob", v)} />
-              <DateField label="Batch Year" value={form.batch_year} onChange={v => set("batch_year", v)} mode="year" />
-            </Row2>
 
-            {/* ── GROUPED PROGRAMME PICKER ── */}
+            <Row2>
+              {isWeb ? <WebDatePicker value={form.dob} onChange={v => set("dob", v)} /> : <MobileDateField label="Date of Birth" value={form.dob} onChange={v => set("dob", v)} />}
+              
+              {/* ── BATCH YEAR (Web vs Mobile Modal) ── */}
+              {isWeb ? (
+                <Field label="Batch Year">
+                  <WebYearPicker value={form.batch_year} onChange={v => set("batch_year", v)} />
+                </Field>
+              ) : (
+                <Field label="Batch Year">
+                  <TouchableOpacity 
+                    style={[styles.input, { justifyContent: "center" }]} 
+                    activeOpacity={0.7}
+                    onPress={() => setShowYearPicker(true)}
+                  >
+                    <Text style={{ color: form.batch_year ? "#111" : "#94A3B8", fontSize: 14 }}>
+                      {form.batch_year ? form.batch_year : "Select year"}
+                    </Text>
+                  </TouchableOpacity>
+                </Field>
+              )}
+            </Row2>
+            
             <ProgrammePicker value={form.programme} onChange={v => set("programme", v)} />
           </View>
 
@@ -473,18 +463,38 @@ export default function RegisterScreen() {
               <AppPicker label="Experience" value={form.years_of_experience} onChange={v => set("years_of_experience", v)}
                 items={[{ label: "0–1 year", value: "1" }, { label: "1–3 years", value: "3" }, { label: "3–5 years", value: "5" }, { label: "5+ years", value: "10" }]} />
             </Row2>
-            <Input label="Industry" placeholder="Information Technology" value={form.industry} onChange={(t: string) => set("industry", t)} />
+            
+            <Row2>
+              <AppPicker 
+                label="Industry *" 
+                value={industrySelection} 
+                onChange={handleIndustryDropdownChange}
+                items={[...INDUSTRY_OPTIONS, { label: "Other / Specify Custom...", value: "Other" }]} 
+              />
+              {industrySelection === "Other" && (
+                <Input 
+                  label="Specify Custom Industry *" 
+                  placeholder="e.g. Aerospace, Renewable Energy" 
+                  value={form.industry} 
+                  onChange={(t: string) => set("industry", t)} 
+                />
+              )}
+            </Row2>
           </View>
 
           <Section title="Personal Details" icon="heart-outline" />
           <View style={styles.card}>
-            <Field label="Marital Status">
-              <ChipSelect options={[{ label: "Single", value: "NO" }, { label: "Married", value: "YES" }]} value={form.married} onChange={v => set("married", v)} />
-            </Field>
+            <Row2>
+              <Field label="Marital Status">
+                <ChipSelect options={[{ label: "Single", value: "NO" }, { label: "Married", value: "YES" }]} value={form.married} onChange={v => set("married", v)} />
+              </Field>
+              {form.married === "YES" && (
+                <Input label="Spouse Name" placeholder="Name" value={form.spouse_name} onChange={(t: string) => set("spouse_name", t)} />
+              )}
+            </Row2>
             {form.married === "YES" && (
               <Row2>
-                <Input label="Spouse Name" placeholder="Name" value={form.spouse_name} onChange={(t: string) => set("spouse_name", t)} />
-                <DateField label="Anniversary" value={form.anniversary_date} onChange={v => set("anniversary_date", v)} />
+                {isWeb ? <WebDatePicker value={form.anniversary_date} onChange={v => set("anniversary_date", v)} /> : <MobileDateField label="Anniversary" value={form.anniversary_date} onChange={v => set("anniversary_date", v)} />}
               </Row2>
             )}
           </View>
@@ -498,75 +508,74 @@ export default function RegisterScreen() {
             </Row2>
           </View>
 
-          <Section title="Membership Payment" icon="card-outline" />
-          <View style={styles.card}>
+          {/* ── UNIFIED SUBMIT BUTTON ── */}
+          <View style={{ marginTop: 20 }}>
             <View style={styles.payInfoRow}>
               <Ionicons name="information-circle-outline" size={16} color="#5B21B6" />
               <Text style={styles.payInfoText}>
-                Membership fee: <Text style={{ fontWeight: "800" }}>₹{MEMBERSHIP_AMOUNT}</Text>
+                One-time Membership Fee: <Text style={{ fontWeight: "800" }}>₹{MEMBERSHIP_AMOUNT}</Text>
               </Text>
             </View>
 
-            {Platform.OS !== "web" && !RazorpayCheckout && form.payment_status !== "YES" && (
-              <View style={[styles.payInfoRow, { backgroundColor: "#FEF3C7", marginBottom: 10 }]}>
-                <Ionicons name="warning-outline" size={16} color="#D97706" />
-                <Text style={[styles.payInfoText, { color: "#92400E", flex: 1 }]}>
-                  Razorpay not available in Expo Go. UPI deep link will be used instead.{"\n"}
-                  For full support: <Text style={{ fontWeight: "700" }}>npx expo run:android</Text>
-                </Text>
-              </View>
-            )}
-
-            {form.payment_status !== "YES" && (
-              <View style={styles.payMethodsRow}>
-                {(Platform.OS !== "web" && !RazorpayCheckout
-                  ? ["UPI Apps", "Google Pay", "PhonePe", "Paytm"]
-                  : ["UPI / QR", "Card", "Net Banking", "Wallet"]
-                ).map((m, i) => (
-                  <View key={i} style={styles.payMethodChip}>
-                    <Text style={styles.payMethodText}>{m}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            <View style={[styles.payStatusBadge, form.payment_status === "YES" ? styles.payStatusPaid : styles.payStatusUnpaid]}>
-              <Ionicons name={form.payment_status === "YES" ? "checkmark-circle" : "time-outline"} size={16}
-                color={form.payment_status === "YES" ? "#16A34A" : "#92400E"} />
-              <Text style={[styles.payStatusText, { color: form.payment_status === "YES" ? "#16A34A" : "#92400E" }]}>
-                {form.payment_status === "YES" ? "Payment Successful ✅" : "Payment Pending"}
-              </Text>
-            </View>
-
-            {form.payment_status !== "YES" && (
-              <TouchableOpacity style={[styles.payBtn, payLoading && styles.payBtnDisabled]}
-                onPress={handlePayment} disabled={payLoading} activeOpacity={0.85}>
-                <LinearGradient colors={["#312EBA", "#5B21B6", "#EC1D8F"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.payBtnGradient}>
-                  {payLoading ? (
-                    <Text style={styles.payBtnText}>Opening payment...</Text>
-                  ) : (
-                    <>
-                      <Ionicons name="card-outline" size={20} color="#fff" />
-                      <Text style={styles.payBtnText}>
-                        {Platform.OS !== "web" && !RazorpayCheckout
-                          ? `Pay ₹${MEMBERSHIP_AMOUNT} via UPI`
-                          : `Pay ₹${MEMBERSHIP_AMOUNT} via Razorpay`}
-                      </Text>
-                    </>
-                  )}
-                </LinearGradient>
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity 
+              style={[styles.payBtn, isSubmitting && styles.payBtnDisabled]} 
+              onPress={handleRegisterAndPay} 
+              disabled={isSubmitting}
+              activeOpacity={0.85}
+            >
+              <LinearGradient colors={["#312EBA", "#5B21B6", "#EC1D8F"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.payBtnGradient}>
+                {isSubmitting ? (
+                  <Text style={styles.payBtnText}>Processing...</Text>
+                ) : (
+                  <>
+                    <Ionicons name="card-outline" size={22} color="#fff" />
+                    <Text style={styles.payBtnText}>Register & Pay Securely</Text>
+                  </>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
-
-          <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
-            <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
-            <Text style={styles.submitText}>Register →</Text>
-          </TouchableOpacity>
 
           <View style={{ height: 60 }} />
         </View>
       </ScrollView>
+
+      {/* ── CUSTOM YEAR PICKER MODAL (Mobile Only) ── */}
+      {!isWeb && (
+        <Modal visible={showYearPicker} transparent animationType="slide" onRequestClose={() => setShowYearPicker(false)}>
+          <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}>
+            <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: "50%" }}>
+              
+              {/* Modal Header */}
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 20, borderBottomWidth: 1, borderBottomColor: "#E2E8F0" }}>
+                <Text style={{ fontSize: 16, fontWeight: "800", color: "#0F172A" }}>Select Batch Year</Text>
+                <TouchableOpacity onPress={() => setShowYearPicker(false)}>
+                  <Text style={{ fontSize: 14, fontWeight: "700", color: "#DC2626" }}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Scrollable Year List */}
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {YEAR_OPTIONS.map((year) => (
+                  <TouchableOpacity 
+                    key={year} 
+                    style={{ paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: "#F1F5F9", alignItems: "center", backgroundColor: form.batch_year === year ? "#EEF2FF" : "#fff" }}
+                    onPress={() => {
+                      setForm({ ...form, batch_year: year });
+                      setShowYearPicker(false);
+                    }}
+                  >
+                    <Text style={{ fontSize: 16, fontWeight: form.batch_year === year ? "800" : "500", color: form.batch_year === year ? "#4F46E5" : "#334155" }}>
+                      {year}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              
+            </View>
+          </View>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }
@@ -575,7 +584,7 @@ const styles = StyleSheet.create({
   hero:      { paddingHorizontal: 30, paddingTop: 40, paddingBottom: 36, alignItems: "center" },
   heroTitle: { color: "#fff", fontSize: 30, fontWeight: "800", textAlign: "center" },
   heroSub:   { color: "#cbd5e1", fontSize: 18, marginTop: 6, textAlign: "center" },
-  content:   { padding: isWeb ? 24 : 16, maxWidth: isWeb ? 1500 : undefined, alignSelf: "center", width: "100%" },
+  content:   { padding: isWeb ? 24 : 16, maxWidth: isWeb ? 850 : undefined, alignSelf: "center", width: "100%" },
   avatarWrap:        { alignItems: "center", marginVertical: 20 },
   avatar:            { width: 130, height: 130, borderRadius: 90, borderWidth: 3, borderColor: "#4F46E5" },
   avatarPlaceholder: { width: 130, height: 130, borderRadius: 90, backgroundColor: "#EEF2FF", borderWidth: 2, borderColor: "#4F46E5", borderStyle: "dashed", justifyContent: "center", alignItems: "center" },
@@ -603,17 +612,8 @@ const styles = StyleSheet.create({
   chipSelText: { color: "#4F46E5" },
   payInfoRow:     { flexDirection: "row", alignItems: "flex-start", gap: 8, backgroundColor: "#EEF2FF", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 12 },
   payInfoText:    { color: "#3730A3", fontSize: 14 },
-  payMethodsRow:  { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 14 },
-  payMethodChip:  { backgroundColor: "#F1F5F9", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: "#E2E8F0" },
-  payMethodText:  { fontSize: 11, fontWeight: "600", color: "#475569" },
-  payStatusBadge: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 14 },
-  payStatusPaid:   { backgroundColor: "#DCFCE7" },
-  payStatusUnpaid: { backgroundColor: "#FEF3C7" },
-  payStatusText:   { fontSize: 14, fontWeight: "700" },
   payBtn:         { borderRadius: 14, overflow: "hidden", marginBottom: 10 },
   payBtnDisabled: { opacity: 0.7 },
   payBtnGradient: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 16 },
-  payBtnText:     { color: "#fff", fontWeight: "800", fontSize: 16 },
-  submitBtn:  { backgroundColor: "#4F46E5", paddingVertical: 16, borderRadius: 16, alignItems: "center", marginTop: 16, flexDirection: "row", justifyContent: "center", gap: 10 },
-  submitText: { color: "#fff", fontWeight: "800", fontSize: 16 },
+  payBtnText:     { color: "#fff", fontWeight: "800", fontSize: 17 },
 });

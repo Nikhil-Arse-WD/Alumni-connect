@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require("express");
 const mysql = require("mysql2");
 const cors = require("cors");
@@ -5,15 +6,19 @@ const multer = require("multer");
 const bcrypt = require("bcrypt");
 const path = require("path");
 const fs = require("fs");
+const crypto = require("crypto");
+const nodemailer = require("nodemailer");
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 if (!fs.existsSync("uploads")) fs.mkdirSync("uploads");
 if (!fs.existsSync("uploads/events")) fs.mkdirSync("uploads/events", { recursive: true });
 if (!fs.existsSync("uploads/event-gallery")) fs.mkdirSync("uploads/event-gallery", { recursive: true });
+if (!fs.existsSync("uploads/banners")) fs.mkdirSync("uploads/banners", { recursive: true });
 
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
@@ -36,6 +41,13 @@ const galleryStorage = multer.diskStorage({
 });
 const uploadGallery = multer({ storage: galleryStorage });
 
+const bannerStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, "uploads/banners"),
+  filename: (req, file, cb) =>
+    cb(null, Date.now() + "-" + Math.round(Math.random() * 1e9) + path.extname(file.originalname)),
+});
+const uploadBanner = multer({ storage: bannerStorage });
+
 // ── Helper: notification insert
 const sendNotification = (alumni_id, title, message, type = "general") => {
   db.query(
@@ -49,10 +61,10 @@ const sendNotification = (alumni_id, title, message, type = "general") => {
 // MYSQL CONNECTION
 // =====================================
 const db = mysql.createConnection({
-  host: "localhost",
-  user: "root",
-  password: "diya7067",
-  database: "alumni_db",
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
 });
 
 db.connect((err) => {
@@ -60,10 +72,57 @@ db.connect((err) => {
   console.log("MySQL Connected ✅");
 });
 
+// =====================================
+// SETUP NODEMAILER TRANSPORTER
+// =====================================
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
+
+// ── REUSABLE EMAIL FUNCTION ──
+const sendWelcomeEmail = async (userEmail, fullName, tempPassword) => {
+  const mailOptions = {
+    from: `"SVIMAA Alumni Association" <${process.env.EMAIL_USER}>`,
+    to: userEmail,
+    subject: "Welcome to SVIMAA Alumni Network! 🎓",
+    html: `
+      <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #E2E8F0; border-radius: 10px;">
+        <h2 style="color: #4F46E5;">Welcome to the SVIMSAA Family, ${fullName}!</h2>
+        <p style="color: #475569; font-size: 16px;">
+          Thank you for registering with the Shri Vaishnav Institute of Management Alumni Association (SVIMAA). We are thrilled to have you!
+        </p>
+        <div style="background-color: #F8FAFC; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <h3 style="margin-top: 0; color: #0F172A;">Your Login Credentials:</h3>
+          <p style="margin: 5px 0;"><strong>Email:</strong> ${userEmail}</p>
+          <p style="margin: 5px 0;"><strong>Temporary Password:</strong> ${tempPassword}</p>
+        </div>
+        <p style="color: #DC2626; font-weight: bold; font-size: 14px;">
+          ⚠️ For your security, you will be required to change this temporary password immediately upon your first login.
+        </p>
+        <p style="color: #475569; font-size: 16px; margin-top: 30px;">
+          Best Regards,<br/>
+          <strong>SVIMAA Admin Team</strong>
+        </p>
+      </div>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`Welcome email successfully sent to ${userEmail}`);
+  } catch (error) {
+    console.error(`Failed to send email to ${userEmail}:`, error);
+  }
+};
+
 app.get("/", (req, res) => res.send("API Running ✅"));
 
 // =====================================
-// REGISTER
+// REGISTER (With Retry Logic & Strict Mode)
 // =====================================
 app.post("/register", upload.single("profile_photo"), async (req, res) => {
   try {
@@ -74,46 +133,91 @@ app.post("/register", upload.single("profile_photo"), async (req, res) => {
       country, payment_status,
     } = req.body;
 
-    const member_id = "ALUMNI" + Date.now();
-    const receipt_number = "RCPT" + Math.floor(100000 + Math.random() * 900000);
-    const password = await bcrypt.hash(receipt_number, 10);
-    const profile_photo = req.file ? req.file.filename : null;
-
-    const sql = `
-      INSERT INTO alumni_members (
-        full_name, mobile, email, gender, dob, batch_year, programme, profile_photo,
-        password, employment_type, organisation, designation, years_of_experience,
-        industry, married, spouse_name, anniversary_date, address, city, country,
-        payment_status, member_id, receipt_number
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-    `;
-
-    db.query(sql, [
-      full_name, mobile, email, gender, dob, batch_year, programme, profile_photo,
-      password, employment_type, organisation, designation, years_of_experience,
-      industry, married, spouse_name || null, anniversary_date || null,
-      address, city, country, payment_status, member_id, receipt_number,
-    ], (err) => {
+    db.query("SELECT id, payment_status, receipt_number, member_id FROM alumni_members WHERE email = ?", [email], async (err, existingUsers) => {
       if (err) return res.status(500).json({ success: false, message: "Database Error", error: err });
-      res.json({ success: true, message: "Registration Successful ✅", member_id, receipt_number, login_password: receipt_number });
+
+      const profile_photo = req.file ? req.file.filename : null;
+
+      // Abandoned Cart Logic
+      if (existingUsers.length > 0) {
+        const user = existingUsers[0];
+
+        if (user.payment_status === "YES") {
+          return res.status(400).json({ success: false, message: "This email is already registered and paid. Please login." });
+        }
+
+        const sqlUpdate = `
+          UPDATE alumni_members SET 
+            full_name=?, mobile=?, gender=?, dob=?, batch_year=?, programme=?, 
+            ${profile_photo ? "profile_photo=?," : ""} 
+            employment_type=?, organisation=?, designation=?, years_of_experience=?, 
+            industry=?, married=?, spouse_name=?, anniversary_date=?, address=?, city=?, country=?
+          WHERE email=?
+        `;
+        
+        const updateParams = profile_photo 
+          ? [full_name, mobile, gender, dob, batch_year, programme || null, profile_photo, employment_type || null, organisation || null, designation || null, years_of_experience || null, industry || null, married || "NO", spouse_name || null, anniversary_date || null, address || null, city || null, country || null, email]
+          : [full_name, mobile, gender, dob, batch_year, programme || null, employment_type || null, organisation || null, designation || null, years_of_experience || null, industry || null, married || "NO", spouse_name || null, anniversary_date || null, address || null, city || null, country || null, email];
+
+        db.query(sqlUpdate, updateParams, (updateErr) => {
+          if (updateErr) return res.status(500).json({ success: false, message: "Failed to update existing record" });
+          return res.json({ success: true, message: "Record updated, ready for payment ✅", member_id: user.member_id, receipt_number: user.receipt_number });
+        });
+        return; // Exits the function so it doesn't try to insert a new user below
+      }
+
+      // New User Logic
+      const member_id = "ALUMNI" + Date.now();
+      const receipt_number = "RCPT" + Math.floor(100000 + Math.random() * 900000);
+      const password = await bcrypt.hash(receipt_number, 10);
+
+      const sqlInsert = `
+        INSERT INTO alumni_members (
+          full_name, mobile, email, gender, dob, batch_year, programme, profile_photo,
+          password, employment_type, organisation, designation, years_of_experience,
+          industry, married, spouse_name, anniversary_date, address, city, country,
+          payment_status, member_id, receipt_number
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      `;
+
+      db.query(sqlInsert, [
+        full_name, mobile, email, gender, dob, batch_year, programme || null, profile_photo,
+        password, employment_type || null, organisation || null, designation || null, years_of_experience || null,
+        industry || null, married || "NO", spouse_name || null, anniversary_date || null,
+        address || null, city || null, country || null, payment_status || "NO", member_id, receipt_number,
+      ], (insertErr) => {
+        if (insertErr) return res.status(500).json({ success: false, message: "Database Error" });
+        res.json({ success: true, message: "Registration Saved ✅", member_id, receipt_number });
+      });
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: "Server Error", error });
+    res.status(500).json({ success: false, message: "Server Error", error: error.message });
   }
 });
 
 // =====================================
-// LOGIN
+// SECURE LOGIN
 // =====================================
 app.post("/login", (req, res) => {
   const { email, password } = req.body;
   db.query("SELECT * FROM alumni_members WHERE email = ?", [email], async (err, result) => {
     if (err) return res.status(500).json({ success: false, message: "Server Error" });
     if (result.length === 0) return res.status(401).json({ success: false, message: "Email not found" });
+    
     const user = result[0];
+
+    // ---> RESTRICT UNPAID LOGINS <---
+    if (user.payment_status !== "YES") {
+      return res.status(402).json({ 
+        success: false, 
+        message: "Membership payment pending. Please complete your registration payment to activate your account." 
+      });
+    }
+
     let isMatch = false;
     try { isMatch = await bcrypt.compare(password, user.password); } catch (e) { isMatch = false; }
     if (!isMatch) return res.status(401).json({ success: false, message: "Invalid credentials" });
+    
     res.json({
       success: true, message: "Login Successful ✅",
       user: {
@@ -122,9 +226,60 @@ app.post("/login", (req, res) => {
         email: user.email,
         profile_photo: user.profile_photo,
         role: user.role || "user",
+        is_password_changed: user.is_password_changed,
       },
       token: "123",
     });
+  });
+});
+// =====================================
+// CHANGE PASSWORD
+// =====================================
+app.post("/change-password", async (req, res) => {
+  const { email, current_password, new_password, confirm_password } = req.body;
+
+  if (!email || !current_password || !new_password || !confirm_password) {
+    return res.status(400).json({ success: false, message: "All fields are required" });
+  }
+  if (new_password !== confirm_password) {
+    return res.status(400).json({ success: false, message: "New password and confirm password do not match" });
+  }
+  if (new_password.length < 6) {
+    return res.status(400).json({ success: false, message: "New password must be at least 6 characters" });
+  }
+  if (new_password === current_password) {
+    return res.status(400).json({ success: false, message: "New password must be different from current password" });
+  }
+
+  db.query("SELECT * FROM alumni_members WHERE email = ?", [email], async (err, result) => {
+    if (err) return res.status(500).json({ success: false, message: "Server Error" });
+    if (result.length === 0) return res.status(404).json({ success: false, message: "User not found" });
+
+    const user = result[0];
+
+    let isMatch = false;
+    try {
+      isMatch = await bcrypt.compare(current_password, user.password);
+    } catch (e) {
+      isMatch = false;
+    }
+    if (!isMatch) {
+      return res.status(401).json({ success: false, message: "Current password is incorrect" });
+    }
+
+    try {
+      const hashedPassword = await bcrypt.hash(new_password, 10);
+      db.query(
+        "UPDATE alumni_members SET password = ?, is_password_changed = 1 WHERE email = ?",
+        [hashedPassword, email],
+        (err2) => {
+          if (err2) return res.status(500).json({ success: false, message: "Failed to update password" });
+          res.json({ success: true, message: "Password changed successfully ✅" });
+        }
+      );
+    } catch (e) {
+      res.status(500).json({ success: false, message: "Error hashing password" });
+    }
   });
 });
 
@@ -138,16 +293,40 @@ app.get("/member/:email", (req, res) => {
   });
 });
 
-app.put("/member/update/:email", (req, res) => {
-  const { full_name, mobile, city, country, designation, organisation } = req.body;
-  db.query(
-    "UPDATE alumni_members SET full_name=?, mobile=?, city=?, country=?, designation=?, organisation=? WHERE email=?",
-    [full_name, mobile, city, country, designation, organisation, req.params.email],
-    (err) => {
-      if (err) return res.status(500).json({ success: false, message: "Database Error" });
-      res.json({ success: true, message: "Profile Updated Successfully ✅" });
-    }
-  );
+app.put("/member/update/:email", upload.single("profile_photo"), (req, res) => {
+  const {
+    full_name, mobile, city, country, designation, organisation,
+    address, employment_type, years_of_experience, industry,
+    married, spouse_name, anniversary_date,
+  } = req.body;
+
+  db.query("SELECT profile_photo FROM alumni_members WHERE email = ?", [req.params.email], (err, rows) => {
+    if (err) return res.status(500).json({ success: false });
+
+    const oldPhoto   = rows[0]?.profile_photo || null;
+    const newPhoto   = req.file ? req.file.filename : oldPhoto;
+
+    db.query(
+      `UPDATE alumni_members SET
+        full_name=?, mobile=?, city=?, country=?,
+        designation=?, organisation=?, address=?,
+        employment_type=?, years_of_experience=?, industry=?,
+        married=?, spouse_name=?, anniversary_date=?,
+        profile_photo=?
+       WHERE email=?`,
+      [
+        full_name, mobile, city || null, country || null,
+        designation || null, organisation || null, address || null,
+        employment_type || null, years_of_experience || null, industry || null,
+        married || "NO", spouse_name || null, anniversary_date || null,
+        newPhoto, req.params.email,
+      ],
+      (err2) => {
+        if (err2) return res.status(500).json({ success: false, message: "Database Error" });
+        res.json({ success: true, message: "Profile Updated Successfully ✅" });
+      }
+    );
+  });
 });
 
 // =====================================
@@ -241,6 +420,7 @@ app.get("/forum/posts", (req, res) => {
     res.json({ success: true, data: result });
   });
 });
+
 app.post("/forum/like", (req, res) => {
   const { post_id, user_id } = req.body;
   db.query("SELECT * FROM forum_likes WHERE post_id=? AND user_id=?", [post_id, user_id], (err, result) => {
@@ -289,24 +469,6 @@ app.post("/forum/report", (req, res) => {
   });
 });
 
-// ======================================================
-// FORUM COUNT — FIXED
-//
-// Problem tha:
-//   Frontend se last_seen milliseconds (JS Date.now()) aata tha
-//   MySQL FROM_UNIXTIME() seconds expect karta hai
-//   Toh 1748000000000 ms / 1000 = 1748000000 seconds — ye sahi hai
-//   Lekin agar last_seen = 0 aaye (pehli baar) toh
-//   FROM_UNIXTIME(0) = '1970-01-01 00:00:00' — ye bhi sahi hai
-//
-// ACTUAL FIX:
-//   Pehle UNIX_TIMESTAMP(created_at) use karo — timezone safe
-//   FROM_UNIXTIME() mein timezone conversion ho sakta tha agar
-//   MySQL server timezone alag ho
-//   UNIX_TIMESTAMP(created_at) > ? directly compare karo seconds se
-// ======================================================
-// forum/count — seen_at ke baad created posts count karo
-// ── FORUM COUNT
 app.get("/forum/count/:userId", (req, res) => {
   const userId = req.params.userId;
   db.query(
@@ -319,7 +481,6 @@ app.get("/forum/count/:userId", (req, res) => {
       }
 
       if (result.length === 0) {
-        // Pehli baar user — insert karo, count = total active posts
         db.query(
           `INSERT INTO forum_user_seen (user_id, seen_at) VALUES (?, '2000-01-01 00:00:00')`,
           [userId],
@@ -358,7 +519,6 @@ app.get("/forum/count/:userId", (req, res) => {
   );
 });
 
-// ── FORUM SEEN
 app.post("/forum/seen/:userId", (req, res) => {
   db.query(
     `INSERT INTO forum_user_seen (user_id, seen_at)
@@ -374,6 +534,7 @@ app.post("/forum/seen/:userId", (req, res) => {
     }
   );
 });
+
 // =====================================
 // NOTIFICATIONS
 // =====================================
@@ -515,7 +676,7 @@ app.post("/admin/login", (req, res) => {
         id: admin.id,
         name: admin.name,
         email: admin.email,
-        role: admin.role,  // ✅ यही fix है
+        role: admin.role,
       },
     });
   });
@@ -714,13 +875,21 @@ app.post("/mentorship/request", (req, res) => {
 app.post("/contributions/donate", (req, res) => {
   const { alumni_id, donation_type, amount, equipment_description, scholarship_description, message } = req.body;
   if (!alumni_id || !donation_type) return res.status(400).json({ success: false, message: "Required fields missing" });
+  
   const receipt_number = donation_type === "Money" ? "DON-" + Date.now() + "-" + Math.floor(Math.random() * 9000 + 1000) : null;
+  
   db.query(
     `INSERT INTO donations (alumni_id, donation_type, amount, equipment_description, scholarship_description, message, receipt_number, payment_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [alumni_id, donation_type, amount||null, equipment_description||null, scholarship_description||null, message||null, receipt_number, donation_type==="Money"?"Pending":"Paid"],
-    (err) => {
+    (err, result) => { // <--- Notice 'result' is added here!
       if (err) return res.status(500).json({ success: false });
-      res.json({ success: true, message: "Donation submitted ✅", receipt_number });
+      
+      res.json({ 
+        success: true, 
+        message: "Donation submitted ✅", 
+        receipt_number,
+        donation_id: result.insertId // <--- Easebuzz needs this ID!
+      });
     }
   );
 });
@@ -736,8 +905,16 @@ app.get("/contributions/all/:alumni_id", (req, res) => {
   const id = req.params.alumni_id;
   const lQ = new Promise((resolve, reject) => db.query(`SELECT 'lecture' as type, id, topic as title, status, created_at FROM guest_lectures WHERE alumni_id = ? ORDER BY id DESC`, [id], (e,r) => e?reject(e):resolve(r)));
   const mQ = new Promise((resolve, reject) => db.query(`SELECT 'mentor' as type, id, expertise as title, status, created_at FROM mentorships WHERE alumni_id = ? ORDER BY id DESC`, [id], (e,r) => e?reject(e):resolve(r)));
-  const dQ = new Promise((resolve, reject) => db.query(`SELECT 'donation' as type, id, donation_type as title, status, created_at, amount, receipt_number FROM donations WHERE alumni_id = ? ORDER BY id DESC`, [id], (e,r) => e?reject(e):resolve(r)));
-  Promise.all([lQ, mQ, dQ]).then(([lectures, mentors, donations]) => res.json({ success: true, lectures, mentors, donations })).catch(() => res.status(500).json({ success: false }));
+  const dQ = new Promise((resolve, reject) => db.query(
+    `SELECT 'donation' as type, id, donation_type as title, status, created_at, amount, receipt_number 
+     FROM donations 
+     WHERE alumni_id = ? AND (donation_type != 'Money' OR payment_status = 'Paid') 
+     ORDER BY id DESC`, 
+     [id], (e,r) => e?reject(e):resolve(r)
+  ));
+  Promise.all([lQ, mQ, dQ])
+    .then(([lectures, mentors, donations]) => res.json({ success: true, lectures, mentors, donations }))
+    .catch(() => res.status(500).json({ success: false }));
 });
 
 app.put("/admin/contribution/:type/:id", (req, res) => {
@@ -841,16 +1018,57 @@ app.delete("/admin/member/:id", (req, res) => {
 });
 
 app.post("/admin/notifications/bulk", (req, res) => {
-  const { title, message, target } = req.body;
+
+  const { title, message, target, batch_year } = req.body;
+
   let sql = `SELECT id FROM alumni_members WHERE 1=1`;
-  if (target === "Approved Only") sql += ` AND approved = 1`;
-  if (target === "Pending Only") sql += ` AND approved = 0`;
-  db.query(sql, (err, members) => {
-    if (err) return res.status(500).json({ success: false });
-    members.forEach(m => sendNotification(m.id, title, message, "general"));
-    db.query(`INSERT INTO bulk_notifications (title, message, target, sent_count) VALUES (?, ?, ?, ?)`, [title, message, target, members.length]);
-    res.json({ success: true, sent_count: members.length });
+  let values = [];
+
+  if (target === "Approved Only") {
+    sql += ` AND approved = 1`;
+  }
+
+  if (target === "Batch Only") {
+    sql += ` AND batch_year = ?`;
+    values.push(batch_year);
+  }
+
+  db.query(sql, values, (err, members) => {
+
+    if (err) {
+      console.log(err);
+      return res.status(500).json({ success: false });
+    }
+
+    members.forEach((m) => {
+      sendNotification(
+        m.id,
+        title,
+        message,
+        "general"
+      );
+    });
+
+    db.query(
+      `INSERT INTO bulk_notifications
+      (title, message, target, batch_year, sent_count)
+      VALUES (?, ?, ?, ?, ?)`,
+      [
+        title,
+        message,
+        target,
+        batch_year || null,
+        members.length
+      ]
+    );
+
+    res.json({
+      success: true,
+      sent_count: members.length
+    });
+
   });
+
 });
 
 app.get("/admin/notifications/history", (req, res) => {
@@ -894,6 +1112,7 @@ app.put("/admin/forum/post/:id", (req, res) => {
     res.json({ success: true });
   });
 });
+
 app.get("/contributions/community", (req, res) => {
   const sql = `
     SELECT 
@@ -930,10 +1149,9 @@ app.get("/contributions/community", (req, res) => {
     });
   });
 });
+
 // =====================================
 // ADMIN MANAGEMENT ROUTES
-// Yeh routes server.js mein add karo
-// existing /admin/login ke neeche
 // =====================================
 
 // GET all admins
@@ -955,11 +1173,11 @@ app.post("/admin/admins", async (req, res) => {
     return res.status(400).json({ success: false, message: "Name, email and password required" });
 
   try {
-   
+    const hashedPassword = await bcrypt.hash(password, 10);
     db.query(
       `INSERT INTO admins (name, email, password, phone, role)
        VALUES (?, ?, ?, ?, ?)`,
-      [name, email, password, phone || null, role || "admin"],
+      [name, email, hashedPassword, phone || null, role || "admin"],
       (err) => {
         if (err) {
           if (err.code === "ER_DUP_ENTRY")
@@ -979,10 +1197,10 @@ app.put("/admin/admins/:id", async (req, res) => {
   const { name, email, password, phone, role } = req.body;
   try {
     if (password && password.trim()) {
-    //  const hashed = await bcrypt.hash(password, 10);
+      const hashedPassword = await bcrypt.hash(password, 10);
       db.query(
         `UPDATE admins SET name=?, email=?, password=?, phone=?, role=? WHERE id=?`,
-        [name, email, password, phone || null, role, req.params.id],
+        [name, email, hashedPassword, phone || null, role, req.params.id],
         (err) => {
           if (err) return res.status(500).json({ success: false });
           res.json({ success: true, message: "Admin updated ✅" });
@@ -1013,7 +1231,6 @@ app.delete("/admin/admins/:id", (req, res) => {
 
 app.post("/admin/delete-request", (req, res) => {
   const { requester_id } = req.body;
-  // Pehle check karo pending request already hai ya nahi
   db.query(
     `SELECT * FROM admin_delete_requests WHERE requester_id = ? AND status = 'Pending'`,
     [requester_id],
@@ -1055,7 +1272,6 @@ app.put("/admin/delete-request/:id", (req, res) => {
     [status, req.params.id],
     (err) => {
       if (err) return res.status(500).json({ success: false });
-      // Agar approved — account delete karo
       if (status === "Approved") {
         db.query(`DELETE FROM admins WHERE id = ?`, [requester_id], (err2) => {
           if (err2) return res.status(500).json({ success: false });
@@ -1067,9 +1283,439 @@ app.put("/admin/delete-request/:id", (req, res) => {
     }
   );
 });
+
+// =====================================
+// BANNER ROUTES
+// =====================================
+
+// ── ALUMNI: naya banner request submit karo ──
+app.post("/banner-request", uploadBanner.single("banner_image"), (req, res) => {
+  const {
+    full_name, email, mobile, organisation_name, banner_title,
+    banner_description, website_link, preferred_duration,
+    preferred_start_date, additional_notes,
+  } = req.body;
+ 
+  if (!full_name || !email || !mobile || !banner_title || !banner_description) {
+    return res.status(400).json({ success: false, message: "Required fields missing" });
+  }
+ 
+  const banner_image = req.file ? `/uploads/banners/${req.file.filename}` : null;
+ 
+  db.query(
+    `INSERT INTO banner_requests
+      (full_name, email, mobile, organisation_name, banner_title, banner_description,
+       website_link, preferred_duration, preferred_start_date, additional_notes, banner_image)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      full_name, email, mobile, organisation_name || null, banner_title, banner_description,
+      website_link || null, preferred_duration || null, preferred_start_date || null,
+      additional_notes || null, banner_image,
+    ],
+    (err, result) => {
+      if (err) return res.status(500).json({ success: false, message: "Database Error", error: err });
+ 
+      db.query("SELECT id FROM alumni_members WHERE email = ?", [email], (e2, rows) => {
+        if (!e2 && rows.length > 0) {
+          sendNotification(
+            rows[0].id,
+            "📢 Banner Request Received",
+            "Your ad banner request has been sent to admin for review.",
+            "general"
+          );
+        }
+      });
+ 
+      res.json({ success: true, message: "Banner request submitted ✅", id: result.insertId });
+    }
+  );
+});
+ 
+// ── ALUMNI: apni request(s) ka status/payment dekhna ──
+app.get("/banner-request/mine/:email", (req, res) => {
+  db.query(
+    `SELECT * FROM banner_requests WHERE email = ? ORDER BY id DESC`,
+    [req.params.email],
+    (err, result) => {
+      if (err) return res.status(500).json({ success: false });
+      res.json({ success: true, data: result });
+    }
+  );
+});
+ 
+// ── PUBLIC / HOME PAGE: sirf approved banners ──
+app.get("/banners/active", (req, res) => {
+  db.query(
+    `SELECT id, banner_title, banner_description, website_link, banner_image,
+            organisation_name, preferred_start_date, additional_notes
+     FROM banner_requests
+     WHERE status = 'Approved'
+     ORDER BY id DESC`,
+    (err, result) => {
+      if (err) {
+        console.log("banners/active DB error:", err);
+        return res.status(500).json({ success: false });
+      }
+      res.json({ success: true, data: result });
+    }
+  );
+});
+
+// ── ADMIN: saare banner requests list karo ──
+app.get("/admin/banner-requests", (req, res) => {
+  db.query(`SELECT * FROM banner_requests ORDER BY id DESC`, (err, result) => {
+    if (err) return res.status(500).json({ success: false });
+    res.json({ success: true, data: result });
+  });
+});
+ 
+// ── ADMIN: approve karne se pehle payment maango ──
+app.put("/admin/banner-request/request-payment/:id", (req, res) => {
+  const { amount, payment_note } = req.body;
+  if (!amount || Number(amount) <= 0) {
+    return res.status(400).json({ success: false, message: "Valid amount is required" });
+  }
+ 
+  db.query(
+    `UPDATE banner_requests
+     SET status = 'Payment Requested', amount_requested = ?, payment_note = ?, payment_status = 'Pending'
+     WHERE id = ?`,
+    [amount, payment_note || null, req.params.id],
+    (err) => {
+      if (err) return res.status(500).json({ success: false });
+ 
+      db.query("SELECT email FROM banner_requests WHERE id = ?", [req.params.id], (e2, rows) => {
+        if (!e2 && rows.length > 0) {
+          db.query("SELECT id FROM alumni_members WHERE email = ?", [rows[0].email], (e3, urows) => {
+            if (!e3 && urows.length > 0) {
+              sendNotification(
+                urows[0].id,
+                "💳 Payment Required for Banner Approval",
+                `Please pay ₹${amount} to get your banner approved.${payment_note ? " Note: " + payment_note : ""}`,
+                "general"
+              );
+            }
+          });
+        }
+      });
+ 
+      res.json({ success: true, message: "Payment request sent to alumni ✅" });
+    }
+  );
+});
+ 
+// ── ADMIN: payment mil gaya, ab banner approve karo ──
+app.put("/admin/banner-request/approve/:id", (req, res) => {
+  db.query(
+    `UPDATE banner_requests SET status = 'Approved', payment_status = 'Paid' WHERE id = ?`,
+    [req.params.id],
+    (err) => {
+      if (err) return res.status(500).json({ success: false });
+ 
+      db.query("SELECT email FROM banner_requests WHERE id = ?", [req.params.id], (e2, rows) => {
+        if (!e2 && rows.length > 0) {
+          db.query("SELECT id FROM alumni_members WHERE email = ?", [rows[0].email], (e3, urows) => {
+            if (!e3 && urows.length > 0) {
+              sendNotification(
+                urows[0].id,
+                "✅ Banner Approved!",
+                "Your ad banner is now live on the Home page.",
+                "general"
+              );
+            }
+          });
+        }
+      });
+ 
+      res.json({ success: true, message: "Banner Approved ✅" });
+    }
+  );
+});
+ 
+// ── ADMIN: reject karo ──
+app.put("/admin/banner-request/reject/:id", (req, res) => {
+  const { admin_remarks } = req.body;
+  db.query(
+    `UPDATE banner_requests SET status = 'Rejected', admin_remarks = ? WHERE id = ?`,
+    [admin_remarks || null, req.params.id],
+    (err) => {
+      if (err) return res.status(500).json({ success: false });
+ 
+      db.query("SELECT email FROM banner_requests WHERE id = ?", [req.params.id], (e2, rows) => {
+        if (!e2 && rows.length > 0) {
+          db.query("SELECT id FROM alumni_members WHERE email = ?", [rows[0].email], (e3, urows) => {
+            if (!e3 && urows.length > 0) {
+              sendNotification(
+                urows[0].id,
+                "❌ Banner Request Rejected",
+                admin_remarks || "Your banner request was not approved by admin.",
+                "general"
+              );
+            }
+          });
+        }
+      });
+ 
+      res.json({ success: true, message: "Banner Rejected" });
+    }
+  );
+});
+ 
+// ── ADMIN: request delete karo ──
+app.delete("/admin/banner-request/:id", (req, res) => {
+  db.query(`DELETE FROM banner_requests WHERE id = ?`, [req.params.id], (err) => {
+    if (err) return res.status(500).json({ success: false });
+    res.json({ success: true });
+  });
+});
+
+// ======================================================
+// BIRTHDAYS + ANNIVERSARIES
+// ======================================================
+
+app.get("/birthdays/today", (req, res) => {
+  const birthdayQ = new Promise((resolve, reject) => {
+    db.query(
+      `SELECT id, full_name, profile_photo, dob, batch_year
+       FROM alumni_members
+       WHERE dob IS NOT NULL
+         AND DAY(dob) = DAY(CURDATE())
+         AND MONTH(dob) = MONTH(CURDATE())
+       ORDER BY full_name`,
+      (err, rows) => (err ? reject(err) : resolve(rows))
+    );
+  });
+
+  const anniversaryQ = new Promise((resolve, reject) => {
+    db.query(
+      `SELECT id, full_name, profile_photo, anniversary_date, spouse_name
+       FROM alumni_members
+       WHERE married = 'YES'
+         AND anniversary_date IS NOT NULL
+         AND DAY(anniversary_date) = DAY(CURDATE())
+         AND MONTH(anniversary_date) = MONTH(CURDATE())
+       ORDER BY full_name`,
+      (err, rows) => (err ? reject(err) : resolve(rows))
+    );
+  });
+
+  Promise.all([birthdayQ, anniversaryQ])
+    .then(([birthdays, anniversaries]) => {
+
+      const birthdayData = birthdays.map((b) => ({
+        id: b.id,
+        full_name: b.full_name,
+        profile_photo: b.profile_photo,
+        batch_year: b.batch_year,
+        dob: b.dob,
+      }));
+
+      const anniversaryData = anniversaries.map((a) => ({
+        id: a.id,
+        full_name: a.full_name,
+        profile_photo: a.profile_photo,
+        spouse_name: a.spouse_name,
+        anniversary_date: a.anniversary_date,
+      }));
+
+      res.json({
+        success: true,
+        birthdays: birthdayData,
+        anniversaries: anniversaryData,
+      });
+    })
+    .catch((err) => {
+      console.log(err);
+      res.status(500).json({
+        success: false,
+        message: "Server Error",
+      });
+    });
+});
+// ======================================================
+// UNIFIED EASEBUZZ PAYMENT GATEWAY PIPELINE
+// ======================================================
+
+app.post("/pay/initiate", async (req, res) => {
+  const { amount, firstname, email, phone, productinfo, payment_type, reference_id, return_url } = req.body;
+
+  const key = process.env.EASEBUZZ_KEY;
+  const salt = process.env.EASEBUZZ_SALT;
+  const env = process.env.EASEBUZZ_ENV || "test";
+  const baseUrl = env === "prod" ? "https://pay.easebuzz.in" : "https://testpay.easebuzz.in";
+
+  // ── 0. SAFETY CHECK ──
+  if (!key || !salt) {
+    console.error("CRITICAL ERROR: Easebuzz Key or Salt is missing from your .env file!");
+    return res.status(500).json({ success: false, message: "Payment Gateway configuration error on server." });
+  }
+
+  // ── 1. FIX SURL/FURL LOCALHOST REJECTION ──
+  let serverIp = process.env.SERVER_URL || "http://127.0.0.1:2000"; 
+  serverIp = serverIp.replace(/\/+$/, ""); // Removes any accidental trailing slashes
+  serverIp = serverIp.replace("localhost", "127.0.0.1"); // Easebuzz rejects 'localhost', so we disguise it!
+  if (!serverIp.startsWith("http")) serverIp = `http://${serverIp}`;
+
+  const txnid = `${payment_type}_${Date.now()}`;
+  const amountStr = parseFloat(amount).toFixed(2);
+  
+  const udf1 = payment_type || ""; 
+  const udf2 = reference_id || ""; 
+  
+  // ── THE FIX: HEX ENCODE THE URL SO EASEBUZZ FIREWALL ACCEPTS IT ──
+  const udf3 = return_url ? Buffer.from(return_url).toString("hex") : "";
+
+  // ── 2. THE CORRECTED HASH (EXACTLY 8 PIPES AFTER UDF3) ──
+  // Sequence: key|txnid|amount|productinfo|firstname|email|udf1|udf2|udf3|udf4|udf5|udf6|udf7|udf8|udf9|udf10|salt
+  const hashString = `${key}|${txnid}|${amountStr}|${productinfo}|${firstname}|${email}|${udf1}|${udf2}|${udf3}||||||||${salt}`;
+  const hash = crypto.createHash("sha512").update(hashString).digest("hex");
+
+  // ── 3. LEDGER INSERT ──
+  db.query(
+    `INSERT INTO transactions (txnid, payment_type, reference_id, amount, status) VALUES (?, ?, ?, ?, 'Pending')`,
+    [txnid, payment_type, reference_id, amountStr],
+    async (dbErr) => {
+      if (dbErr) {
+        console.error("Ledger Insert Error:", dbErr);
+        return res.status(500).json({ success: false, message: "Database Error" });
+      }
+
+      // ── 4. BUILD EASEBUZZ FORM ──
+      const form = new URLSearchParams();
+      form.append("key", key);
+      form.append("txnid", txnid);
+      form.append("amount", amountStr);
+      form.append("productinfo", productinfo);
+      form.append("firstname", firstname);
+      form.append("email", email);
+      form.append("phone", phone);
+      form.append("surl", `${serverIp}/pay/success`); 
+      form.append("furl", `${serverIp}/pay/failed`);  
+      form.append("udf1", udf1);
+      form.append("udf2", udf2);
+      form.append("udf3", udf3);
+      form.append("hash", hash);
+      
+      try {
+        const response = await fetch(`${baseUrl}/payment/initiateLink`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json" },
+          body: form.toString(),
+        });
+        
+        const data = await response.json();
+
+        if (data.status === 1) {
+          res.json({ success: true, txnid, checkout_url: `${baseUrl}/pay/${data.data}` });
+        } else {
+          console.error("Easebuzz Rejection Data:", data); // Logs the exact reason to your terminal if it fails again
+          db.query(`UPDATE transactions SET status = 'Failed', error_message = ? WHERE txnid = ?`, [data.data, txnid]);
+          res.status(400).json({ success: false, message: data.data || "Gateway connection failed" });
+        }
+      } catch (err) {
+        console.error("Easebuzz Init Error:", err);
+        res.status(500).json({ success: false, message: "Server network error" });
+      }
+    }
+  );
+});
+// ── WEBHOOK: PAYMENT SUCCESS ──
+app.post("/pay/success", (req, res) => {
+  // 1. Extract ALL fields sent back by Easebuzz required for the reverse hash
+  const { 
+    status, txnid, easepayid, amount, productinfo, firstname, email, 
+    udf1, udf2, udf3, udf4, udf5, udf6, udf7, udf8, udf9, udf10, 
+    hash, key 
+  } = req.body;
+
+  const salt = process.env.EASEBUZZ_SALT;
+
+  // 2. Prepare the exact Reverse Hash Sequence
+  // Sequence: salt|status|udf10|udf9|udf8|udf7|udf6|udf5|udf4|udf3|udf2|udf1|email|firstname|productinfo|amount|txnid|key  
+  const reverseHashString = `${salt}|${status}|${udf10 || ""}|${udf9 || ""}|${udf8 || ""}|${udf7 || ""}|${udf6 || ""}|${udf5 || ""}|${udf4 || ""}|${udf3 || ""}|${udf2 || ""}|${udf1 || ""}|${email}|${firstname}|${productinfo}|${amount}|${txnid}|${key}`;
+  
+  // 3. Encrypt the Hash String
+  const calculatedHash = crypto.createHash("sha512").update(reverseHashString).digest("hex");
+
+  // 4. THE SECURITY CHECK (Match the Hashes)
+  if (calculatedHash !== hash) {
+    console.error(`🚨 SECURITY ALERT: Fake webhook payload detected for TXN: ${txnid}`);
+    return res.status(403).send("Transaction verification failed. Hash mismatch.");
+  }
+
+  // ── 5. DECODE THE URL AND PROCEED SAFELY ──
+  const decodedUrl = udf3 ? Buffer.from(udf3, "hex").toString("utf-8") : "";
+
+  if (status === "success") {
+    db.query(`UPDATE transactions SET status = 'Success', easebuzz_payid = ? WHERE txnid = ?`, [easepayid, txnid]);
+
+    if (udf1 === "REG") {
+      db.query("UPDATE alumni_members SET payment_status = 'YES' WHERE email = ?", [udf2], (err) => {
+        if (!err) {
+          db.query("SELECT full_name, receipt_number FROM alumni_members WHERE email = ?", [udf2], (err2, rows) => {
+            if (!err2 && rows.length > 0) sendWelcomeEmail(udf2, rows[0].full_name, rows[0].receipt_number);
+          });
+        }
+      });
+    } else if (udf1 === "DON") {
+      db.query("UPDATE donations SET payment_status = 'Paid' WHERE id = ?", [udf2]);
+    }
+
+    res.send(`
+      <html><body style="display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;background:#F8FAFC;font-family:sans-serif;text-align:center;">
+        <script>
+          // Instantly triggers deep link to auto-close Expo browser!
+          if ("${decodedUrl}") { window.location.href = "${decodedUrl}"; }
+        </script>
+        <h2 style="color:#16A34A;font-size:32px;">Payment Successful ✅</h2>
+        <p style="color:#475569;font-size:18px;">Taking you back to the app...</p>
+      </body></html>
+    `);
+  } else {
+    // If the hash is valid, but the payment itself somehow failed
+    res.redirect(307, "/pay/failed");
+  }
+});
+
+// ── WEBHOOK: PAYMENT FAILED ──
+app.post("/pay/failed", (req, res) => {
+  const { 
+    status, txnid, amount, productinfo, firstname, email, 
+    udf1, udf2, udf3, udf4, udf5, udf6, udf7, udf8, udf9, udf10, 
+    hash, key, error_Message 
+  } = req.body;
+  
+  const salt = process.env.EASEBUZZ_SALT;
+
+  // 1. Security Check for Failed payments too (so nobody can fake a failure to mess with your database)
+  const reverseHashString = `${salt}|${status}|${udf10 || ""}|${udf9 || ""}|${udf8 || ""}|${udf7 || ""}|${udf6 || ""}|${udf5 || ""}|${udf4 || ""}|${udf3 || ""}|${udf2 || ""}|${udf1 || ""}|${email}|${firstname}|${productinfo}|${amount}|${txnid}|${key}`;
+  const calculatedHash = crypto.createHash("sha512").update(reverseHashString).digest("hex");
+
+  if (calculatedHash !== hash) {
+    console.error(`🚨 SECURITY ALERT: Fake webhook payload detected for TXN: ${txnid}`);
+    return res.status(403).send("Transaction verification failed. Hash mismatch.");
+  }
+
+  // 2. Decode the URL and handle the failure
+  const decodedUrl = udf3 ? Buffer.from(udf3, "hex").toString("utf-8") : "";
+  
+  db.query(`UPDATE transactions SET status = 'Failed', error_message = ? WHERE txnid = ?`, [error_Message || "Failed", txnid]);
+  if (udf1 === "DON") db.query("UPDATE donations SET payment_status = 'Failed' WHERE id = ?", [udf2]);
+
+  res.send(`
+    <html><body style="display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;background:#F8FAFC;font-family:sans-serif;text-align:center;">
+      <script>
+        if ("${decodedUrl}") { window.location.href = "${decodedUrl}"; }
+      </script>
+      <h2 style="color:#DC2626;font-size:32px;">Payment Failed ❌</h2>
+      <p style="color:#475569;font-size:18px;">Taking you back to the app...</p>
+    </body></html>
+  `);
+});
 // =====================================
 // SERVER
 // =====================================
-app.listen(2000, "0.0.0.0", () => {
-  console.log("Server Running on Port 2000 🚀");
+const PORT = process.env.PORT || 2000;
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server Running on Port ${PORT} 🚀`);
 });

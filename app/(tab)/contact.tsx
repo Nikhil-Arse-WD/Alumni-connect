@@ -1,23 +1,27 @@
-import React from "react";
+import React, { useRef, useState } from "react";
 import Footer from "../components/Footer";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import {
+  Animated,
+  Easing,
+  KeyboardAvoidingView,
   Linking,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
   useWindowDimensions,
 } from "react-native";
 
-
 export default function ContactScreen() {
   const { width } = useWindowDimensions();
-  const router= useRouter();
+  const router = useRouter();
   const isWeb = width >= 768;
 
   const CONTACTS = [
@@ -38,6 +42,134 @@ export default function ContactScreen() {
       color: ["#EC4899", "#DB2777"],
     },
   ];
+
+  const REASONS = [
+    "General Inquiry",
+    "Alumni Event",
+    "Membership",
+    "Career / Job Help",
+    "Other",
+  ];
+
+  // ---- FORM MODAL STATE ----
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedContact, setSelectedContact] = useState<any>(null);
+  const [userName, setUserName] = useState("");
+  const [batchYear, setBatchYear] = useState("");
+  const [contactInfo, setContactInfo] = useState("");
+  const [userLocation, setUserLocation] = useState("");
+  const [reason, setReason] = useState("");
+  const [userQuery, setUserQuery] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
+  const [focusedField, setFocusedField] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  const scaleAnim = useRef(new Animated.Value(0.9)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const successAnim = useRef(new Animated.Value(0)).current;
+
+  const MAX_MESSAGE_LEN = 300;
+
+  const requiredFilled =
+    userName.trim().length > 0 &&
+    userLocation.trim().length > 0 &&
+    reason.length > 0 &&
+    userQuery.trim().length > 0;
+
+  const completedCount = [
+    userName.trim().length > 0,
+    userLocation.trim().length > 0,
+    reason.length > 0,
+    userQuery.trim().length > 0,
+  ].filter(Boolean).length;
+
+  const openWhatsappForm = (contact: any) => {
+    setSelectedContact(contact);
+    setUserName("");
+    setBatchYear("");
+    setContactInfo("");
+    setUserLocation("");
+    setReason("");
+    setUserQuery("");
+    setErrorMsg("");
+    setFocusedField("");
+    setSending(false);
+    setSent(false);
+    successAnim.setValue(0);
+    setModalVisible(true);
+
+    scaleAnim.setValue(0.9);
+    fadeAnim.setValue(0);
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 220,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        friction: 7,
+        tension: 80,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const closeModal = () => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 160,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 0.92,
+        duration: 160,
+        useNativeDriver: true,
+      }),
+    ]).start(() => setModalVisible(false));
+  };
+
+  const handleSendWhatsapp = () => {
+    if (!requiredFilled) {
+      setErrorMsg("Please fill all required fields marked with *");
+      return;
+    }
+    setErrorMsg("");
+    setSending(true);
+
+    const message =
+      `Hello ${selectedContact.name},\n\n` +
+      `*New Inquiry via Alumni Portal*\n` +
+      `Name: ${userName}\n` +
+      (batchYear.trim() ? `Batch Year: ${batchYear}\n` : "") +
+      (contactInfo.trim() ? `Contact: ${contactInfo}\n` : "") +
+      `Location: ${userLocation}\n` +
+      `Reason: ${reason}\n\n` +
+      `Message:\n${userQuery}`;
+
+    const url = `https://wa.me/${selectedContact.whatsapp}?text=${encodeURIComponent(
+      message
+    )}`;
+
+    // brief interactive feedback before handing off to WhatsApp
+    setTimeout(() => {
+      setSending(false);
+      setSent(true);
+      Animated.spring(successAnim, {
+        toValue: 1,
+        friction: 6,
+        useNativeDriver: true,
+      }).start();
+
+      setTimeout(() => {
+        Linking.openURL(url);
+        closeModal();
+      }, 700);
+    }, 500);
+  };
 
   return (
     <ScrollView
@@ -160,13 +292,10 @@ export default function ContactScreen() {
               </Text>
             </TouchableOpacity>
 
+            {/* WHATSAPP -> OPENS PROFESSIONAL INQUIRY FORM */}
             <TouchableOpacity
               style={styles.actionBtn}
-              onPress={() =>
-                Linking.openURL(
-                  `https://wa.me/${item.whatsapp}`
-                )
-              }
+              onPress={() => openWhatsappForm(item)}
             >
               <Ionicons
                 name="logo-whatsapp"
@@ -345,6 +474,176 @@ export default function ContactScreen() {
       </LinearGradient>
 
       <Footer />
+
+      {/* ---- WHATSAPP QUERY FORM MODAL ---- */}
+      <Modal
+        visible={modalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <ScrollView
+            contentContainerStyle={styles.modalScrollWrap}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.modalCard}>
+              {/* HEADER */}
+              <View style={styles.modalHeaderRow}>
+                <View style={styles.modalIconCircle}>
+                  <Ionicons name="logo-whatsapp" size={22} color="#16A34A" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.modalTitle}>
+                    Contact {selectedContact?.name}
+                  </Text>
+                  <Text style={styles.modalSub}>
+                    Fill in your details to send a WhatsApp message
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setModalVisible(false)}
+                  style={styles.closeBtn}
+                >
+                  <Ionicons name="close" size={20} color="#64748B" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.divider} />
+
+              {/* FULL NAME */}
+              <Text style={styles.fieldLabel}>
+                Full Name <Text style={styles.required}>*</Text>
+              </Text>
+              <View style={styles.inputWrap}>
+                <Ionicons name="person-outline" size={18} color="#94A3B8" />
+                <TextInput
+                  placeholder="Enter your full name"
+                  placeholderTextColor="#94A3B8"
+                  value={userName}
+                  onChangeText={setUserName}
+                  style={styles.inputField}
+                />
+              </View>
+
+              {/* BATCH + CONTACT ROW */}
+              <View style={styles.fieldRow}>
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <Text style={styles.fieldLabel}>Batch Year</Text>
+                  <View style={styles.inputWrap}>
+                    <Ionicons name="school-outline" size={18} color="#94A3B8" />
+                    <TextInput
+                      placeholder="e.g. 2018"
+                      placeholderTextColor="#94A3B8"
+                      value={batchYear}
+                      onChangeText={setBatchYear}
+                      keyboardType="numeric"
+                      maxLength={4}
+                      style={styles.inputField}
+                    />
+                  </View>
+                </View>
+
+                <View style={{ flex: 1, marginLeft: 8 }}>
+                  <Text style={styles.fieldLabel}>Email / Phone</Text>
+                  <View style={styles.inputWrap}>
+                    <Ionicons name="at-outline" size={18} color="#94A3B8" />
+                    <TextInput
+                      placeholder="Optional"
+                      placeholderTextColor="#94A3B8"
+                      value={contactInfo}
+                      onChangeText={setContactInfo}
+                      style={styles.inputField}
+                    />
+                  </View>
+                </View>
+              </View>
+
+              {/* LOCATION */}
+              <Text style={styles.fieldLabel}>
+                City / Location <Text style={styles.required}>*</Text>
+              </Text>
+              <View style={styles.inputWrap}>
+                <Ionicons name="location-outline" size={18} color="#94A3B8" />
+                <TextInput
+                  placeholder="e.g. Indore, MP"
+                  placeholderTextColor="#94A3B8"
+                  value={userLocation}
+                  onChangeText={setUserLocation}
+                  style={styles.inputField}
+                />
+              </View>
+
+              {/* REASON CHIPS */}
+              <Text style={styles.fieldLabel}>
+                Reason for Contact <Text style={styles.required}>*</Text>
+              </Text>
+              <View style={styles.chipWrap}>
+                {REASONS.map((r) => (
+                  <TouchableOpacity
+                    key={r}
+                    onPress={() => setReason(r)}
+                    style={[
+                      styles.chip,
+                      reason === r && styles.chipActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.chipText,
+                        reason === r && styles.chipTextActive,
+                      ]}
+                    >
+                      {r}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* MESSAGE */}
+              <Text style={styles.fieldLabel}>
+                Your Message <Text style={styles.required}>*</Text>
+              </Text>
+              <View style={[styles.inputWrap, styles.textAreaWrap]}>
+                <TextInput
+                  placeholder="What would you like to ask or discuss?"
+                  placeholderTextColor="#94A3B8"
+                  value={userQuery}
+                  onChangeText={setUserQuery}
+                  multiline
+                  numberOfLines={4}
+                  style={[styles.inputField, styles.textArea]}
+                />
+              </View>
+
+              {errorMsg ? (
+                <View style={styles.errorBox}>
+                  <Ionicons name="alert-circle-outline" size={16} color="#DC2626" />
+                  <Text style={styles.errorText}>{errorMsg}</Text>
+                </View>
+              ) : null}
+
+              {/* ACTIONS */}
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={styles.cancelBtn}
+                  onPress={() => setModalVisible(false)}
+                >
+                  <Text style={styles.cancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.submitBtn}
+                  onPress={handleSendWhatsapp}
+                >
+                  <Ionicons name="logo-whatsapp" size={18} color="#fff" />
+                  <Text style={styles.submitBtnText}>Send Message</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -669,5 +968,172 @@ const styles = StyleSheet.create({
     color: "#4F46E5",
     fontWeight: "800",
     fontSize: 15,
+  },
+
+  // ---- MODAL STYLES ----
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15,23,42,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalScrollWrap: {
+    flexGrow: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+    width: "100%",
+  },
+  modalCard: {
+    backgroundColor: "#fff",
+    borderRadius: 26,
+    padding: 24,
+    width: "100%",
+    maxWidth: 460,
+  },
+  modalHeaderRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  modalIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: "#F0FDF4",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+  modalSub: {
+    color: "#64748B",
+    fontSize: 13,
+    marginTop: 3,
+  },
+  closeBtn: {
+    padding: 4,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#E2E8F0",
+    marginVertical: 18,
+  },
+  fieldLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#334155",
+    marginBottom: 8,
+  },
+  required: {
+    color: "#DC2626",
+  },
+  fieldRow: {
+    flexDirection: "row",
+    marginTop: 4,
+  },
+  inputWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1.2,
+    borderColor: "#E2E8F0",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    marginBottom: 16,
+    gap: 10,
+    backgroundColor: "#F8FAFC",
+  },
+  inputField: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: "#0F172A",
+    outlineStyle:"None",
+  }as any,
+  textAreaWrap: {
+    alignItems: "flex-start",
+    paddingVertical: 4,
+  },
+  textArea: {
+    textAlignVertical: "top",
+    minHeight: 90,
+    paddingTop: 10,
+  },
+  chipWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 16,
+  },
+  chip: {
+    borderWidth: 1.2,
+    borderColor: "#E2E8F0",
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    borderRadius: 30,
+    backgroundColor: "#F8FAFC",
+  },
+  chipActive: {
+    backgroundColor: "#EEF2FF",
+    borderColor: "#4F46E5",
+  },
+  chipText: {
+    fontSize: 13,
+    color: "#475569",
+    fontWeight: "600",
+  },
+  chipTextActive: {
+    color: "#4F46E5",
+  },
+  errorBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#FEF2F2",
+    padding: 10,
+    borderRadius: 12,
+    marginBottom: 14,
+  },
+  errorText: {
+    color: "#DC2626",
+    fontSize: 13,
+    flex: 1,
+  },
+  modalActions: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 4,
+  },
+  cancelBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 16,
+    borderWidth: 1.2,
+    borderColor: "#E2E8F0",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cancelBtnText: {
+    color: "#475569",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  submitBtn: {
+    flex: 1.4,
+    backgroundColor: "#16A34A",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 16,
+  },
+  submitBtnText: {
+    color: "#fff",
+    fontWeight: "800",
+    fontSize: 14,
   },
 });

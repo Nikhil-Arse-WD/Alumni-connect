@@ -7,16 +7,16 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Alert, Animated, FlatList, Image, Modal,
-  Platform, Pressable, ScrollView, StyleSheet,
-  Text, TextInput, TouchableOpacity, View,
-  useWindowDimensions,
+    Alert, Animated, FlatList, Image, Modal,
+    Platform, Pressable, ScrollView, StyleSheet,
+    Text, TextInput, TouchableOpacity, View,
+    useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import SidebarWeb from "./components/SidebarWeb";
 import Sidebar from "./components/sidebar";
 
-const API     = "http://10.232.80.175:2000";
+const API     = "http://10.254.25.118:2000";
 const PRIMARY = "#6366f1";
 
 const C = {

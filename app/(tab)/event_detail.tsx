@@ -3,26 +3,26 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
+import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import React, {
-  useEffect,
-  useState,
+    useEffect,
+    useState,
 } from "react";
-
 import {
-  Alert,
-  Dimensions,
-  Image,
-  Modal,
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    Dimensions,
+
+    Modal,
+    Platform,
+    SafeAreaView,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 
@@ -40,7 +40,7 @@ const isDesktop =
   width >= 1100;
 
 const API =
-  "http://10.232.80.175:2000";
+  "http://10.254.25.118:2000";
 
 export default function App() {
     const [currentTime, setCurrentTime] =
@@ -727,9 +727,6 @@ useEffect(() => {
                 color="#fff"
               />
             </TouchableOpacity>
-
-           
-
           </View>
         </View>
       </View>
@@ -759,6 +756,10 @@ useEffect(() => {
         : `${API}${event.cover_photo}`,
     }}
     style={styles.rsvpImageModern}
+    contentFit="cover"
+  transition={0}
+  cachePolicy="memory-disk"
+ 
   />
 
   {/* CONTENT */}
@@ -1357,7 +1358,8 @@ const styles =
       
       rsvpImageModern: {
         width: "100%",
-        height: 170,
+        height: isDesktop?340:180,
+        
       },
       
       rsvpBodyModern: {
@@ -1479,13 +1481,13 @@ const styles =
       flex: 1,
       backgroundColor:
         "#F1F5F9",
+        marginBottom:Platform.OS === "web" ?10:140,
     },
     topSection: {
         paddingHorizontal: 18,
         paddingTop: 20,
         paddingBottom: 28,
         elevation: 10,
-      
         alignItems: Platform.OS === "web" ?"center":"flex-start",
       },
       

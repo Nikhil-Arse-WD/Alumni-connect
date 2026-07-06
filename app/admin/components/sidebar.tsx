@@ -32,6 +32,7 @@ const menuItems = [
   { title: "Job Board",      route: "jobs",            icon: "briefcase-outline" },
   { title: "Giving Back",  route: "donation",   icon: "heart-outline" },
   { title: "Notifications",  route: "notifications",   icon: "notifications-outline" },
+  { title: "Banner Advertisement", route: "Adbanner", icon: "megaphone-outline" },
   { title: "Admin Management", route: "add_admin", icon: "shield-checkmark-outline" },
   { title: "Logout",         route: "logout",          icon: "log-out-outline" },
 ];

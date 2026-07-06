@@ -4,19 +4,20 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Animated,
-  Dimensions,
-  FlatList,
-  Image,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    Animated,
+    Dimensions,
+    FlatList,
+    Image,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from "react-native";
 import Footer from "../components/Footer";
-
+import BirthdayModal from "./birthdaymodel";
+import FeaturedAdCarousel from "./livead";
 // ─── Responsive ────────────────────────────────────────────────────────────────
 const { width: W } = Dimensions.get("window");
 const isWeb     = Platform.OS === "web";
@@ -24,7 +25,7 @@ const isMobile  = W < 640;
 const isTablet  = W >= 640 && W < 1100;
 const isDesktop = W >= 1100;
 const px        = isDesktop ? 48 : isTablet ? 28 : 18;
-const API       = "http://10.232.80.175:2000";
+const API       = "http://10.254.25.118:2000";
 
 // ─── Data ──────────────────────────────────────────────────────────────────────
 const EVENT_PALETTES = [
@@ -120,6 +121,22 @@ function SectionHeader({ title, sub, label = "View all →", onPress }: { title:
 
 function Divider() { return <View style={{ height: 1, backgroundColor: "#f1f5f9", marginHorizontal: px }} />; }
 
+// ── Calculate how many years a couple has been married, based on
+//    anniversary_date. Handles same-day-today (0 → "New Milestone").
+function getYearsTogether(anniversaryDateStr: string | null | undefined): number | null {
+  if (!anniversaryDateStr) return null;
+  const annivDate = new Date(anniversaryDateStr);
+  if (isNaN(annivDate.getTime())) return null;
+  const today = new Date();
+  let years = today.getFullYear() - annivDate.getFullYear();
+  // If today's month/day hasn't reached the anniversary month/day yet this year, subtract 1
+  const hasHadAnniversaryThisYear =
+    today.getMonth() > annivDate.getMonth() ||
+    (today.getMonth() === annivDate.getMonth() && today.getDate() >= annivDate.getDate());
+  if (!hasHadAnniversaryThisYear) years -= 1;
+  return Math.max(years, 0);
+}
+
 function OfficeBearerCard({
   item,
   index,
@@ -188,8 +205,15 @@ export default function HomeScreen() {
 
   const [events,  setEvents]  = useState<any[]>([]);
   const [jobs,    setJobs]    = useState<any[]>([]);
+  const [bannerAds, setBannerAds] = useState<any[]>([]); // ← approved ad banners
   const [stats,   setStats]   = useState({ total_members: 0, total_events: 0, active_jobs: 0 });
   const [loading, setLoading] = useState(true);
+  const [birthdays, setBirthdays] = useState<any[]>([]);
+  
+  const [anniversaries, setAnniversaries] = useState<any[]>([]);
+  // ── Birthday modal state (same pattern as the other home screen) ─────────
+  const [userDateOfBirth, setUserDateOfBirth] = useState<string | null>(null);
+
   const formatDate = (date: any) => {
     const d = new Date(date);
   
@@ -208,6 +232,13 @@ export default function HomeScreen() {
     return h < 12 ? "Good Morning ☀️" : h < 18 ? "Good Afternoon ✨" : "Good Evening 🌙";
   }, []);
 
+  // ─── Combined celebrations feed — birthdays + anniversaries in one row ──
+  const celebrations = useMemo(() => {
+    const bdayItems = birthdays.map((b) => ({ ...b, __type: "birthday" as const }));
+    const annivItems = anniversaries.map((a) => ({ ...a, __type: "anniversary" as const }));
+    return [...bdayItems, ...annivItems];
+  }, [birthdays, anniversaries]);
+
   useEffect(() => {
     Animated.loop(Animated.sequence([
       Animated.timing(floatY,   { toValue: -12, duration: 2200, useNativeDriver: true }),
@@ -222,24 +253,55 @@ export default function HomeScreen() {
     Animated.timing(bearerFade, { toValue: 1, duration: 800, useNativeDriver: true }).start();
 
     fetchAll();
+    fetchUserProfile(); // ← fetch DOB for birthday modal trigger
   }, []);
+
+  // ── Fetch user profile for birthday check ──────────────────────────────
+  const fetchUserProfile = async () => {
+    try {
+      // Future API Call:
+      // const profileRes = await axios.get(`${API}/user/me`);
+      // setUserDateOfBirth(profileRes.data.dob);
+
+      // For now, using today's date dynamically (YYYY-MM-DD) so the
+      // modal triggers correctly when it actually matches user's DOB logic
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, "0");
+      const dd = String(today.getDate()).padStart(2, "0");
+
+      const mockToday = `${yyyy}-${mm}-${dd}`;
+      setUserDateOfBirth(mockToday);
+    } catch (error) {
+      console.log("Error fetching profile:", error);
+    }
+  };
 
   const fetchAll = async () => {
     try {
-      const [evR, jbR, stR] = await Promise.allSettled([
+      const [evR, jbR, stR, bnR,bdR] = await Promise.allSettled([
         axios.get(`${API}/events`),
         axios.get(`${API}/jobs`),
         axios.get(`${API}/admin/stats`),
+        axios.get(`${API}/banners/active`),
+        axios.get(`${API}/birthdays/today`),
+         // ← approved banner ads
       ]);
       if (evR.status === "fulfilled") setEvents((evR.value.data.events || []).filter((e: any) => e.status === "Upcoming").slice(0, 6));
       if (jbR.status === "fulfilled") setJobs((jbR.value.data.jobs || []).filter((j: any) => !j.is_closed).slice(0, 6));
       if (stR.status === "fulfilled" && stR.value.data.success) setStats(stR.value.data.data);
+      if (bnR.status === "fulfilled" && bnR.value.data.success) setBannerAds(bnR.value.data.data || []);
+      if (bdR.status === "fulfilled" && bdR.value.data.success) {
+        setBirthdays(bdR.value.data.birthdays || []);
+        setAnniversaries(bdR.value.data.anniversaries || []);
+      }
     } catch (e) { console.log(e); }
     finally { setLoading(false); }
   };
 
   const headerBg = scrollY.interpolate({ inputRange: [0, 140], outputRange: ["transparent", "rgba(13,27,62,0.98)"], extrapolate: "clamp" });
   const eW = isDesktop ? (W - px * 2 - 36) / 3 : isTablet ? 280 : 230;
+  const bW = isDesktop ? 380 : isTablet ? 320 : 280;
 
   return (
     <View style={{ flex: 1, backgroundColor: "#f8fafc" }}>
@@ -285,25 +347,8 @@ export default function HomeScreen() {
                   <Text style={styles.heroBtnGhostText}>Alumni Directory</Text>
                 </TouchableOpacity>
               </View>
-
-              <View style={styles.statsRow}>
-                {[
-                  { n: stats.total_members > 0 ? `${stats.total_members}+` : "2,400+", l: "Alumni",    icon: "people"       },
-                  { n: "180+",                                                           l: "Companies", icon: "business"     },
-                  { n: stats.total_events > 0 ? String(stats.total_events) : "12",      l: "Events",    icon: "calendar"     },
-                  { n: "95%",                                                            l: "Placement", icon: "trending-up"  },
-                ].map((s, i) => (
-                  <View key={i} style={styles.statCard}>
-                    <View style={styles.statIconBox}>
-                      <Ionicons name={s.icon as any} size={16} color="#fbbf24" />
-                    </View>
-                    <Text style={styles.statNum}>{s.n}</Text>
-                    <Text style={styles.statLbl}>{s.l}</Text>
-                  </View>
-                ))}
-              </View>
             </View>
-
+              
             {isDesktop && (
               <Animated.View style={[styles.heroIllus, { transform: [{ translateY: floatY }] }]}>
                 <LinearGradient colors={["rgba(255,255,255,0.12)", "rgba(255,255,255,0.04)"]} style={styles.ilustGlass}>
@@ -317,29 +362,129 @@ export default function HomeScreen() {
                       </View>
                     ))}
                   </View>
+                  
                 </LinearGradient>
               </Animated.View>
             )}
           </View>
+          {bannerAds.length > 0 && (
+  <FeaturedAdCarousel ads={bannerAds} />
+)}
         </LinearGradient>
 
-        {/* ── QUICK ACCESS GRID ── */}
-        <View style={[styles.quickGrid, { paddingHorizontal: px, marginTop: 28 }]}>
-          {QUICK_LINKS.map((q, i) => (
-            <TouchableOpacity key={i} style={styles.quickItem} onPress={() => router.push(q.route as any)} activeOpacity={0.85}>
-              <View style={[styles.quickIcon, { backgroundColor: q.color }]}>
-                <Ionicons name={q.icon as any} size={22} color={q.ic} />
+        {/* ══════════ TODAY'S CELEBRATIONS — birthdays + anniversaries, one row ══════════ */}
+        {celebrations.length > 0 && (
+          <View style={[styles.birthdaySection, { paddingHorizontal: px }]}>
+            <View style={styles.birthdayHeader}>
+              <View style={styles.birthdayHeaderIconWrap}>
+                <Text style={{ fontSize: 22 }}>🎉</Text>
               </View>
-              <Text style={styles.quickLabel}>{q.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.birthdaySectionTitle}>Today's Celebrations</Text>
+                <Text style={styles.birthdaySectionSub}>Birthdays & anniversaries — wish them well!</Text>
+              </View>
+              <View style={styles.celebCountPill}>
+                <Text style={styles.celebCountText}>{celebrations.length}</Text>
+              </View>
+            </View>
 
-        {/* ══════════ OFFICE BEARERS ══════════ */}
-       
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.birthdayScrollContent}>
+              {celebrations.map((item) => {
+                const isBday = item.__type === "birthday";
+                const years = isBday ? null : getYearsTogether(item.anniversary_date);
 
-        {/* ══════════ UPCOMING EVENTS ══════════ */}
-{/* ══════════ UPCOMING EVENTS ══════════ */}
+                return (
+                  <TouchableOpacity
+                    key={`${item.__type}-${item.id}`}
+                    style={styles.birthdayCard}
+                    activeOpacity={0.85}
+                    onPress={() => router.push({ pathname: "/alumniprofile", params: { id: item.id } })}
+                  >
+                    <LinearGradient
+                      colors={isBday ? ["#fff", "#fdf2f8"] : ["#fff", "#eff6ff"]}
+                      style={styles.birthdayCardInner}
+                    >
+                      {/* Decorative confetti dots */}
+                      <View style={styles.confettiDot1} />
+                      <View style={styles.confettiDot2} />
+                      <View style={styles.confettiDot3} />
+
+                      {/* Type ribbon — top-left */}
+                      <View
+                        style={[
+                          styles.typeRibbon,
+                          { backgroundColor: isBday ? "#db2777" : "#2563eb" },
+                        ]}
+                      >
+                        <Text style={styles.typeRibbonText}>{isBday ? "BIRTHDAY" : "ANNIVERSARY"}</Text>
+                      </View>
+
+                      {/* Years badge for anniversaries — top-right */}
+                      {!isBday && years !== null && years > 0 && (
+                        <View style={styles.yearsBadge}>
+                          <Text style={styles.yearsBadgeText}>{years}{"\n"}YRS</Text>
+                        </View>
+                      )}
+
+                      <View
+                        style={[
+                          styles.birthdayRing,
+                          { borderColor: isBday ? "#fbcfe8" : "#BFDBFE" },
+                        ]}
+                      >
+                        <View style={styles.birthdayAvatarWrap}>
+                          {item.profile_photo ? (
+                            <Image source={{ uri: `${API}/uploads/${item.profile_photo}` }} style={styles.birthdayAvatar} />
+                          ) : (
+                            <LinearGradient
+                              colors={isBday ? ["#f472b6", "#ec4899"] : ["#60a5fa", "#3b82f6"]}
+                              style={styles.birthdayFallbackAvatar}
+                            >
+                              <Text style={styles.birthdayFallbackText}>{item.full_name?.charAt(0)}</Text>
+                            </LinearGradient>
+                          )}
+                          <View style={styles.cakeBadge}>
+                            <Text style={{ fontSize: 12 }}>{isBday ? "🎂" : "💍"}</Text>
+                          </View>
+                        </View>
+                      </View>
+
+                      <Text style={styles.birthdayName} numberOfLines={1}>{item.full_name}</Text>
+
+                      {isBday ? (
+                        item.batch_year ? (
+                          <Text style={styles.birthdayBatch}>Batch {item.batch_year}</Text>
+                        ) : null
+                      ) : (
+                        item.spouse_name ? (
+                          <Text style={styles.birthdayBatch} numberOfLines={1}>& {item.spouse_name}</Text>
+                        ) : null
+                      )}
+
+                      {isBday ? (
+                        <View style={styles.birthdayWishBtn}>
+                          <Ionicons name="gift-outline" size={12} color="#db2777" />
+                          <Text style={styles.birthdayWishBtnText}>Say Happy Birthday</Text>
+                        </View>
+                      ) : (
+                        <View style={styles.anniversaryYearsRow}>
+                          <Ionicons name="heart" size={11} color="#2563eb" />
+                          <Text style={styles.anniversaryYearsText}>
+                            {years !== null
+                              ? years === 0
+                                ? "Just Married!"
+                                : `${years} ${years === 1 ? "Year" : "Years"} Together`
+                              : "Happy Anniversary"}
+                          </Text>
+                        </View>
+                      )}
+                    </LinearGradient>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
 
 <View style={{ marginTop: 24 }}>
   <LinearGradient
@@ -750,6 +895,10 @@ export default function HomeScreen() {
 
         <Footer />
       </ScrollView>
+
+      {/* ── BIRTHDAY MODAL — rendered at root level, same as other home screen ── */}
+      <BirthdayModal/>
+
     </View>
   );
 }
@@ -757,7 +906,7 @@ export default function HomeScreen() {
 // ─── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   // HERO
-  hero:           { paddingTop: isMobile ? 20 : 20, paddingBottom: 60, overflow: "hidden" },
+  hero:           { paddingTop: isMobile ? 20 : 20, paddingBottom: 30, overflow: "hidden" },
   blob1:          { position: "absolute", width: 400, height: 400, borderRadius: 200, backgroundColor: "rgba(255,255,255,0.05)", right: -120, top: -100 },
   blob2:          { position: "absolute", width: 250, height: 250, borderRadius: 125, backgroundColor: "rgba(251,191,36,0.08)", left: -60, bottom: -60 },
   blob3:          { position: "absolute", width: 160, height: 160, borderRadius: 80,  backgroundColor: "rgba(255,255,255,0.04)", left: 200, top: 30 },
@@ -791,6 +940,16 @@ const styles = StyleSheet.create({
   quickIcon:  { width: 52, height: 52, borderRadius: 16, alignItems: "center", justifyContent: "center" },
   quickLabel: { fontSize: 11, fontWeight: "600", color: "#475569", textAlign: "center" },
 
+  // ── SPONSORED / AD BANNERS ──
+  sponsoredCard:      { backgroundColor: "#fff", borderRadius: 18, overflow: "hidden", borderWidth: 1, borderColor: "#e2e8f0", shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 3 },
+  sponsoredImg:       { width: "100%", height: 130 },
+  sponsoredImgEmpty:  { backgroundColor: "#F1F5F9", justifyContent: "center", alignItems: "center" },
+  sponsoredBody:      { padding: 13 },
+  sponsoredTitle:     { fontSize: 14, fontWeight: "800", color: "#0f172a" },
+  sponsoredDesc:      { fontSize: 11.5, color: "#64748b", marginTop: 4, lineHeight: 16 },
+  sponsoredLinkRow:   { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 8 },
+  sponsoredLinkTxt:   { fontSize: 11, color: "#4F46E5", fontWeight: "700" },
+
   // ── OFFICE BEARERS ──
   bearerHero: {
     paddingTop: 32,
@@ -798,9 +957,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     marginTop: 24,
   },
-  // ADD THESE STYLES INSIDE StyleSheet.create({ ... })
 
-// ───────── HIGHLIGHT HERO ─────────
 highlightHero: {
   paddingTop: 30,
   paddingBottom: 24,
@@ -973,7 +1130,6 @@ highlightBtnText: {
   bearerImg: {
     width: "100%",
     height: "100%",
-    //resizeMode: "cover",
   },
   bearerInfo: {
     padding: 16,
@@ -1033,7 +1189,6 @@ highlightBtnText: {
   mentorBadgeText:     { fontSize: 11, color: "#fbbf24", fontWeight: "700" },
   mentorTitle:         { fontSize: isMobile ? 22 : 22, fontWeight: "900", color: "#fff", marginBottom: 10 },
   mentorDesc:          { fontSize: 13, color: "#a5b4fc", lineHeight: 20, marginBottom: 20, maxWidth: 360 },
- // mentorBtn:           { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#fbbf24", alignSelf: "flex-start", paddingHorizontal: 22, paddingVertical: 12, borderRadius: 14, shadowColor: "#fbbf24", shadowOpacity: 0.35, shadowRadius: 10, elevation: 5 },
   mentorBtnText:       { fontSize: 14, fontWeight: "800", color: "#1e1b4b" },
    mentorFeatures: {
     flexDirection: "row",
@@ -1061,7 +1216,7 @@ highlightBtnText: {
     shadowRadius: 10,
     elevation: 5,
   
-    marginTop: 10, // 👈 add this
+    marginTop: 10,
   },
   mentorFeatureCard: {
     flexDirection: "row",
@@ -1086,7 +1241,6 @@ highlightBtnText: {
   
     minHeight: 82,
   },
- // mentorFeatureCard:   { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", paddingHorizontal: 14, paddingVertical: 12, borderRadius: 14, flex: 1, minWidth: 140 },
   mentorFeatureIcon:   { width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(251,191,36,0.15)", alignItems: "center", justifyContent: "center" },
   mentorFeatureTitle:  { fontSize: 12, fontWeight: "700", color: "#fff" },
   mentorFeatureDesc:   { fontSize: 11, color: "#a5b4fc", marginTop: 1 },
@@ -1115,4 +1269,119 @@ highlightBtnText: {
   // MISC
   emptyBox: { alignItems: "center", paddingVertical: 28, gap: 8, backgroundColor: "#fff" },
   emptyText:{ fontSize: 13, color: "#94A3B8", fontWeight: "600" },
+
+  // ── BIRTHDAY / ANNIVERSARY — combined row ──
+  birthdaySection: { marginTop: 32 },
+  birthdayHeader: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 16 },
+  birthdayHeaderIconWrap: {
+    width: 44, height: 44, borderRadius: 14,
+    backgroundColor: "#FCE7F3",
+    alignItems: "center", justifyContent: "center",
+  },
+  birthdaySectionTitle: { fontSize: 18, fontWeight: "800", color: "#0f172a" },
+  birthdaySectionSub: { fontSize: 13, color: "#64748b", marginTop: 1 },
+  celebCountPill: {
+    backgroundColor: "#0f172a",
+    minWidth: 26,
+    height: 26,
+    borderRadius: 13,
+    paddingHorizontal: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  celebCountText: { color: "#fff", fontSize: 12, fontWeight: "800" },
+  birthdayScrollContent: { gap: 14, paddingBottom: 10, paddingTop: 4 },
+
+  birthdayCard: {
+    width: 168,
+    borderRadius: 22,
+    overflow: "hidden",
+    shadowColor: "#db2777",
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 5,
+  },
+  birthdayCardInner: {
+    padding: 18,
+    paddingTop: 26,
+    alignItems: "center",
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "rgba(219,39,119,0.12)",
+    position: "relative",
+    overflow: "hidden",
+  },
+
+  // decorative confetti dots on the birthday card
+  confettiDot1: { position: "absolute", top: 14, left: 14, width: 6, height: 6, borderRadius: 3, backgroundColor: "#fbcfe8" },
+  confettiDot2: { position: "absolute", top: 22, right: 18, width: 4, height: 4, borderRadius: 2, backgroundColor: "#f9a8d4" },
+  confettiDot3: { position: "absolute", bottom: 60, right: 12, width: 5, height: 5, borderRadius: 2.5, backgroundColor: "#fbcfe8" },
+
+  // Type ribbon — distinguishes birthday vs anniversary cards in the merged row
+  typeRibbon: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderBottomRightRadius: 12,
+  },
+  typeRibbonText: {
+    fontSize: 8.5,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: 0.6,
+  },
+
+  birthdayRing: {
+    padding: 4,
+    borderRadius: 44,
+    borderWidth: 2,
+    borderColor: "#fbcfe8",
+    marginBottom: 12,
+  },
+  birthdayAvatarWrap: { position: "relative" },
+  birthdayAvatar: { width: 68, height: 68, borderRadius: 34, borderWidth: 3, borderColor: "#fff" },
+  birthdayFallbackAvatar: { width: 68, height: 68, borderRadius: 34, borderWidth: 3, borderColor: "#fff", alignItems: "center", justifyContent: "center" },
+  birthdayFallbackText: { fontSize: 26, fontWeight: "800", color: "#fff" },
+  cakeBadge: {
+    position: "absolute", bottom: -2, right: -4,
+    backgroundColor: "#fff", width: 26, height: 26, borderRadius: 13,
+    alignItems: "center", justifyContent: "center",
+    elevation: 3, shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 3,
+    borderWidth: 1, borderColor: "#f1f5f9",
+  },
+  birthdayName: { fontSize: 14.5, fontWeight: "800", color: "#831843", textAlign: "center" },
+  birthdayBatch: { fontSize: 11, color: "#9d174d", opacity: 0.7, marginTop: 2, marginBottom: 8 },
+
+  birthdayWishBtn: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    backgroundColor: "#fff",
+    paddingHorizontal: 12, paddingVertical: 7,
+    borderRadius: 14,
+    marginTop: 6,
+    shadowColor: "#db2777", shadowOpacity: 0.1, shadowRadius: 4, elevation: 1,
+  },
+  birthdayWishBtnText: { fontSize: 10.5, fontWeight: "700", color: "#db2777" },
+
+  // Anniversary-specific
+  yearsBadge: {
+    position: "absolute", top: 10, right: 10,
+    backgroundColor: "#2563eb",
+    borderRadius: 10,
+    paddingHorizontal: 7, paddingVertical: 4,
+    alignItems: "center", justifyContent: "center",
+  },
+  yearsBadgeText: { fontSize: 9, fontWeight: "900", color: "#fff", textAlign: "center", lineHeight: 10 },
+
+  anniversaryYearsRow: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    backgroundColor: "#fff",
+    paddingHorizontal: 10, paddingVertical: 6,
+    borderRadius: 14,
+    marginTop: 6,
+    shadowColor: "#2563eb", shadowOpacity: 0.1, shadowRadius: 4, elevation: 1,
+  },
+  anniversaryYearsText: { fontSize: 10.5, fontWeight: "700", color: "#2563eb" },
 });

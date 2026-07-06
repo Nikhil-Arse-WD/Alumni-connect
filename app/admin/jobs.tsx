@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Sidebar from "./components/sidebar";
 import SidebarWeb from "./components/SidebarWeb";
-const API = "http://10.232.80.175:2000";
+const API = "http://10.254.25.118:2000";
 const PRIMARY = "#5B5FEF";
 
 // ─── Static Web Sidebar ───────────────────────────────────────────
