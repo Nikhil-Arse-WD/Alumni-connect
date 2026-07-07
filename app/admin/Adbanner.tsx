@@ -1,7 +1,6 @@
 // ======================================================
-// bannerrequests.tsx  (ADMIN)
-// Header: AdminContributions jaisa (SidebarWeb on web,
-//         topbar + drawer on mobile)
+// Adbanner.tsx  (ADMIN)
+// Admin dashboard for reviewing and pricing Banner Ad requests
 // ======================================================
 
 import { Feather, Ionicons } from "@expo/vector-icons";
@@ -9,26 +8,27 @@ import axios from "axios";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Animated,
-    Image,
-    Modal,
-    Platform,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
-    useWindowDimensions,
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Image,
+  Modal,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Sidebar from "./components/sidebar";
 import SidebarWeb from "./components/SidebarWeb";
 
-const API = "http://10.254.25.118:2000";
+// Dynamically use the central backend endpoint from environment variables
+const API = process.env.EXPO_PUBLIC_API_BASE || "http://127.0.0.1:2000";
 const isWeb = Platform.OS === "web";
 
 const showAlert = (title: string, msg: string) =>
@@ -67,7 +67,7 @@ const STATUS_STYLE: Record<string, { bg: string; fg: string }> = {
 export default function AdminBannerRequests() {
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const isWebLayout = width >= 768;
+  const isWebLayout = width >= 1024; 
 
   // ── Drawer (mobile only) ──────────────────────────────────────
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -123,7 +123,7 @@ export default function AdminBannerRequests() {
       const res = await axios.get(`${API}/admin/banner-requests`);
       if (res.data.success) setItems(res.data.data);
     } catch (e) {
-      console.log(e);
+      console.log("Error fetching banner requests:", e);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -159,7 +159,7 @@ export default function AdminBannerRequests() {
       });
       setPayModalFor(null);
       fetchData();
-      showAlert("Sent ✅", "Payment request sent to the alumni.");
+      showAlert("Sent ✅", "Payment request generated and routed to alumni dashboard.");
     } catch {
       showAlert("Error", "Failed to send payment request.");
     } finally {
@@ -172,7 +172,7 @@ export default function AdminBannerRequests() {
       setBusyId(item.id);
       await axios.put(`${API}/admin/banner-request/approve/${item.id}`);
       fetchData();
-      showAlert("Approved ✅", "Banner is now live on the Home page.");
+      showAlert("Approved ✅", "Banner deployment complete. Advertisement is now live.");
     } catch {
       showAlert("Error", "Failed to approve.");
     } finally {
@@ -194,7 +194,7 @@ export default function AdminBannerRequests() {
       });
       setRejectModalFor(null);
       fetchData();
-      showAlert("Rejected", "Request has been rejected.");
+      showAlert("Rejected", "Request application has been declined.");
     } catch {
       showAlert("Error", "Failed to reject.");
     } finally {
@@ -205,10 +205,13 @@ export default function AdminBannerRequests() {
   const deleteReq = (item: BannerReq) => {
     const doDelete = async () => {
       try {
+        setBusyId(item.id);
         await axios.delete(`${API}/admin/banner-request/${item.id}`);
         fetchData();
       } catch {
         showAlert("Error", "Failed to delete.");
+      } finally {
+        setBusyId(null);
       }
     };
     if (isWeb) {
@@ -223,153 +226,153 @@ export default function AdminBannerRequests() {
 
   // ── Main content ─────────────────────────────────────────────
   const MainContent = (
-    <>
-      {/* Page title (AdminContributions style) */}
-      <View style={{ padding: 18, paddingBottom: 4 }}>
+    <View style={styles.mainWrapper}>
+      <View style={styles.headerTitleBox}>
         <Text style={styles.pageTitle}>Banner Ad Requests</Text>
         <Text style={styles.breadcrumb}>Dashboard {">"} Banner Requests</Text>
       </View>
 
-      {/* Filter chips */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.filterRow}
-        contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
-      >
-        {FILTERS.map(f => (
-          <TouchableOpacity
-            key={f}
-            onPress={() => setFilter(f)}
-            style={[styles.filterChip, filter === f && styles.filterChipOn]}
-          >
-            <Text style={[styles.filterChipTxt, filter === f && styles.filterChipTxtOn]}>
-              {f} ({counts[f]})
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      <View style={styles.filterOuterWrap}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.filterRow}
+          contentContainerStyle={{ paddingHorizontal: isWebLayout ? 24 : 16, gap: 8 }}
+        >
+          {FILTERS.map(f => (
+            <TouchableOpacity
+              key={f}
+              onPress={() => setFilter(f)}
+              style={[styles.filterChip, filter === f && styles.filterChipOn]}
+            >
+              <Text style={[styles.filterChipTxt, filter === f && styles.filterChipTxtOn]}>
+                {f} ({counts[f]})
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
 
-      {/* Cards list */}
       <ScrollView
-        contentContainerStyle={{ padding: 16, paddingBottom: 60 }}
+        contentContainerStyle={[styles.scrollContainer, { paddingHorizontal: isWebLayout ? 24 : 16 }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        showsVerticalScrollIndicator={false}
       >
         {loading ? (
           <View style={styles.loaderWrap}>
-            <ActivityIndicator size="large" color="#6366F1" />
-            <Text style={styles.loaderTxt}>Loading requests...</Text>
+            <ActivityIndicator size="large" color="#4F46E5" />
+            <Text style={styles.loaderTxt}>Loading requests database...</Text>
           </View>
         ) : visible.length === 0 ? (
           <View style={styles.emptyBox}>
-            <Ionicons name="megaphone-outline" size={40} color="#CBD5E1" />
-            <Text style={styles.emptyTxt}>No requests in "{filter}"</Text>
+            <Ionicons name="megaphone-outline" size={48} color="#CBD5E1" />
+            <Text style={styles.emptyTxt}>No requests found under "{filter}" status</Text>
           </View>
         ) : (
-          visible.map(item => {
-            const st = STATUS_STYLE[item.status];
-            return (
-              <View key={item.id} style={styles.card}>
-                <View style={styles.cardTop}>
-                  {item.banner_image ? (
-                    <Image source={{ uri: API + item.banner_image }} style={styles.thumb} />
-                  ) : (
-                    <View style={[styles.thumb, styles.thumbEmpty]}>
-                      <Ionicons name="image-outline" size={22} color="#94A3B8" />
+          <View style={isWebLayout ? styles.webGrid : styles.mobileGrid}>
+            {visible.map(item => {
+              const st = STATUS_STYLE[item.status];
+              const isItemBusy = busyId === item.id;
+              
+              return (
+                <View key={item.id} style={[styles.card, isWebLayout && styles.webCard]}>
+                  <View style={styles.cardTop}>
+                    {item.banner_image ? (
+                      <Image source={{ uri: item.banner_image.startsWith('http') ? item.banner_image : API + item.banner_image }} style={styles.thumb} />
+                    ) : (
+                      <View style={[styles.thumb, styles.thumbEmpty]}>
+                        <Ionicons name="image-outline" size={24} color="#94A3B8" />
+                      </View>
+                    )}
+                    <View style={{ flex: 1, justifyContent: 'center' }}>
+                      <Text style={styles.cardTitle} numberOfLines={1}>{item.banner_title}</Text>
+                      <Text style={styles.subLine} numberOfLines={1}>
+                        {item.full_name}{item.organisation_name ? ` · ${item.organisation_name}` : ""}
+                      </Text>
+                      <View style={[styles.statusPill, { backgroundColor: st.bg }]}>
+                        <Text style={[styles.statusPillTxt, { color: st.fg }]}>{item.status}</Text>
+                      </View>
                     </View>
-                  )}
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.cardTitle} numberOfLines={1}>{item.banner_title}</Text>
-                    <Text style={styles.subLine} numberOfLines={1}>
-                      {item.full_name}{item.organisation_name ? ` · ${item.organisation_name}` : ""}
-                    </Text>
-                    <View style={[styles.statusPill, { backgroundColor: st.bg }]}>
-                      <Text style={[styles.statusPillTxt, { color: st.fg }]}>{item.status}</Text>
-                    </View>
                   </View>
-                </View>
 
-                <Text style={styles.desc} numberOfLines={3}>{item.banner_description}</Text>
+                  <Text style={styles.desc} numberOfLines={3}>{item.banner_description}</Text>
 
-                <View style={styles.metaGrid}>
-                  <MetaRow icon="mail-outline"              text={item.email} />
-                  <MetaRow icon="call-outline"              text={item.mobile} />
-                  {!!item.website_link   && <MetaRow icon="link-outline"             text={item.website_link} />}
-                  <MetaRow icon="time-outline"              text={`Duration: ${item.preferred_duration}`} />
-                  {!!item.preferred_start_date && <MetaRow icon="calendar-outline"   text={`Start: ${item.preferred_start_date}`} />}
-                  {!!item.additional_notes     && <MetaRow icon="chatbox-ellipses-outline" text={item.additional_notes} />}
-                </View>
-
-                {item.status === "Payment Requested" && (
-                  <View style={styles.payBox}>
-                    <Ionicons name="cash-outline" size={16} color="#1D4ED8" />
-                    <Text style={styles.payBoxTxt}>
-                      ₹{item.amount_requested} requested
-                      {item.payment_note ? ` — ${item.payment_note}` : ""}
-                      {" · "}Payment: {item.payment_status}
-                    </Text>
+                  <View style={styles.metaGrid}>
+                    <MetaRow icon="mail-outline"            text={item.email} />
+                    <MetaRow icon="call-outline"            text={item.mobile} />
+                    {!!item.website_link   && <MetaRow icon="link-outline"             text={item.website_link} />}
+                    <MetaRow icon="time-outline"            text={`Duration: ${item.preferred_duration}`} />
+                    {!!item.preferred_start_date && <MetaRow icon="calendar-outline"   text={`Launch Date: ${item.preferred_start_date}`} />}
+                    {!!item.additional_notes     && <MetaRow icon="chatbox-ellipses-outline" text={item.additional_notes} />}
                   </View>
-                )}
 
-                {item.status === "Rejected" && item.admin_remarks && (
-                  <View style={[styles.payBox, { backgroundColor: "#FEE2E2" }]}>
-                    <Ionicons name="close-circle-outline" size={16} color="#B91C1C" />
-                    <Text style={[styles.payBoxTxt, { color: "#B91C1C" }]}>{item.admin_remarks}</Text>
-                  </View>
-                )}
-
-                {/* Actions */}
-                <View style={styles.actionsRow}>
-                  {item.status === "Pending" && (
-                    <>
-                      <ActionBtn label="Request Payment" icon="cash-outline"  color="#4F46E5" onPress={() => openPayModal(item)} />
-                      <ActionBtn label="Reject"          icon="close-outline" color="#DC2626" onPress={() => openRejectModal(item)} />
-                    </>
-                  )}
                   {item.status === "Payment Requested" && (
-                    <>
-                      <ActionBtn
-                        label={busyId === item.id ? "Approving..." : "Mark Paid & Approve"}
-                        icon="checkmark-done-outline"
-                        color="#16A34A"
-                        disabled={busyId === item.id}
-                        onPress={() => approve(item)}
-                      />
-                      <ActionBtn label="Reject" icon="close-outline" color="#DC2626" onPress={() => openRejectModal(item)} />
-                    </>
+                    <View style={styles.payBox}>
+                      <Ionicons name="cash-outline" size={16} color="#1D4ED8" />
+                      <Text style={styles.payBoxTxt}>
+                        ₹{item.amount_requested} required
+                        {item.payment_note ? ` — ${item.payment_note}` : ""}
+                        {" · "}Gateway: {item.payment_status}
+                      </Text>
+                    </View>
                   )}
-                  {(item.status === "Approved" || item.status === "Rejected") && (
-                    <ActionBtn label="Delete" icon="trash-outline" color="#64748B" onPress={() => deleteReq(item)} />
+
+                  {item.status === "Rejected" && item.admin_remarks && (
+                    <View style={[styles.payBox, { backgroundColor: "#FEE2E2" }]}>
+                      <Ionicons name="close-circle-outline" size={16} color="#B91C1C" />
+                      <Text style={[styles.payBoxTxt, { color: "#B91C1C" }]}>{item.admin_remarks}</Text>
+                    </View>
                   )}
+
+                  <View style={styles.actionsRow}>
+                    {item.status === "Pending" && (
+                      <>
+                        <ActionBtn label="Request Fee" icon="cash-outline"  color="#4F46E5" onPress={() => openPayModal(item)} disabled={isItemBusy} />
+                        <ActionBtn label="Reject"          icon="close-outline" color="#DC2626" onPress={() => openRejectModal(item)} disabled={isItemBusy} />
+                      </>
+                    )}
+                    {item.status === "Payment Requested" && (
+                      <>
+                        <ActionBtn
+                          label={isItemBusy ? "Processing..." : "Force Approve"}
+                          icon="checkmark-done-outline"
+                          color="#16A34A"
+                          disabled={isItemBusy}
+                          onPress={() => approve(item)}
+                        />
+                        <ActionBtn label="Reject" icon="close-outline" color="#DC2626" onPress={() => openRejectModal(item)} disabled={isItemBusy} />
+                      </>
+                    )}
+                    {(item.status === "Approved" || item.status === "Rejected") && (
+                      <ActionBtn label={isItemBusy ? "Removing..." : "Delete Record"} icon="trash-outline" color="#64748B" onPress={() => deleteReq(item)} disabled={isItemBusy} />
+                    )}
+                  </View>
                 </View>
-              </View>
-            );
-          })
+              );
+            })}
+          </View>
         )}
       </ScrollView>
-    </>
+    </View>
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-
-      {/* ── WEB: sidebar + content ── */}
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       {isWebLayout ? (
         <View style={{ flex: 1, flexDirection: "row" }}>
           <SidebarWeb handleMenu={handleMenu} />
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, backgroundColor: "#F8FAFC" }}>
             {MainContent}
           </View>
         </View>
       ) : (
-        /* ── MOBILE: topbar + drawer + content ── */
         <>
           <View style={styles.topBar}>
             <TouchableOpacity onPress={openDrawer}>
-              <Feather name="menu" size={24} color="#000" />
+              <Feather name="menu" size={24} color="#0F172A" />
             </TouchableOpacity>
-            <Text style={styles.topTitle}>Banner Requests</Text>
-            <Ionicons name="notifications-outline" size={24} color="#000" />
+            <Text style={styles.topTitle}>Banner Ad Control</Text>
+            <Ionicons name="notifications-outline" size={24} color="#0F172A" />
           </View>
 
           {MainContent}
@@ -383,28 +386,28 @@ export default function AdminBannerRequests() {
         </>
       )}
 
-      {/* ── Payment request modal ── */}
+      {/* ── Fee Request Modal ── */}
       <Modal visible={!!payModalFor} transparent animationType="fade" onRequestClose={() => setPayModalFor(null)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>Request Payment</Text>
+            <Text style={styles.modalTitle}>Request Promotion Fee</Text>
             <Text style={styles.modalSub}>
-              "{payModalFor?.banner_title}" ko approve karne se pehle alumni se yeh amount maanga jayega.
+              Specify the placement fee for "{payModalFor?.banner_title}". The alumnus will be prompted to make this payment secure from their custom dashboard.
             </Text>
-            <Text style={styles.modalLabel}>Amount (₹) *</Text>
+            <Text style={styles.modalLabel}>Amount (INR) *</Text>
             <TextInput
               style={styles.modalInput}
               value={amount}
               onChangeText={setAmount}
-              placeholder="e.g. 2000"
+              placeholder="e.g. 2500"
               keyboardType="numeric"
             />
-            <Text style={styles.modalLabel}>Note (optional)</Text>
+            <Text style={styles.modalLabel}>Instructional Note (Optional)</Text>
             <TextInput
-              style={[styles.modalInput, { height: 80, textAlignVertical: "top" }]}
+              style={[styles.modalInput, { height: 80, textAlignVertical: "top", paddingTop: 10 }]}
               value={note}
               onChangeText={setNote}
-              placeholder="e.g. Payment via UPI to xyz@upi"
+              placeholder="e.g. Standard premium 30-day placement fee."
               multiline
             />
             <View style={styles.modalBtnRow}>
@@ -414,24 +417,24 @@ export default function AdminBannerRequests() {
               <TouchableOpacity style={styles.modalSaveBtn} onPress={submitPaymentRequest} disabled={savingPay}>
                 {savingPay
                   ? <ActivityIndicator color="#fff" size="small" />
-                  : <Text style={styles.modalSaveTxt}>Send Request</Text>}
+                  : <Text style={styles.modalSaveTxt}>Dispatch Request</Text>}
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
 
-      {/* ── Reject modal ── */}
+      {/* ── Operational Rejection Modal ── */}
       <Modal visible={!!rejectModalFor} transparent animationType="fade" onRequestClose={() => setRejectModalFor(null)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>Reject Request</Text>
-            <Text style={styles.modalSub}>"{rejectModalFor?.banner_title}" ko reject karne ka reason (optional):</Text>
+            <Text style={styles.modalTitle}>Decline Advertisement Request</Text>
+            <Text style={styles.modalSub}>Provide an audit reason for declining "{rejectModalFor?.banner_title}". This log will be accessible to the alumnus.</Text>
             <TextInput
-              style={[styles.modalInput, { height: 80, textAlignVertical: "top" }]}
+              style={[styles.modalInput, { height: 80, textAlignVertical: "top", paddingTop: 10 }]}
               value={remarks}
               onChangeText={setRemarks}
-              placeholder="Reason for rejection..."
+              placeholder="e.g. Creative asset aspect ratio mismatched."
               multiline
             />
             <View style={styles.modalBtnRow}>
@@ -445,22 +448,21 @@ export default function AdminBannerRequests() {
               >
                 {savingReject
                   ? <ActivityIndicator color="#fff" size="small" />
-                  : <Text style={styles.modalSaveTxt}>Reject</Text>}
+                  : <Text style={styles.modalSaveTxt}>Confirm Reject</Text>}
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
-
     </SafeAreaView>
   );
 }
 
-// ── Helper components ────────────────────────────────────────────
+// ── Shared UI Structural Extensions ────────────────────────────────────────────
 function MetaRow({ icon, text }: { icon: string; text: string }) {
   return (
     <View style={styles.metaRow}>
-      <Ionicons name={icon as any} size={13} color="#64748B" />
+      <Ionicons name={icon as any} size={14} color="#64748B" />
       <Text style={styles.metaTxt} numberOfLines={1}>{text}</Text>
     </View>
   );
@@ -469,21 +471,32 @@ function MetaRow({ icon, text }: { icon: string; text: string }) {
 function ActionBtn({ label, icon, color, onPress, disabled }: any) {
   return (
     <TouchableOpacity
-      style={[styles.actionBtn, { borderColor: color }, disabled && { opacity: 0.6 }]}
+      style={[styles.actionBtn, { borderColor: color }, disabled && { opacity: 0.4 }]}
       onPress={onPress}
       disabled={disabled}
-      activeOpacity={0.85}
+      activeOpacity={0.7}
     >
-      <Ionicons name={icon} size={15} color={color} />
+      <Ionicons name={icon} size={14} color={color} />
       <Text style={[styles.actionBtnTxt, { color }]}>{label}</Text>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F5F6FA" },
+  container: { flex: 1, backgroundColor: "#F8FAFC" },
+  mainWrapper: { flex: 1 },
+  headerTitleBox: { padding: 24, paddingBottom: 8 },
+  
+  // ── Responsive System Configuration ──
+  scrollContainer: { paddingBottom: 60, flexGrow: 1 },
+  mobileGrid: { flexDirection: "column", gap: 16 },
+  webGrid: { 
+    flexDirection: "row", 
+    flexWrap: "wrap", 
+    gap: 20,
+    width: "100%"
+  },
 
-  // ── Mobile topbar (AdminContributions style) ──────────────────
   topBar: {
     height: 65,
     backgroundColor: "#fff",
@@ -491,62 +504,71 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 18,
-    elevation: 3,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
   },
-  topTitle: { fontSize: 18, fontWeight: "700" },
+  topTitle: { fontSize: 18, fontWeight: "700", color: "#0F172A" },
 
-  // ── Page heading ──────────────────────────────────────────────
-  pageTitle: { fontSize: 28, fontWeight: "800", color: "#0F172A" },
-  breadcrumb: { color: "#64748B", marginTop: 4, fontSize: 13 },
+  pageTitle: { fontSize: 28, fontWeight: "800", color: "#0F172A", letterSpacing: -0.5 },
+  breadcrumb: { color: "#64748B", marginTop: 4, fontSize: 13, fontWeight: "500" },
 
-  // ── Filter chips ──────────────────────────────────────────────
-  filterRow: { flexGrow: 0, marginTop: 10, marginBottom: 4 },
-  filterChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: "#fff", borderWidth: 1.5, borderColor: "#E2E8F0" },
+  filterOuterWrap: { marginBottom: 12 },
+  filterRow: { flexGrow: 0, paddingVertical: 4 },
+  filterChip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 24, backgroundColor: "#fff", borderWidth: 1, borderColor: "#E2E8F0" },
   filterChipOn: { backgroundColor: "#EEF2FF", borderColor: "#4F46E5" },
-  filterChipTxt: { fontSize: 12.5, fontWeight: "600", color: "#64748B" },
-  filterChipTxtOn: { color: "#4F46E5" },
+  filterChipTxt: { fontSize: 13, fontWeight: "600", color: "#64748B" },
+  filterChipTxtOn: { color: "#4F46E5", fontWeight: "700" },
 
-  // ── Loader / empty ────────────────────────────────────────────
-  loaderWrap: { flex: 1, justifyContent: "center", alignItems: "center", paddingVertical: 60 },
-  loaderTxt: { marginTop: 12, color: "#64748B", fontSize: 14 },
-  emptyBox: { alignItems: "center", paddingVertical: 60, gap: 8 },
-  emptyTxt: { fontSize: 13, color: "#94A3B8", fontWeight: "600" },
+  loaderWrap: { flex: 1, justifyContent: "center", alignItems: "center", minHeight: 300 },
+  loaderTxt: { marginTop: 14, color: "#64748B", fontSize: 14, fontWeight: "500" },
+  emptyBox: { flex: 1, alignItems: "center", justifyContent: "center", minHeight: 300, gap: 12 },
+  emptyTxt: { fontSize: 14, color: "#94A3B8", fontWeight: "600" },
 
-  // ── Card ──────────────────────────────────────────────────────
-  card: { backgroundColor: "#fff", borderRadius: 18, padding: 14, marginBottom: 14, borderWidth: 1, borderColor: "#E2E8F0", elevation: 2 },
-  cardTop: { flexDirection: "row", gap: 12, marginBottom: 10 },
-  thumb: { width: 64, height: 64, borderRadius: 12 },
-  thumbEmpty: { backgroundColor: "#F1F5F9", justifyContent: "center", alignItems: "center" },
-  cardTitle: { fontSize: 15, fontWeight: "800", color: "#0F172A" },
-  subLine: { fontSize: 12, color: "#64748B", marginTop: 2 },
-  statusPill: { alignSelf: "flex-start", paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20, marginTop: 6 },
-  statusPillTxt: { fontSize: 10.5, fontWeight: "700" },
-  desc: { fontSize: 12.5, color: "#475569", lineHeight: 18, marginBottom: 10 },
+  card: { 
+    backgroundColor: "#fff", 
+    borderRadius: 16, 
+    padding: 18, 
+    borderWidth: 1, 
+    borderColor: "#E2E8F0",
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2 
+  },
+  webCard: {
+    width: "calc(50% - 10px)" as any, // 🚨 TypeScript Web Math Fix Applied Here!
+    minWidth: 420
+  },
+  cardTop: { flexDirection: "row", gap: 16, marginBottom: 14 },
+  thumb: { width: 72, height: 72, borderRadius: 12, backgroundColor: "#F1F5F9" },
+  thumbEmpty: { justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: "#E2E8F0", borderStyle: 'dashed' },
+  cardTitle: { fontSize: 16, fontWeight: "800", color: "#0F172A" },
+  subLine: { fontSize: 13, color: "#64748B", marginTop: 2, fontWeight: "500" },
+  statusPill: { alignSelf: "flex-start", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginTop: 6 },
+  statusPillTxt: { fontSize: 11, fontWeight: "700", letterSpacing: 0.2 },
+  desc: { fontSize: 13.5, color: "#475569", lineHeight: 20, marginBottom: 14 },
 
-  // ── Meta rows ─────────────────────────────────────────────────
-  metaGrid: { gap: 6, marginBottom: 10 },
-  metaRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  metaTxt: { fontSize: 12, color: "#64748B", flex: 1 },
+  metaGrid: { gap: 8, marginBottom: 16, backgroundColor: "#F8FAFC", padding: 12, borderRadius: 12 },
+  metaRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  metaTxt: { fontSize: 12.5, color: "#475569", flex: 1, fontWeight: "500" },
 
-  // ── Pay / reject info box ─────────────────────────────────────
-  payBox: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#DBEAFE", padding: 10, borderRadius: 10, marginBottom: 10 },
-  payBoxTxt: { fontSize: 12, color: "#1D4ED8", flex: 1, fontWeight: "600" },
+  payBox: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#EFF6FF", padding: 12, borderRadius: 12, marginBottom: 16 },
+  payBoxTxt: { fontSize: 12.5, color: "#1D4ED8", flex: 1, fontWeight: "600" },
 
-  // ── Action buttons ────────────────────────────────────────────
-  actionsRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
-  actionBtn: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1.5, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
-  actionBtnTxt: { fontSize: 12.5, fontWeight: "700" },
+  actionsRow: { flexDirection: "row", gap: 8, flexWrap: "wrap", marginTop: 'auto', paddingTop: 4 },
+  actionBtn: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1.5, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 9, backgroundColor: "#fff" },
+  actionBtnTxt: { fontSize: 13, fontWeight: "700" },
 
-  // ── Modals ────────────────────────────────────────────────────
-  modalOverlay: { flex: 1, backgroundColor: "rgba(15,23,42,0.55)", justifyContent: "center", padding: 20 },
-  modalBox: { backgroundColor: "#fff", borderRadius: 18, padding: 20, maxWidth: 440, width: "100%", alignSelf: "center" },
-  modalTitle: { fontSize: 17, fontWeight: "800", color: "#0F172A", marginBottom: 6 },
-  modalSub: { fontSize: 12.5, color: "#64748B", marginBottom: 14, lineHeight: 18 },
-  modalLabel: { fontSize: 12.5, fontWeight: "700", color: "#475569", marginBottom: 6, marginTop: 4 },
-  modalInput: { backgroundColor: "#F8FAFC", borderWidth: 1.5, borderColor: "#E2E8F0", borderRadius: 10, paddingHorizontal: 12, height: 46, fontSize: 14, color: "#111" },
-  modalBtnRow: { flexDirection: "row", gap: 10, marginTop: 18 },
-  modalCancelBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, borderWidth: 1.5, borderColor: "#E2E8F0", alignItems: "center" },
-  modalCancelTxt: { fontSize: 13.5, fontWeight: "700", color: "#64748B" },
-  modalSaveBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: "#4F46E5", alignItems: "center" },
-  modalSaveTxt: { fontSize: 13.5, fontWeight: "700", color: "#fff" },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(15,23,42,0.6)", justifyContent: "center", padding: 20 },
+  modalBox: { backgroundColor: "#fff", borderRadius: 20, padding: 24, maxWidth: 460, width: "100%", alignSelf: "center", shadowRadius: 24, shadowOpacity: 0.15 },
+  modalTitle: { fontSize: 18, fontWeight: "800", color: "#0F172A", marginBottom: 6, letterSpacing: -0.3 },
+  modalSub: { fontSize: 13, color: "#64748B", marginBottom: 16, lineHeight: 20, fontWeight: "400" },
+  modalLabel: { fontSize: 13, fontWeight: "700", color: "#334155", marginBottom: 6, marginTop: 8 },
+  modalInput: { backgroundColor: "#F8FAFC", borderWidth: 1.5, borderColor: "#E2E8F0", borderRadius: 12, paddingHorizontal: 14, height: 48, fontSize: 14, color: "#0F172A" },
+  modalBtnRow: { flexDirection: "row", gap: 12, marginTop: 20 },
+  modalCancelBtn: { flex: 1, paddingVertical: 13, borderRadius: 12, borderWidth: 1.5, borderColor: "#E2E8F0", alignItems: "center", backgroundColor: "#fff" },
+  modalCancelTxt: { fontSize: 14, fontWeight: "700", color: "#64748B" },
+  modalSaveBtn: { flex: 1, paddingVertical: 13, borderRadius: 12, backgroundColor: "#4F46E5", alignItems: "center" },
+  modalSaveTxt: { fontSize: 14, fontWeight: "700", color: "#fff" },
 });

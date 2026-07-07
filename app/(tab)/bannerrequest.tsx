@@ -24,18 +24,25 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-const API_URL  = "http://10.254.25.118:2000/banner-request";
+// Base API URL dynamically loaded from .env
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE || "http://127.0.0.1:2000";
+const API_URL  = `${API_BASE}/banner-request`;
 const isWeb    = Platform.OS === "web";
 
 const showAlert = (title: string, msg: string) =>
   isWeb ? window.alert(`${title}\n${msg}`) : Alert.alert(title, msg);
 
-// ── Reusable bits (kept local to this screen) ───────────────────────
-function TInput({ value, onChange, placeholder, keyboardType = "default", multiline = false }: any) {
+// ── Reusable Form Components ───────────────────────
+function TInput({ value, onChange, placeholder, keyboardType = "default", multiline = false, error }: any) {
   return (
     <TextInput
-      style={[styles.input, multiline && { height: 100, textAlignVertical: "top", paddingTop: 12 }]}
+      style={[
+        styles.input, 
+        multiline && { height: 110, textAlignVertical: "top", paddingTop: 14 },
+        error && styles.inputError // Visual red border indicator
+      ]}
       value={value}
       onChangeText={onChange}
       placeholder={placeholder}
@@ -57,6 +64,7 @@ function ChipGroup({ options, value, onChange }: {
           key={o.value}
           style={[styles.chip, value === o.value && styles.chipOn]}
           onPress={() => onChange(o.value)}
+          activeOpacity={0.7}
         >
           <Text style={[styles.chipTxt, value === o.value && styles.chipTxtOn]}>{o.label}</Text>
         </TouchableOpacity>
@@ -69,23 +77,20 @@ function SectionHead({ icon, title }: { icon: string; title: string }) {
   return (
     <View style={styles.secHead}>
       <View style={styles.secIcon}>
-        <Ionicons name={icon as any} size={15} color="#6366F1" />
+        <Ionicons name={icon as any} size={16} color="#4F46E5" />
       </View>
       <Text style={styles.secTitle}>{title}</Text>
     </View>
   );
 }
 
-function Card({ children }: { children: React.ReactNode }) {
-  return <View style={styles.card}>{children}</View>;
-}
-
-function FieldBox({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function FieldBox({ label, hint, error, children }: { label: string; hint?: string; error?: string; children: React.ReactNode }) {
   return (
     <View style={styles.fieldBox}>
       <Text style={styles.label}>{label}</Text>
       {children}
-      {!!hint && <Text style={styles.hint}>{hint}</Text>}
+      {!!error && <Text style={styles.errorTxt}>{error}</Text>}
+      {!!hint && !error && <Text style={styles.hint}>{hint}</Text>}
     </View>
   );
 }
@@ -149,32 +154,42 @@ export default function BannerRequestScreen() {
             mobile:    u.mobile    || "",
           }));
         }
-      } catch {}
-      setLoadingUser(false);
+      } catch (e) {
+        console.warn("Failed to load user session", e);
+      } finally {
+        setLoadingUser(false);
+      }
     })();
   }, []);
 
-  const pickBannerImage = async () => {
+ const pickBannerImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"], allowsEditing: true, quality: 0.85, aspect: [16, 9],
+      mediaTypes: ['images'], // 🚨 Fixed the deprecation warning
+      allowsEditing: true, 
+      quality: 0.85, 
+      aspect: [16, 9],
     });
-    if (!result.canceled) setBannerImage(result.assets[0].uri);
+    if (!result.canceled) {
+      setBannerImage(result.assets[0].uri);
+      setErrors(p => ({ ...p, banner_image: "" }));
+    }
   };
 
   const validate = (): boolean => {
     const e: { [k: string]: string } = {};
-    if (!form.full_name.trim())         e.full_name = "Name is required";
-    if (!form.email.trim())             e.email = "Email is required";
-    if (!form.mobile.trim())            e.mobile = "Mobile number is required";
-    if (!form.banner_title.trim())      e.banner_title = "Banner title is required";
+    if (!form.full_name.trim())          e.full_name = "Name is required";
+    if (!form.email.trim())              e.email = "Email is required";
+    if (!form.mobile.trim())             e.mobile = "Mobile number is required";
+    if (!form.banner_title.trim())       e.banner_title = "Banner title is required";
     if (!form.banner_description.trim()) e.banner_description = "Please describe what the banner is for";
-    if (!bannerImage)                   e.banner_image = "Please upload a banner image";
+    if (!bannerImage)                    e.banner_image = "Please upload a banner image";
     if (form.preferred_duration === "custom" && !form.preferred_start_date.trim()) {
       e.preferred_start_date = "Please specify preferred start date";
     }
+    
     setErrors(e);
     if (Object.keys(e).length > 0) {
-      showAlert("Missing information", "Please fill in all required fields.");
+      showAlert("Missing information", "Please fill in all required fields highlighted in red.");
       return false;
     }
     return true;
@@ -209,7 +224,7 @@ export default function BannerRequestScreen() {
       showAlert("Request Sent ✅", "Your advertisement banner request has been sent to the admin for review. You'll be notified once it's approved.");
       router.back();
     } catch {
-      showAlert("Error", "Failed to send request. Please try again.");
+      showAlert("Error", "Failed to send request. Please check your connection and try again.");
     } finally {
       setSubmitting(false);
     }
@@ -218,17 +233,17 @@ export default function BannerRequestScreen() {
   if (loadingUser) {
     return (
       <View style={styles.loaderWrap}>
-        <ActivityIndicator size="large" color="#6366F1" />
-        <Text style={styles.loaderTxt}>Loading...</Text>
+        <ActivityIndicator size="large" color="#4F46E5" />
+        <Text style={styles.loaderTxt}>Initializing form...</Text>
       </View>
     );
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#F1F5F9" }}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 80 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#F8FAFC" }} edges={['top']}>
+     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 130 }}>
 
-        {/* ══ HEADER ══ */}
+        {/* ══ HERO HEADER ══ */}
         <LinearGradient
           colors={["#312EBA", "#5B21B6", "#EC1D8F"]}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
@@ -239,129 +254,136 @@ export default function BannerRequestScreen() {
 
           <View style={styles.headerTopRow}>
             <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.8}>
-              <Ionicons name="arrow-back" size={20} color="#fff" />
+              <Ionicons name="arrow-back" size={22} color="#fff" />
             </TouchableOpacity>
             <View style={{ flex: 1 }}>
               <Text style={styles.headerTitle}>Request Ad Banner</Text>
-              <Text style={styles.headerSub}>Ask admin to feature your banner on the Home page</Text>
-            </View>
-          </View>
-
-          <View style={styles.iconCircleWrap}>
-            <View style={styles.iconCircle}>
-              <Ionicons name="megaphone-outline" size={30} color="#fff" />
+              <Text style={styles.headerSub}>Feature your business or event on the SVIMSAA Home page</Text>
             </View>
           </View>
         </LinearGradient>
 
-        {/* ══ FORM ══ */}
+        {/* ══ FORM CONTENT ══ */}
         <View style={styles.content}>
 
           {/* Info banner */}
           <View style={styles.infoBanner}>
-            <Ionicons name="information-circle-outline" size={16} color="#5B21B6" />
+            <Ionicons name="information-circle" size={20} color="#5B21B6" style={{ marginTop: 2 }} />
             <Text style={styles.infoBannerTxt}>
-              Fill out this form to request your advertisement banner be shown on the Home page.
-              An admin will review your request and get back to you.
+              Submit your banner asset and requirements here. An admin will review your artwork and assign a placement fee for your requested duration.
             </Text>
           </View>
 
           {/* Requester Info */}
           <SectionHead icon="person-outline" title="Your Details" />
-          <Card>
+          <View style={styles.card}>
             <Row2>
-              <FieldBox label="Full Name *">
-                <TInput value={form.full_name} onChange={(t: string) => set("full_name", t)} placeholder="Rahul Sharma" />
+              <FieldBox label="Full Name *" error={errors.full_name}>
+                <TInput value={form.full_name} onChange={(t: string) => set("full_name", t)} placeholder="Rahul Sharma" error={errors.full_name} />
               </FieldBox>
-              <FieldBox label="Mobile Number *">
-                <TInput value={form.mobile} onChange={(t: string) => set("mobile", t)} placeholder="98765 43210" keyboardType="phone-pad" />
+              <FieldBox label="Mobile Number *" error={errors.mobile}>
+                <TInput value={form.mobile} onChange={(t: string) => set("mobile", t)} placeholder="98765 43210" keyboardType="phone-pad" error={errors.mobile} />
               </FieldBox>
             </Row2>
-            <FieldBox label="Email *">
-              <TInput value={form.email} onChange={(t: string) => set("email", t)} placeholder="you@example.com" keyboardType="email-address" />
-            </FieldBox>
-            <FieldBox label="Organisation / Business Name" hint="Optional — if this ad is for a business">
-              <TInput value={form.organisation_name} onChange={(t: string) => set("organisation_name", t)} placeholder="Your company name" />
-            </FieldBox>
-          </Card>
+            <Row2>
+              <FieldBox label="Email Address *" error={errors.email}>
+                <TInput value={form.email} onChange={(t: string) => set("email", t)} placeholder="you@example.com" keyboardType="email-address" error={errors.email} />
+              </FieldBox>
+              <FieldBox label="Organisation / Business Name" hint="Optional">
+                <TInput value={form.organisation_name} onChange={(t: string) => set("organisation_name", t)} placeholder="e.g. Infosys Ltd." />
+              </FieldBox>
+            </Row2>
+          </View>
 
           {/* Banner details */}
-          <SectionHead icon="image-outline" title="Banner Details" />
-          <Card>
-            <FieldBox label="Banner Title *">
-              <TInput value={form.banner_title} onChange={(t: string) => set("banner_title", t)} placeholder="e.g. Grand Opening Offer!" />
+          <SectionHead icon="image-outline" title="Banner Artwork" />
+          <View style={styles.card}>
+            <FieldBox label="Banner Title *" error={errors.banner_title}>
+              <TInput value={form.banner_title} onChange={(t: string) => set("banner_title", t)} placeholder="e.g. Tech Conference 2026" error={errors.banner_title} />
             </FieldBox>
-            <FieldBox label="Description *" hint="What is this banner about?">
+            
+            <FieldBox label="Description *" hint="Briefly explain the purpose of this advertisement." error={errors.banner_description}>
               <TInput
                 value={form.banner_description}
                 onChange={(t: string) => set("banner_description", t)}
-                placeholder="Briefly describe the purpose of your banner..."
+                placeholder="We are hosting a recruitment drive and would like to..."
                 multiline
+                error={errors.banner_description}
               />
             </FieldBox>
-            <FieldBox label="Website / Link" hint="Optional — where should the banner link to?">
-              <TInput value={form.website_link} onChange={(t: string) => set("website_link", t)} placeholder="https://example.com" keyboardType="url" />
+
+            <FieldBox label="Website / Target Link" hint="Optional — Where should users be redirected when they tap the banner?">
+              <TInput value={form.website_link} onChange={(t: string) => set("website_link", t)} placeholder="https://yourwebsite.com" keyboardType="url" />
             </FieldBox>
 
             {/* Banner image upload */}
-            <FieldBox label="Banner Image *" hint="Recommended size: 1200 x 400px (16:9 works well)">
-              <TouchableOpacity style={styles.uploadBox} onPress={pickBannerImage} activeOpacity={0.85}>
+            <FieldBox label="Banner Image Asset *" hint="Required format: 16:9 Aspect Ratio (e.g. 1200 x 400px)" error={errors.banner_image}>
+              <TouchableOpacity 
+                style={[styles.uploadBox, !!errors.banner_image && { borderColor: "#DC2626", backgroundColor: "#FEF2F2" }]} 
+                onPress={pickBannerImage} 
+                activeOpacity={0.85}
+              >
                 {bannerImage ? (
                   <Image source={{ uri: bannerImage }} style={styles.uploadPreview} />
                 ) : (
                   <View style={styles.uploadEmpty}>
-                    <Ionicons name="cloud-upload-outline" size={26} color="#6366F1" />
-                    <Text style={styles.uploadEmptyTxt}>Tap to upload banner image</Text>
+                    <Ionicons name="cloud-upload-outline" size={32} color="#4F46E5" />
+                    <Text style={styles.uploadEmptyTxt}>Tap to select image from gallery</Text>
                   </View>
                 )}
                 {bannerImage && (
                   <View style={styles.uploadOverlay}>
                     <Ionicons name="camera" size={14} color="#fff" />
-                    <Text style={styles.uploadOverlayTxt}>Change</Text>
+                    <Text style={styles.uploadOverlayTxt}>Change Image</Text>
                   </View>
                 )}
               </TouchableOpacity>
             </FieldBox>
-          </Card>
+          </View>
 
           {/* Duration */}
-          <SectionHead icon="calendar-outline" title="Requested Duration" />
-          <Card>
-            <FieldBox label="How long should the banner run?">
+          <SectionHead icon="time-outline" title="Scheduling" />
+          <View style={styles.card}>
+            <FieldBox label="Requested Display Duration">
               <ChipGroup options={DURATION_OPTIONS} value={form.preferred_duration} onChange={v => set("preferred_duration", v)} />
             </FieldBox>
-            <FieldBox
-              label={form.preferred_duration === "custom" ? "Preferred Start Date *" : "Preferred Start Date"}
-              hint="Optional — admin will confirm the final schedule"
-            >
-              <TInput
-                value={form.preferred_start_date}
-                onChange={(t: string) => set("preferred_start_date", t)}
-                placeholder="YYYY-MM-DD"
-              />
-            </FieldBox>
-          </Card>
+            
+            {form.preferred_duration === "custom" && (
+              <FieldBox
+                label="Preferred Start Date *"
+                hint="Admin will review and confirm availability for this slot."
+                error={errors.preferred_start_date}
+              >
+                <TInput
+                  value={form.preferred_start_date}
+                  onChange={(t: string) => set("preferred_start_date", t)}
+                  placeholder="YYYY-MM-DD"
+                  error={errors.preferred_start_date}
+                />
+              </FieldBox>
+            )}
+          </View>
 
           {/* Notes */}
           <SectionHead icon="chatbox-ellipses-outline" title="Additional Notes" />
-          <Card>
-            <FieldBox label="Anything else the admin should know?" hint="Optional">
+          <View style={styles.card}>
+            <FieldBox label="Message for the Admin" hint="Optional">
               <TInput
                 value={form.additional_notes}
                 onChange={(t: string) => set("additional_notes", t)}
-                placeholder="Any special instructions..."
+                placeholder="Any special requests or instructions..."
                 multiline
               />
             </FieldBox>
-          </Card>
+          </View>
 
-          {/* Buttons */}
+          {/* Action Buttons */}
           <View style={styles.btnRow}>
             <TouchableOpacity
-              style={[styles.submitBtn, submitting && { opacity: 0.72 }]}
+              style={[styles.submitBtn, submitting && { opacity: 0.7 }]}
               onPress={handleSubmit}
               disabled={submitting}
-              activeOpacity={0.88}
+              activeOpacity={0.85}
             >
               <LinearGradient
                 colors={["#312EBA", "#5B21B6", "#EC1D8F"]}
@@ -372,146 +394,142 @@ export default function BannerRequestScreen() {
                   <ActivityIndicator color="#fff" size="small" />
                 ) : (
                   <>
-                    <Ionicons name="paper-plane-outline" size={18} color="#fff" />
-                    <Text style={styles.submitTxt}>Send Request to Admin</Text>
+                    <Ionicons name="paper-plane" size={18} color="#fff" />
+                    <Text style={styles.submitTxt}>Submit Application</Text>
                   </>
                 )}
               </LinearGradient>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.cancelBtn} onPress={() => router.back()} activeOpacity={0.85}>
+            <TouchableOpacity style={styles.cancelBtn} onPress={() => router.back()} activeOpacity={0.8}>
               <Text style={styles.cancelTxt}>Cancel</Text>
             </TouchableOpacity>
           </View>
 
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  loaderWrap: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#F1F5F9" },
-  loaderTxt:  { marginTop: 12, color: "#64748B", fontSize: 14 },
+  loaderWrap: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#F8FAFC" },
+  loaderTxt:  { marginTop: 14, color: "#64748B", fontSize: 15, fontWeight: "500" },
 
   header: {
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === "ios" ? 54 : 20,
-    paddingBottom: 34,
+    paddingHorizontal: 24,
+    paddingTop: 10, // 🚨 Let SafeAreaView handle the camera notch automatically
+    paddingBottom: 40,
     overflow: "hidden",
   },
   dec1: {
     position: "absolute", right: -60, top: -40,
     width: 220, height: 220, borderRadius: 110,
-    borderWidth: 1.5, borderColor: "rgba(255,255,255,0.12)",
+    borderWidth: 2, borderColor: "rgba(255,255,255,0.1)",
   },
   dec2: {
-    position: "absolute", right: 30, top: 40,
-    width: 120, height: 120, borderRadius: 60,
-    backgroundColor: "rgba(255,255,255,0.07)",
+    position: "absolute", right: 40, top: 50,
+    width: 140, height: 140, borderRadius: 70,
+    backgroundColor: "rgba(255,255,255,0.06)",
   },
 
   headerTopRow: {
     flexDirection: "row", alignItems: "center",
-    gap: 12, marginBottom: 20,
+    gap: 16, marginBottom: 10,
   },
   backBtn: {
-    width: 38, height: 38, borderRadius: 11,
-    backgroundColor: "rgba(255,255,255,0.18)",
+    width: 44, height: 44, borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.15)",
     justifyContent: "center", alignItems: "center",
   },
-  headerTitle: { fontSize: 20, fontWeight: "800", color: "#fff" },
-  headerSub:   { fontSize: 12, color: "rgba(255,255,255,0.72)", marginTop: 2 },
-
-  iconCircleWrap: { alignItems: "center", marginTop: 6 },
-  iconCircle: {
-    width: 68, height: 68, borderRadius: 34,
-    backgroundColor: "rgba(255,255,255,0.18)",
-    borderWidth: 1.5, borderColor: "rgba(255,255,255,0.3)",
-    justifyContent: "center", alignItems: "center",
-  },
+  headerTitle: { fontSize: 24, fontWeight: "800", color: "#fff", letterSpacing: -0.5 },
+  headerSub:   { fontSize: 13.5, color: "rgba(255,255,255,0.8)", marginTop: 4, fontWeight: "500", lineHeight: 18 },
 
   content: {
-    padding: isWeb ? 28 : 16,
-    maxWidth: isWeb ? 1400 : undefined,
+    padding: isWeb ? 32 : 16,
+    maxWidth: isWeb ? 800 : undefined,
     alignSelf: "center",
     width: "100%",
-    marginBottom: Platform.OS === "web" ? 0 : 50,
+    marginTop: -20, // Pulls the content up slightly to overlap the header nicely
   },
 
   infoBanner: {
-    flexDirection: "row", alignItems: "flex-start", gap: 8,
-    backgroundColor: "#F3E8FF", borderRadius: 14,
-    padding: 14, marginBottom: 8,
+    flexDirection: "row", alignItems: "flex-start", gap: 12,
+    backgroundColor: "#EEF2FF", borderRadius: 16,
+    padding: 16, marginBottom: 10,
+    borderWidth: 1, borderColor: "#E0E7FF"
   },
-  infoBannerTxt: { flex: 1, fontSize: 12.5, color: "#5B21B6", lineHeight: 18 },
+  infoBannerTxt: { flex: 1, fontSize: 13, color: "#4338CA", lineHeight: 20, fontWeight: "500" },
 
   secHead: {
-    flexDirection: "row", alignItems: "center", gap: 10,
-    marginTop: 22, marginBottom: 10,
-    paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: "#E2E8F0",
+    flexDirection: "row", alignItems: "center", gap: 12,
+    marginTop: 24, marginBottom: 12,
+    paddingBottom: 8,
   },
   secIcon: {
-    width: 28, height: 28, borderRadius: 8,
+    width: 32, height: 32, borderRadius: 10,
     backgroundColor: "#EEF2FF",
     justifyContent: "center", alignItems: "center",
   },
-  secTitle: { fontSize: 14, fontWeight: "700", color: "#0F172A" },
+  secTitle: { fontSize: 16, fontWeight: "800", color: "#0F172A", letterSpacing: -0.2 },
 
   card: {
-    backgroundColor: "#fff", borderRadius: 20, padding: 16,
-    marginBottom: 4,
-    shadowColor: "#000", shadowOpacity: 0.05,
-    shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2,
+    backgroundColor: "#fff", borderRadius: 20, padding: 20,
+    shadowColor: "#0F172A", shadowOpacity: 0.04,
+    shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 2,
+    borderWidth: 1, borderColor: "#F1F5F9"
   },
 
-  rowWeb: { flexDirection: "row", gap: 12 },
+  rowWeb: { flexDirection: "row", gap: 16 },
   rowMob: { flexDirection: "column" },
 
-  fieldBox: { marginBottom: 14 },
-  label: { fontSize: 13, fontWeight: "600", color: "#475569", marginBottom: 6 },
-  hint:  { fontSize: 11.5, color: "#94A3B8", marginTop: 5 },
+  fieldBox: { marginBottom: 18 },
+  label: { fontSize: 13.5, fontWeight: "700", color: "#334155", marginBottom: 8 },
+  hint:  { fontSize: 12, color: "#94A3B8", marginTop: 6 },
+  errorTxt: { fontSize: 12, color: "#DC2626", marginTop: 6, fontWeight: "500" },
 
   input: {
     backgroundColor: "#F8FAFC", borderWidth: 1.5, borderColor: "#E2E8F0",
-    borderRadius: 12, paddingHorizontal: 14, height: 48,
-    fontSize: 14, color: "#111",
+    borderRadius: 14, paddingHorizontal: 16, height: 52,
+    fontSize: 14, color: "#0F172A",
+  },
+  inputError: {
+    borderColor: "#FCA5A5", backgroundColor: "#FEF2F2"
   },
 
-  chipRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
-  chip:    { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 20, backgroundColor: "#F8FAFC", borderWidth: 1.5, borderColor: "#E2E8F0" },
+  chipRow: { flexDirection: "row", gap: 10, flexWrap: "wrap" },
+  chip:    { paddingHorizontal: 18, paddingVertical: 12, borderRadius: 24, backgroundColor: "#F8FAFC", borderWidth: 1.5, borderColor: "#E2E8F0" },
   chipOn:  { backgroundColor: "#EEF2FF", borderColor: "#4F46E5" },
-  chipTxt:   { fontSize: 13, fontWeight: "600", color: "#64748B" },
-  chipTxtOn: { color: "#4F46E5" },
+  chipTxt:   { fontSize: 13.5, fontWeight: "600", color: "#64748B" },
+  chipTxtOn: { color: "#4F46E5", fontWeight: "700" },
 
   uploadBox: {
-    height: 160, borderRadius: 14, overflow: "hidden",
-    backgroundColor: "#F8FAFC", borderWidth: 1.5, borderColor: "#E2E8F0",
+    height: 180, borderRadius: 16, overflow: "hidden",
+    backgroundColor: "#F8FAFC", borderWidth: 2, borderColor: "#E2E8F0",
     borderStyle: "dashed", justifyContent: "center", alignItems: "center",
   },
-  uploadEmpty: { alignItems: "center", gap: 6 },
-  uploadEmptyTxt: { fontSize: 13, color: "#6366F1", fontWeight: "600" },
-  uploadPreview: { width: "100%", height: "100%" },
+  uploadEmpty: { alignItems: "center", gap: 8 },
+  uploadEmptyTxt: { fontSize: 14, color: "#4F46E5", fontWeight: "600" },
+  uploadPreview: { width: "100%", height: "100%", resizeMode: "cover" },
   uploadOverlay: {
-    position: "absolute", bottom: 8, right: 8,
-    flexDirection: "row", alignItems: "center", gap: 5,
-    backgroundColor: "rgba(0,0,0,0.55)",
-    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20,
+    position: "absolute", bottom: 12, right: 12,
+    flexDirection: "row", alignItems: "center", gap: 6,
+    backgroundColor: "rgba(15, 23, 42, 0.75)",
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20,
   },
-  uploadOverlayTxt: { color: "#fff", fontSize: 11, fontWeight: "600" },
+  uploadOverlayTxt: { color: "#fff", fontSize: 12, fontWeight: "600" },
 
-  btnRow: { flexDirection: "row", gap: 12, marginTop: 28 },
+  btnRow: { flexDirection: "row", gap: 12, marginTop: 24 },
   submitBtn: { flex: 2, borderRadius: 16, overflow: "hidden" },
   submitBtnInner: {
     flexDirection: "row", alignItems: "center",
-    justifyContent: "center", gap: 8, paddingVertical: 15,
+    justifyContent: "center", gap: 10, paddingVertical: 16,
   },
-  submitTxt: { color: "#fff", fontWeight: "800", fontSize: 15 },
+  submitTxt: { color: "#fff", fontWeight: "800", fontSize: 16 },
   cancelBtn: {
-    flex: 1, flexDirection: "row", alignItems: "center",
-    justifyContent: "center", gap: 6,
-    backgroundColor: "#000", borderRadius: 16,
-    paddingVertical: 15, borderWidth: 1.5, borderColor: "#E2E8F0",
+    flex: 1, alignItems: "center", justifyContent: "center",
+    backgroundColor: "#fff", borderRadius: 16,
+    paddingVertical: 16, borderWidth: 1.5, borderColor: "#E2E8F0",
   },
-  cancelTxt: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  cancelTxt: { color: "#475569", fontWeight: "700", fontSize: 15 },
 });

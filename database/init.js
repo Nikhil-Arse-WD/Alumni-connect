@@ -20,16 +20,21 @@ const rateLimit = require("express-rate-limit");
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, 
   max: 100,
-  message: "Too many requests from this IP, please try again after 15 minutes"
+  handler: (req, res) => {
+    // FORCE JSON RESPONSE
+    res.status(429).json({ success: false, message: "Too many requests from this IP, please try again after 15 minutes" });
+  }
 });
 
 // Strict limiter specifically for Login and Payment routes to prevent brute-forcing
 const strictLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, 
   max: 10, // Only 10 attempts allowed
-  message: "Too many attempts, please try again later."
+  handler: (req, res) => {
+    // FORCE JSON RESPONSE
+    res.status(429).json({ success: false, message: "Too many attempts, please try again later." });
+  }
 });
-
 // Apply general limiter to all routes
 app.use(generalLimiter);
 
@@ -105,9 +110,14 @@ const db = mysql.createPool({
   queueLimit: 0
 });
 
-db.connect((err) => {
-  if (err) { console.log("DB Error", err); return; }
-  console.log("MySQL Connected ✅");
+db.getConnection((err, connection) => {
+  if (err) { 
+    console.error("DB Pool Connection Error:", err); 
+    return; 
+  }
+  // Release the connection back to the pool immediately after a successful test
+  if (connection) connection.release();
+  console.log("MySQL Pool Connected ✅");
 });
 
 // =====================================
@@ -253,7 +263,8 @@ app.post("/login", (req, res) => {
     }
 
     let isMatch = false;
-    try { isMatch = await bcrypt.compare(password, user.password); } catch (e) { isMatch = false; }
+// Wrapping in String() guarantees bcrypt won't crash if the password is numbers only
+try { isMatch = await bcrypt.compare(String(password), String(user.password)); } catch (e) { isMatch = false; }
     if (!isMatch) return res.status(401).json({ success: false, message: "Invalid credentials" });
     
     res.json({
@@ -1656,32 +1667,15 @@ app.post("/pay/initiate", async (req, res) => {
       }
     }
   );
-});
-// ── WEBHOOK: PAYMENT SUCCESS ──
+});// ── WEBHOOK: PAYMENT SUCCESS ──
 app.post("/pay/success", (req, res) => {
-  // 1. Extract ALL fields sent back by Easebuzz required for the reverse hash
-  const { 
-    status, txnid, easepayid, amount, productinfo, firstname, email, 
-    udf1, udf2, udf3, udf4, udf5, udf6, udf7, udf8, udf9, udf10, 
-    hash, key 
-  } = req.body;
-
+  const { status, txnid, easepayid, amount, productinfo, firstname, email, udf1, udf2, udf3, udf4, udf5, udf6, udf7, udf8, udf9, udf10, hash, key } = req.body;
   const salt = process.env.EASEBUZZ_SALT;
-
-  // 2. Prepare the exact Reverse Hash Sequence
-  // Sequence: salt|status|udf10|udf9|udf8|udf7|udf6|udf5|udf4|udf3|udf2|udf1|email|firstname|productinfo|amount|txnid|key  
   const reverseHashString = `${salt}|${status}|${udf10 || ""}|${udf9 || ""}|${udf8 || ""}|${udf7 || ""}|${udf6 || ""}|${udf5 || ""}|${udf4 || ""}|${udf3 || ""}|${udf2 || ""}|${udf1 || ""}|${email}|${firstname}|${productinfo}|${amount}|${txnid}|${key}`;
-  
-  // 3. Encrypt the Hash String
   const calculatedHash = crypto.createHash("sha512").update(reverseHashString).digest("hex");
 
-  // 4. THE SECURITY CHECK (Match the Hashes)
-  if (calculatedHash !== hash) {
-    console.error(`🚨 SECURITY ALERT: Fake webhook payload detected for TXN: ${txnid}`);
-    return res.status(403).send("Transaction verification failed. Hash mismatch.");
-  }
+  if (calculatedHash !== hash) return res.status(403).send("Hash mismatch.");
 
-  // ── 5. DECODE THE URL AND PROCEED SAFELY ──
   const decodedUrl = udf3 ? Buffer.from(udf3, "hex").toString("utf-8") : "";
 
   if (status === "success") {
@@ -1697,56 +1691,62 @@ app.post("/pay/success", (req, res) => {
       });
     } else if (udf1 === "DON") {
       db.query("UPDATE donations SET payment_status = 'Paid' WHERE id = ?", [udf2]);
+    } else if (udf1 === "BAN") {
+      db.query("UPDATE banner_requests SET payment_status = 'Paid', status = 'Approved' WHERE id = ?", [udf2]);
     }
 
     res.send(`
       <html><body style="display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;background:#F8FAFC;font-family:sans-serif;text-align:center;">
         <script>
-          // Instantly triggers deep link to auto-close Expo browser!
-          if ("${decodedUrl}") { window.location.href = "${decodedUrl}"; }
+          if (window.opener) {
+            // WEB POPUP MODE: Send hidden success message to the main app and auto-close!
+            window.opener.postMessage({ type: 'PAYMENT_RETURN', status: 'success' }, "*");
+            window.close();
+          } else {
+            // MOBILE MODE: Attach status to the deep link and trigger it
+            if ("${decodedUrl}") { 
+              const separator = "${decodedUrl}".includes("?") ? "&" : "?";
+              window.location.href = "${decodedUrl}" + separator + "status=success"; 
+            }
+          }
         </script>
         <h2 style="color:#16A34A;font-size:32px;">Payment Successful ✅</h2>
-        <p style="color:#475569;font-size:18px;">Taking you back to the app...</p>
+        <p style="color:#475569;font-size:18px;">Verifying transaction...</p>
       </body></html>
     `);
   } else {
-    // If the hash is valid, but the payment itself somehow failed
     res.redirect(307, "/pay/failed");
   }
 });
 
 // ── WEBHOOK: PAYMENT FAILED ──
 app.post("/pay/failed", (req, res) => {
-  const { 
-    status, txnid, amount, productinfo, firstname, email, 
-    udf1, udf2, udf3, udf4, udf5, udf6, udf7, udf8, udf9, udf10, 
-    hash, key, error_Message 
-  } = req.body;
-  
+  const { status, txnid, amount, productinfo, firstname, email, udf1, udf2, udf3, udf4, udf5, udf6, udf7, udf8, udf9, udf10, hash, key, error_Message } = req.body;
   const salt = process.env.EASEBUZZ_SALT;
-
-  // 1. Security Check for Failed payments too (so nobody can fake a failure to mess with your database)
   const reverseHashString = `${salt}|${status}|${udf10 || ""}|${udf9 || ""}|${udf8 || ""}|${udf7 || ""}|${udf6 || ""}|${udf5 || ""}|${udf4 || ""}|${udf3 || ""}|${udf2 || ""}|${udf1 || ""}|${email}|${firstname}|${productinfo}|${amount}|${txnid}|${key}`;
   const calculatedHash = crypto.createHash("sha512").update(reverseHashString).digest("hex");
 
-  if (calculatedHash !== hash) {
-    console.error(`🚨 SECURITY ALERT: Fake webhook payload detected for TXN: ${txnid}`);
-    return res.status(403).send("Transaction verification failed. Hash mismatch.");
-  }
+  if (calculatedHash !== hash) return res.status(403).send("Hash mismatch.");
 
-  // 2. Decode the URL and handle the failure
   const decodedUrl = udf3 ? Buffer.from(udf3, "hex").toString("utf-8") : "";
-  
   db.query(`UPDATE transactions SET status = 'Failed', error_message = ? WHERE txnid = ?`, [error_Message || "Failed", txnid]);
   if (udf1 === "DON") db.query("UPDATE donations SET payment_status = 'Failed' WHERE id = ?", [udf2]);
 
   res.send(`
     <html><body style="display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;background:#F8FAFC;font-family:sans-serif;text-align:center;">
       <script>
-        if ("${decodedUrl}") { window.location.href = "${decodedUrl}"; }
+        if (window.opener) {
+          window.opener.postMessage({ type: 'PAYMENT_RETURN', status: 'failed' }, "*");
+          window.close();
+        } else {
+          if ("${decodedUrl}") { 
+            const separator = "${decodedUrl}".includes("?") ? "&" : "?";
+            window.location.href = "${decodedUrl}" + separator + "status=failed"; 
+          }
+        }
       </script>
       <h2 style="color:#DC2626;font-size:32px;">Payment Failed ❌</h2>
-      <p style="color:#475569;font-size:18px;">Taking you back to the app...</p>
+      <p style="color:#475569;font-size:18px;">Returning to application...</p>
     </body></html>
   `);
 });

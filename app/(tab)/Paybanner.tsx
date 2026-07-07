@@ -1,279 +1,310 @@
 // ======================================================
-// paybanner.tsx
-// DEMO payment screen — koi real gateway nahi, sirf
-// simulation. Submit karte hi banner auto-approve ho jata hai.
-// Route: app/paybanner.tsx
+// Paybanner.tsx
+// Order Review and Secure Checkout Pipeline for Ad Banners
+// Route: app/(tab)/Paybanner.tsx
 // Navigate with params: { id, amount, title }
 // ======================================================
 
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import { LinearGradient } from "expo-linear-gradient";
+import * as ExpoLinking from "expo-linking";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useState } from "react";
+import * as WebBrowser from "expo-web-browser";
+import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  useWindowDimensions,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-const API = "http://10.254.25.118:2000";
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE;
 const isWeb = Platform.OS === "web";
 
 const showAlert = (title: string, msg: string) =>
   isWeb ? window.alert(`${title}\n${msg}`) : Alert.alert(title, msg);
 
-type Mode = "card" | "upi";
-
 export default function PayBannerScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id: string; amount: string; title: string }>();
+  const { width } = useWindowDimensions();
+  const isWebLayout = width >= 768;
 
-  const [mode, setMode] = useState<Mode>("upi");
-  const [upiId, setUpiId] = useState("");
-  const [cardNumber, setCardNumber] = useState("");
-  const [cardName, setCardName] = useState("");
-  const [expiry, setExpiry] = useState("");
-  const [cvv, setCvv] = useState("");
+  // ── Connection & Setup States ──
+  const [envConfigError, setEnvConfigError] = useState(false);
+  const [paramError, setParamError] = useState(false);
+  const [isLoadingUser, setIsLoadingUser] = useState(true);
   const [paying, setPaying] = useState(false);
-  const [success, setSuccess] = useState(false);
 
-  const formatCardNumber = (t: string) => {
-    const digits = t.replace(/\D/g, "").slice(0, 16);
-    return digits.replace(/(.{4})/g, "$1 ").trim();
-  };
+  // User details cache needed for Easebuzz validation tokens
+  const [userProfile, setUserProfile] = useState<{
+    full_name: string;
+    email: string;
+    mobile: string;
+  } | null>(null);
 
-  const formatExpiry = (t: string) => {
-    const digits = t.replace(/\D/g, "").slice(0, 4);
-    if (digits.length <= 2) return digits;
-    return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-  };
-
-  const validate = () => {
-    if (mode === "upi") {
-      if (!upiId.includes("@")) {
-        showAlert("Invalid UPI ID", "Please enter a valid UPI ID, e.g. yourname@upi");
-        return false;
-      }
-    } else {
-      if (cardNumber.replace(/\s/g, "").length < 16) {
-        showAlert("Invalid Card", "Please enter a valid 16-digit card number");
-        return false;
-      }
-      if (!cardName.trim()) {
-        showAlert("Missing Name", "Please enter the name on card");
-        return false;
-      }
-      if (expiry.length < 5) {
-        showAlert("Invalid Expiry", "Please enter expiry as MM/YY");
-        return false;
-      }
-      if (cvv.length < 3) {
-        showAlert("Invalid CVV", "Please enter a valid CVV");
-        return false;
-      }
+  // ── Verify System and Parameters on Mount ──
+  useEffect(() => {
+    if (!API_BASE) {
+      setEnvConfigError(true);
+      setIsLoadingUser(false);
+      return;
     }
-    return true;
-  };
 
-  const handlePay = async () => {
-    if (!validate()) return;
+    if (!params.id || !params.amount || !params.title) {
+      setParamError(true);
+      setIsLoadingUser(false);
+      return;
+    }
+
+    (async () => {
+      try {
+        const storedUser = await AsyncStorage.getItem("user");
+        if (storedUser) {
+          setUserProfile(JSON.parse(storedUser));
+        } else {
+          setUserProfile({ full_name: "Alumni Member", email: "alumni@svimsaa.com", mobile: "9999999999" });
+        }
+      } catch (err) {
+        console.error("Session fetch failed:", err);
+      } finally {
+        setIsLoadingUser(false);
+      }
+    })();
+  }, [params.id, params.amount, params.title]);
+
+  // ── Secure Easebuzz Gateway Transaction Dispatcher ──
+  const handleSecurePayment = async () => {
+    if (envConfigError || paramError || !userProfile) return;
+    
     try {
       setPaying(true);
-      // ── DEMO ONLY — koi real gateway call nahi ho raha ──
-      await new Promise(r => setTimeout(r, 1400)); // fake "processing" delay
-      await axios.put(`${API}/banner-request/demo-pay/${params.id}`);
-      setSuccess(true);
-    } catch {
-      showAlert("Payment Failed", "Something went wrong. Please try again.");
-    } finally {
+
+      const returnUrl = ExpoLinking.createURL("/mybanner");
+      const safeName = userProfile.full_name.trim().replace(/[^a-zA-Z\s]/g, "").slice(0, 50) || "Alumni";
+      const safePhone = userProfile.mobile.replace(/\D/g, "").slice(-10) || "9999999999";
+
+      const response = await axios.post(`${API_BASE}/pay/initiate`, {
+        amount: parseFloat(params.amount),
+        firstname: safeName,
+        email: userProfile.email.trim(),
+        phone: safePhone,
+        productinfo: `Ad Slot Placement Fee: ${params.title.slice(0, 30)}`,
+        payment_type: "BAN", 
+        reference_id: params.id, 
+        return_url: returnUrl
+      });
+
+      if (response.data && response.data.checkout_url) {
+        const checkoutUrl = response.data.checkout_url;
+
+        if (isWeb) {
+          // ── WEB: Open Mini Window Popup ──
+          const width = 500; const height = 750;
+          const left = (window.innerWidth - width) / 2;
+          const top = (window.innerHeight - height) / 2;
+          const popup = window.open(checkoutUrl, "Payment", `width=${width},height=${height},left=${left},top=${top}`);
+
+          const handleMessage = (event: any) => {
+            if (event.data?.type === 'PAYMENT_RETURN') {
+              window.removeEventListener('message', handleMessage);
+              setPaying(false);
+              
+              if (event.data.status === 'success') {
+                showAlert("Payment Successful! ✅", "Your placement fee has been processed and your banner is now live on the Home page.");
+                router.replace("/mybanner");
+              } else {
+                showAlert("Transaction Failed", "The payment was incomplete. Please retry.");
+              }
+            }
+          };
+          window.addEventListener('message', handleMessage);
+
+          const checkClosed = setInterval(() => {
+            if (popup?.closed) {
+              clearInterval(checkClosed);
+              setPaying(false);
+              window.removeEventListener('message', handleMessage);
+            }
+          }, 1000);
+
+        } else {
+          // ── MOBILE: In-App Browser with Deep Link Parsing ──
+          const browserResult = await WebBrowser.openAuthSessionAsync(checkoutUrl, returnUrl);
+          setPaying(false);
+
+          if (browserResult.type === 'success' && browserResult.url) {
+            const parsed = ExpoLinking.parse(browserResult.url);
+            if (parsed.queryParams?.status === 'success') {
+              showAlert("Payment Successful! ✅", "Your placement fee has been processed and your banner is now live on the Home page.");
+              router.replace("/mybanner");
+            } else {
+              showAlert("Transaction Failed", "The payment was incomplete. Please retry.");
+            }
+          } else {
+            showAlert("Payment Cancelled", "You closed the gateway before completing the payment.");
+          }
+        }
+      } else {
+        throw new Error("Invalid payload mapping token returned from core api server.");
+      }
+    } catch (error: any) {
+      // ── FIXED CATCH BLOCK ──
       setPaying(false);
+      const errMsg = error?.response?.data?.message || error?.message || "Gateway handshake link loss.";
+      showAlert("Checkout Routing Error", errMsg);
     }
   };
 
-  if (success) {
+  if (envConfigError) {
     return (
-      <View style={styles.successWrap}>
-        <View style={styles.successIcon}>
-          <Ionicons name="checkmark" size={44} color="#fff" />
-        </View>
-        <Text style={styles.successTitle}>Payment Successful!</Text>
-        <Text style={styles.successSub}>
-          ₹{params.amount} paid for "{params.title}". Your banner is now approved and live on the Home page.
-        </Text>
-        <TouchableOpacity style={styles.successBtn} onPress={() => router.replace("/mybanner")} activeOpacity={0.88}>
-          <Text style={styles.successBtnTxt}>View My Requests</Text>
+      <View style={styles.errorContainer}>
+        <Ionicons name="cloud-offline-outline" size={54} color="#EF4444" />
+        <Text style={styles.errorTitle}>Configuration Mismatch</Text>
+        <Text style={styles.errorSub}>The backend endpoint variable is undefined. Please ensure EXPO_PUBLIC_API_BASE is properly mapped inside your root environment configuration file.</Text>
+      </View>
+    );
+  }
+
+  if (paramError) {
+    return (
+      <View style={styles.errorContainer}>
+        <Ionicons name="alert-circle-outline" size={54} color="#F59E0B" />
+        <Text style={styles.errorTitle}>Invoice Record Missing</Text>
+        <Text style={styles.errorSub}>Unable to load checkout context. The target invoice unique parameter references are missing or corrupted.</Text>
+        <TouchableOpacity style={styles.errorBtn} onPress={() => router.back()}>
+          <Text style={styles.errorBtnTxt}>Go Back</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
+  if (isLoadingUser) {
+    return (
+      <View style={styles.loaderWrap}>
+        <ActivityIndicator size="large" color="#4F46E5" />
+        <Text style={styles.loaderTxt}>Generating checkout statement...</Text>
+      </View>
+    );
+  }
+
   return (
-    <View style={{ flex: 1, backgroundColor: "#F1F5F9" }}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        
         <LinearGradient colors={["#312EBA", "#5B21B6", "#EC1D8F"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.header}>
           <View style={styles.headerTopRow}>
             <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.8}>
-              <Ionicons name="arrow-back" size={20} color="#fff" />
+              <Ionicons name="arrow-back" size={22} color="#fff" />
             </TouchableOpacity>
             <View style={{ flex: 1 }}>
-              <Text style={styles.headerTitle}>Complete Payment</Text>
-              <Text style={styles.headerSub}>Banner: {params.title}</Text>
+              <Text style={styles.headerTitle}>Billing Summary</Text>
+              <Text style={styles.headerSub}>Verify payment requirements before checkout</Text>
             </View>
           </View>
 
           <View style={styles.amountBox}>
-            <Text style={styles.amountLabel}>Amount to Pay</Text>
-            <Text style={styles.amountValue}>₹{params.amount}</Text>
+            <Text style={styles.amountLabel}>Total Placement Fee</Text>
+            <Text style={styles.amountValue}>₹{parseFloat(params.amount || "0").toLocaleString("en-IN")}.00</Text>
           </View>
         </LinearGradient>
 
-        <View style={styles.demoNotice}>
-          <Ionicons name="information-circle-outline" size={16} color="#B45309" />
-          <Text style={styles.demoNoticeTxt}>
-            This is a demo payment screen for testing. No real transaction will occur — any details you enter are not sent anywhere.
-          </Text>
-        </View>
-
-        <View style={styles.content}>
-          {/* Mode switch */}
-          <View style={styles.modeRow}>
-            <TouchableOpacity style={[styles.modeBtn, mode === "upi" && styles.modeBtnOn]} onPress={() => setMode("upi")}>
-              <Ionicons name="phone-portrait-outline" size={16} color={mode === "upi" ? "#4F46E5" : "#64748B"} />
-              <Text style={[styles.modeTxt, mode === "upi" && styles.modeTxtOn]}>UPI</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.modeBtn, mode === "card" && styles.modeBtnOn]} onPress={() => setMode("card")}>
-              <Ionicons name="card-outline" size={16} color={mode === "card" ? "#4F46E5" : "#64748B"} />
-              <Text style={[styles.modeTxt, mode === "card" && styles.modeTxtOn]}>Card</Text>
-            </TouchableOpacity>
+        <View style={[styles.contentWrapper, isWebLayout && styles.webContentBox]}>
+          
+          <Text style={styles.sectionTitle}>Asset & Slot Allocation Details</Text>
+          <View style={styles.invoiceCard}>
+            <View style={styles.invoiceRow}>
+              <Text style={styles.invoiceLabel}>Advertisement Reference</Text>
+              <Text style={styles.invoiceValue} numberOfLines={1}>{params.title}</Text>
+            </View>
+            <View style={styles.invoiceRow}>
+              <Text style={styles.invoiceLabel}>Application Registry ID</Text>
+              <Text style={[styles.invoiceValue, styles.mono]}>#B-00{params.id}</Text>
+            </View>
+            <View style={styles.invoiceRow}>
+              <Text style={styles.invoiceLabel}>Billed Recipient</Text>
+              <Text style={styles.invoiceValue}>{userProfile?.full_name}</Text>
+            </View>
+            <View style={[styles.invoiceRow, { borderBottomWidth: 0 }]}>
+              <Text style={styles.invoiceLabel}>Secure Gateway Routing</Text>
+              <Text style={styles.invoiceValue}>Easebuzz Sandbox Pipeline</Text>
+            </View>
           </View>
 
-          <View style={styles.card}>
-            {mode === "upi" ? (
-              <View>
-                <Text style={styles.label}>UPI ID</Text>
-                <TextInput
-                  style={styles.input}
-                  value={upiId}
-                  onChangeText={setUpiId}
-                  placeholder="yourname@upi"
-                  placeholderTextColor="#94A3B8"
-                  autoCapitalize="none"
-                />
-              </View>
-            ) : (
-              <View style={{ gap: 14 }}>
-                <View>
-                  <Text style={styles.label}>Card Number</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={cardNumber}
-                    onChangeText={t => setCardNumber(formatCardNumber(t))}
-                    placeholder="1234 5678 9012 3456"
-                    placeholderTextColor="#94A3B8"
-                    keyboardType="number-pad"
-                    maxLength={19}
-                  />
-                </View>
-                <View>
-                  <Text style={styles.label}>Name on Card</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={cardName}
-                    onChangeText={setCardName}
-                    placeholder="John Doe"
-                    placeholderTextColor="#94A3B8"
-                  />
-                </View>
-                <View style={{ flexDirection: "row", gap: 12 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Expiry</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={expiry}
-                      onChangeText={t => setExpiry(formatExpiry(t))}
-                      placeholder="MM/YY"
-                      placeholderTextColor="#94A3B8"
-                      keyboardType="number-pad"
-                      maxLength={5}
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>CVV</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={cvv}
-                      onChangeText={t => setCvv(t.replace(/\D/g, "").slice(0, 3))}
-                      placeholder="123"
-                      placeholderTextColor="#94A3B8"
-                      keyboardType="number-pad"
-                      secureTextEntry
-                      maxLength={3}
-                    />
-                  </View>
-                </View>
-              </View>
-            )}
+          <View style={styles.complianceBox}>
+            <Ionicons name="shield-checkmark" size={18} color="#16A34A" style={{ marginTop: 2 }} />
+            <Text style={styles.complianceTxt}>
+              This network link utilizes end-to-end cryptographic SHA-512 authentication signatures. Your standard financial credentials are encrypted safely off-device and are never processed locally.
+            </Text>
           </View>
 
-          <TouchableOpacity style={[styles.payBtn, paying && { opacity: 0.75 }]} onPress={handlePay} disabled={paying} activeOpacity={0.88}>
+          <TouchableOpacity 
+            style={[styles.payBtn, paying && styles.payBtnDisabled]} 
+            onPress={handleSecurePayment} 
+            disabled={paying} 
+            activeOpacity={0.85}
+          >
             <LinearGradient colors={["#312EBA", "#5B21B6", "#EC1D8F"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.payBtnInner}>
               {paying ? (
                 <ActivityIndicator color="#fff" size="small" />
               ) : (
                 <>
-                  <Ionicons name="lock-closed-outline" size={16} color="#fff" />
-                  <Text style={styles.payBtnTxt}>Pay ₹{params.amount}</Text>
+                  <Ionicons name="lock-closed" size={18} color="#fff" />
+                  <Text style={styles.payBtnTxt}>Proceed to Secure Payment Terminal</Text>
                 </>
               )}
             </LinearGradient>
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  header: { paddingHorizontal: 20, paddingTop: Platform.OS === "ios" ? 54 : 20, paddingBottom: 24 },
-  headerTopRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 18 },
-  backBtn: { width: 38, height: 38, borderRadius: 11, backgroundColor: "rgba(255,255,255,0.18)", justifyContent: "center", alignItems: "center" },
-  headerTitle: { fontSize: 18, fontWeight: "800", color: "#fff" },
-  headerSub: { fontSize: 12, color: "rgba(255,255,255,0.72)", marginTop: 2 },
+  container: { flex: 1, backgroundColor: "#F8FAFC" },
+  loaderWrap: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#F8FAFC" },
+  loaderTxt: { marginTop: 14, color: "#64748B", fontSize: 15, fontWeight: "500" },
 
-  amountBox: { backgroundColor: "rgba(255,255,255,0.12)", borderRadius: 16, padding: 16, alignItems: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)" },
-  amountLabel: { fontSize: 11, color: "rgba(255,255,255,0.75)", fontWeight: "600" },
-  amountValue: { fontSize: 30, color: "#fff", fontWeight: "900", marginTop: 4 },
+  header: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 36 },
+  headerTopRow: { flexDirection: "row", alignItems: "center", gap: 16, marginBottom: 24 },
+  backBtn: { width: 44, height: 44, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.15)", justifyContent: "center", alignItems: "center" },
+  headerTitle: { fontSize: 22, fontWeight: "800", color: "#fff", letterSpacing: -0.5 },
+  headerSub: { fontSize: 13, color: "rgba(255,255,255,0.75)", marginTop: 4, fontWeight: "500" },
 
-  demoNotice: { flexDirection: "row", gap: 8, backgroundColor: "#FEF3C7", margin: 16, marginBottom: 4, padding: 12, borderRadius: 12, alignItems: "flex-start" },
-  demoNoticeTxt: { flex: 1, fontSize: 11.5, color: "#92400E", lineHeight: 16 },
+  amountBox: { backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 16, padding: 20, alignItems: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)" },
+  amountLabel: { fontSize: 12, color: "rgba(255,255,255,0.7)", fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5 },
+  amountValue: { fontSize: 36, color: "#fff", fontWeight: "900", marginTop: 4, letterSpacing: -0.5 },
 
-  content: { padding: 16 },
+  contentWrapper: { padding: 16 },
+  webContentBox: { maxWidth: 640, alignSelf: "center", width: "100%", paddingVertical: 24 },
 
-  modeRow: { flexDirection: "row", gap: 10, marginBottom: 14 },
-  modeBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 11, borderRadius: 12, borderWidth: 1.5, borderColor: "#E2E8F0", backgroundColor: "#fff" },
-  modeBtnOn: { borderColor: "#4F46E5", backgroundColor: "#EEF2FF" },
-  modeTxt: { fontSize: 13, fontWeight: "700", color: "#64748B" },
-  modeTxtOn: { color: "#4F46E5" },
+  sectionTitle: { fontSize: 14, fontWeight: "700", color: "#475569", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12, paddingHorizontal: 4 },
+  invoiceCard: { backgroundColor: "#fff", borderRadius: 16, paddingHorizontal: 16, borderWidth: 1, borderColor: "#E2E8F0", shadowColor: "#0F172A", shadowOpacity: 0.03, shadowRadius: 8, elevation: 1, marginBottom: 16 },
+  invoiceRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#F1F5F9", gap: 16 },
+  invoiceLabel: { fontSize: 13.5, color: "#64748B", fontWeight: "500" },
+  invoiceValue: { fontSize: 14, color: "#0F172A", fontWeight: "700", flex: 1, textAlign: "right" },
+  mono: { fontFamily: Platform.OS === "ios" ? "Courier" : "monospace", fontSize: 13, color: "#4F46E5" },
 
-  card: { backgroundColor: "#fff", borderRadius: 18, padding: 16, borderWidth: 1, borderColor: "#E2E8F0", marginBottom: 20 },
-  label: { fontSize: 12.5, fontWeight: "700", color: "#475569", marginBottom: 6 },
-  input: { backgroundColor: "#F8FAFC", borderWidth: 1.5, borderColor: "#E2E8F0", borderRadius: 12, paddingHorizontal: 14, height: 48, fontSize: 14, color: "#111" },
+  complianceBox: { flexDirection: "row", alignItems: "flex-start", gap: 10, backgroundColor: "#F0FDF4", borderWidth: 1, borderColor: "#DCFCE7", padding: 14, borderRadius: 14, marginBottom: 24 },
+  complianceTxt: { flex: 1, fontSize: 12, color: "#166534", lineHeight: 18, fontWeight: "500" },
 
-  payBtn: { borderRadius: 16, overflow: "hidden" },
-  payBtnInner: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 15 },
-  payBtnTxt: { color: "#fff", fontWeight: "800", fontSize: 15 },
+  payBtn: { borderRadius: 16, overflow: "hidden", shadowColor: "#4F46E5", shadowOpacity: 0.15, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 3 },
+  payBtnDisabled: { opacity: 0.6 },
+  payBtnInner: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 16 },
+  payBtnTxt: { color: "#fff", fontWeight: "800", fontSize: 15.5 },
 
-  successWrap: { flex: 1, backgroundColor: "#fff", justifyContent: "center", alignItems: "center", padding: 30 },
-  successIcon: { width: 84, height: 84, borderRadius: 42, backgroundColor: "#16A34A", justifyContent: "center", alignItems: "center", marginBottom: 20 },
-  successTitle: { fontSize: 22, fontWeight: "900", color: "#0F172A", marginBottom: 8 },
-  successSub: { fontSize: 13.5, color: "#64748B", textAlign: "center", lineHeight: 20, marginBottom: 28 },
-  successBtn: { backgroundColor: "#4F46E5", paddingHorizontal: 26, paddingVertical: 14, borderRadius: 14 },
-  successBtnTxt: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  errorContainer: { flex: 1, backgroundColor: "#F8FAFC", justifyContent: "center", alignItems: "center", padding: 32, textAlign: "center" as any },
+  errorTitle: { fontSize: 18, fontWeight: "800", color: "#0F172A", marginTop: 16, marginBottom: 8 },
+  errorSub: { fontSize: 13.5, color: "#64748B", textAlign: "center", lineHeight: 20, maxWidth: 420 },
+  errorBtn: { marginTop: 24, backgroundColor: "#0F172A", paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
+  errorBtnTxt: { color: "#fff", fontWeight: "700", fontSize: 14 }
 });
