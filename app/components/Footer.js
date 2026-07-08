@@ -3,236 +3,220 @@ import React from "react";
 import {
   Linking,
   Platform,
-  ScrollView,
   StyleSheet,
   Text,
-
   TouchableOpacity,
-  View
+  View,
+  useWindowDimensions
 } from "react-native";
 import { WebView } from "react-native-webview";
 
 export default function Footer() {
+  const { width } = useWindowDimensions();
+  const isWebLayout = width >= 768; // Breakpoint for Web/Tablet Grid
+
   return (
-    <ScrollView style={styles.container}>
-
-      {/* 🔷 FOOTER */}
-      <View style={styles.footer}>
-
-        {/* 🔹 ABOUT + ADDRESS */}
-        <View style={styles.topSection}>
-
+    <View style={styles.footerBackground}>
+      {/* ── Responsive Container (Max Width on Web, Full Width on Mobile) ── */}
+      <View style={[styles.footerContent, isWebLayout ? styles.webGrid : styles.mobileStack]}>
+        
+        {/* 🔹 COLUMN 1: ABOUT + ADDRESS */}
+        <View style={isWebLayout ? styles.colLarge : styles.colFull}>
           <Text style={styles.instituteName}>
             Shri Vaishnav Institute of Management & Sciences
           </Text>
-
           <Text style={styles.footerText}>
             Autonomous Institute • NAAC 'A' Grade • AICTE Approved
           </Text>
 
           <View style={styles.addressBox}>
-            <Text style={styles.addressTitle}>📍 Address</Text>
-            <Text style={styles.footerText}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 }}>
+              <Ionicons name="location" size={16} color="#FACC15" />
+              <Text style={styles.addressTitle}>Address</Text>
+            </View>
+            <Text style={styles.addressText}>
               Scheme No.71, Gumasta Nagar{"\n"}
               Indore (M.P.) - 452009
             </Text>
 
             <TouchableOpacity
               style={styles.directionBtn}
-              onPress={() =>
-                Linking.openURL(
-                  "https://www.google.com/maps/dir/?api=1&destination=Shri+Vaishnav+Institute+of+Management+%26+Sciences+Indore"
-                )
-              }
+              onPress={() => Linking.openURL("https://www.google.com/maps/dir/?api=1&destination=Shri+Vaishnav+Institute+of+Management+%26+Sciences+Indore")}
+              activeOpacity={0.7}
             >
+              <Ionicons name="navigate-outline" size={16} color="#F87171" />
               <Text style={styles.directionText}>Get Directions</Text>
             </TouchableOpacity>
           </View>
-
         </View>
 
-        {/* 🔹 CONTACT */}
-        <View style={styles.contactSection}>
+        {/* 🔹 COLUMN 2: CONTACT */}
+        <View style={isWebLayout ? styles.colSmall : styles.colFull}>
           <Text style={styles.sectionHeading}>GET IN TOUCH</Text>
 
           <View style={styles.contactRow}>
-            <Ionicons name="mail" size={16} color="#facc15" />
-            <Text style={styles.footerText}>info@svim.edu.in</Text>
+            <Ionicons name="mail" size={16} color="#FACC15" />
+            <Text style={styles.contactText}>info@svim.edu.in</Text>
           </View>
 
           <View style={styles.contactRow}>
-            <Ionicons name="call" size={16} color="#facc15" />
-            <Text style={styles.footerText}>+91-731-234-9111</Text>
+            <Ionicons name="call" size={16} color="#FACC15" />
+            <Text style={styles.contactText}>+91-731-234-9111</Text>
           </View>
 
-          {/* 🔥 SOCIAL */}
+          {/* 🔥 SOCIAL (Now fully interactive) */}
+          <Text style={[styles.sectionHeading, { marginTop: 24 }]}>FOLLOW US</Text>
           <View style={styles.socialRow}>
-            <FontAwesome name="facebook" size={18} color="#fff" />
-            <FontAwesome name="instagram" size={18} color="#fff" />
-            <FontAwesome name="linkedin" size={18} color="#fff" />
-            <FontAwesome name="twitter" size={18} color="#fff" />
+            <TouchableOpacity activeOpacity={0.7} style={styles.socialBtn}>
+              <FontAwesome name="facebook" size={18} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity activeOpacity={0.7} style={styles.socialBtn}>
+              <FontAwesome name="instagram" size={18} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity activeOpacity={0.7} style={styles.socialBtn}>
+              <FontAwesome name="linkedin" size={18} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity activeOpacity={0.7} style={styles.socialBtn}>
+              <FontAwesome name="twitter" size={18} color="#fff" />
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* 🔹 MAP */}
-        <View style={styles.mapSection}>
+        {/* 🔹 COLUMN 3: MAP */}
+        <View style={isWebLayout ? styles.colLarge : styles.colFull}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <Text style={styles.sectionHeading}>LOCATE US</Text>
+            <TouchableOpacity
+              style={styles.mapButton}
+              onPress={() => Linking.openURL("https://www.google.com/maps/place/Shri+Vaishnav+Institute+of+Management+%26+Sciences")}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.mapButtonText}>Open in Maps</Text>
+              <Ionicons name="open-outline" size={14} color="#60A5FA" />
+            </TouchableOpacity>
+          </View>
 
-  {/* 🔥 Open in Maps Button */}
-  <TouchableOpacity
-    style={styles.mapButton}
-    onPress={() =>
-      Linking.openURL(
-        "https://www.google.com/maps/place/Shri+Vaishnav+Institute+of+Management+%26+Sciences"
-      )
-    }
-  >
-    <Text style={styles.mapButtonText}>Open in Maps ↗</Text>
-  </TouchableOpacity>
-
-  {/* 🔥 Google Map Embed */}
-  {/* 🔥 MAP */}
-{Platform.OS === "web" ? (
-
-<iframe
-  src="https://maps.google.com/maps?q=Shri%20Vaishnav%20Institute%20of%20Management%20Indore&t=&z=15&ie=UTF8&iwloc=&output=embed"
-  width="100%"
-  height="290"
-  style={{
-    border: 0,
-    borderRadius: 10,
-  }}
-  loading="lazy"
-/>
-
-) : (
-
-<WebView
-  style={styles.map}
-  source={{
-    html: `
-      <iframe
-        width="100%"
-        height="100%"
-        frameborder="0"
-        style="border:0"
-        src="https://maps.google.com/maps?q=Shri%20Vaishnav%20Institute%20of%20Management%20Indore&t=&z=15&ie=UTF8&iwloc=&output=embed"
-        allowfullscreen>
-      </iframe>
-    `,
-  }}
-/>
-
-)}
-
-</View>
-
-        {/* 🔹 COPYRIGHT */}
-        <Text style={styles.copy}>
-          © 2026 SVIMAA - All Rights Reserved | Designed with ❤️ for Alumni
-        </Text>
+          {/* 🔥 MAP EMBED */}
+          <View style={styles.mapWrapper}>
+            {Platform.OS === "web" ? (
+              <iframe
+                src="https://maps.google.com/maps?q=Shri%20Vaishnav%20Institute%20of%20Management%20Indore&t=&z=15&ie=UTF8&iwloc=&output=embed"
+                width="100%"
+                height="100%"
+                style={{ border: "none" }}
+                loading="lazy"
+              />
+            ) : (
+              <WebView
+                style={styles.map}
+                scrollEnabled={false}
+                source={{
+                  html: `
+                    <!DOCTYPE html>
+                    <html>
+                      <head>
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+                        <style>body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; }</style>
+                      </head>
+                      <body>
+                        <iframe width="100%" height="100%" frameborder="0" style="border:0" src="https://maps.google.com/maps?q=Shri%20Vaishnav%20Institute%20of%20Management%20Indore&t=&z=15&ie=UTF8&iwloc=&output=embed" allowfullscreen></iframe>
+                      </body>
+                    </html>
+                  `,
+                }}
+              />
+            )}
+          </View>
+        </View>
 
       </View>
 
-    </ScrollView>
+      {/* 🔹 BOTTOM COPYRIGHT BANNER */}
+      <View style={styles.copyrightBanner}>
+        <Text style={styles.copyText}>
+          © 2026 SVIMAA - All Rights Reserved | Designed with ❤️ for Alumni
+        </Text>
+      </View>
+
+    </View>
   );
 }
 
 /* 🔷 STYLES */
 const styles = StyleSheet.create({
-
-  container: {
-    backgroundColor: "#f5f7fb",
-    marginBottom: Platform.OS === "web" ?0:50,
+  footerBackground: {
+    backgroundColor: "#0F172A",
+    width: "100%",
+    // Safe padding for mobile bottom tabs
+    paddingBottom: Platform.OS === "web" ? 0 : 90, 
   },
-
-  footer: {
-    backgroundColor: "#0f172a",
-    padding: 20,
+  footerContent: {
+    paddingHorizontal: 24,
+    paddingTop: 48,
+    paddingBottom: 32,
+    width: "100%",
+    alignSelf: "center",
   },
-
-  topSection: {
-    marginBottom: 20,
-  },
-
-  instituteName: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 16,
-    marginBottom: 5,
-  },
-
-  footerText: {
-    color: "#cbd5e1",
-    fontSize: 13,
-    marginTop: 4,
-  },
-
-  addressBox: {
-    backgroundColor: "#1e293b",
-    padding: 12,
-    borderRadius: 10,
-    marginTop: 10,
-  },
-
-  addressTitle: {
-    color: "#facc15",
-    fontWeight: "bold",
-    marginBottom: 5,
-  },
-
-  directionBtn: {
-    borderWidth: 1,
-    borderColor: "#ff4d4d",
-    padding: 8,
-    borderRadius: 6,
-    marginTop: 10,
-    alignItems: "center",
-  },
-
-  directionText: {
-    color: "#ff4d4d",
-    fontWeight: "600",
-  },
-
-  contactSection: {
-    marginBottom: 20,
-  },
-
-  sectionHeading: {
-    color: "#facc15",
-    fontWeight: "bold",
-    marginBottom: 10,
-  },
-
-  contactRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 6,
-  },
-
-  socialRow: {
+  
+  // ── Grid Layouts ──
+  webGrid: {
+    maxWidth: 1200,
     flexDirection: "row",
     justifyContent: "space-between",
-    width: 140,
-    marginTop: 10,
+    gap: 40,
+  },
+  mobileStack: {
+    flexDirection: "column",
+    gap: 36,
+  },
+  colLarge: { flex: 1.2 },
+  colSmall: { flex: 0.8 },
+  colFull: { width: "100%" },
+
+  // ── Typography & Elements ──
+  instituteName: { color: "#fff", fontWeight: "800", fontSize: 18, marginBottom: 6, letterSpacing: -0.2 },
+  footerText: { color: "#94A3B8", fontSize: 13, lineHeight: 20 },
+  
+  addressBox: { backgroundColor: "#1E293B", padding: 18, borderRadius: 16, marginTop: 16, borderWidth: 1, borderColor: "#334155" },
+  addressTitle: { color: "#FACC15", fontWeight: "800", fontSize: 13, letterSpacing: 0.5, textTransform: "uppercase" },
+  addressText: { color: "#CBD5E1", fontSize: 13.5, lineHeight: 22 },
+
+  directionBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+    borderWidth: 1.5, borderColor: "rgba(248, 113, 113, 0.4)",
+    paddingVertical: 10, paddingHorizontal: 16, borderRadius: 10, marginTop: 14,
+    backgroundColor: "rgba(248, 113, 113, 0.1)",
+  },
+  directionText: { color: "#F87171", fontWeight: "700", fontSize: 13 },
+
+  sectionHeading: { color: "#FACC15", fontWeight: "800", fontSize: 13, letterSpacing: 1, textTransform: "uppercase", marginBottom: 16 },
+  contactRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 12 },
+  contactText: { color: "#E2E8F0", fontSize: 14, fontWeight: "500" },
+
+  socialRow: { flexDirection: "row", gap: 12 },
+  socialBtn: {
+    width: 38, height: 38, borderRadius: 19,
+    backgroundColor: "#1E293B",
+    justifyContent: "center", alignItems: "center",
+    borderWidth: 1, borderColor: "#334155",
   },
 
-  mapSection: {
-    marginTop: 10,
-  },
+  mapButton: { flexDirection: "row", alignItems: "center", gap: 6 },
+  mapButtonText: { color: "#60A5FA", fontWeight: "600", fontSize: 13 },
 
-  map: {
+  mapWrapper: {
     width: "100%",
-    height: 160,
-    borderRadius: 10,
+    height: 180, // Fixed height keeps the map looking clean
+    borderRadius: 16,
+    overflow: "hidden",
+    backgroundColor: "#1E293B", // Placeholder color while loading
   },
+  map: { width: "100%", height: "100%", backgroundColor: "transparent" },
 
-  copy: {
-    textAlign: "center",
-    color: "#94a3b8",
-    marginTop: 15,
-    fontSize: 12,
-  }
-
+  copyrightBanner: {
+    borderTopWidth: 1, borderTopColor: "#1E293B",
+    paddingVertical: 20, paddingHorizontal: 24,
+    alignItems: "center",
+  },
+  copyText: { textAlign: "center", color: "#64748B", fontSize: 12.5, fontWeight: "500" }
 });

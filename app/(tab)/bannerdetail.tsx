@@ -1,9 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React from "react";
+import React, { useState } from "react";
 import {
   Image,
   Linking,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -48,6 +49,9 @@ export default function BannerDetailScreen() {
   const { width } = useWindowDimensions();
   const isWebLayout = width >= 768;
 
+  // ── NEW STATE: Controls the full-screen image viewer ──
+  const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
+
   const params = useLocalSearchParams<{
     banner_title: string;
     banner_description: string;
@@ -84,7 +88,14 @@ export default function BannerDetailScreen() {
         {/* ── FULL WIDTH BANNER IMAGE ── */}
         <View style={styles.bannerWrap}>
           {imageUri ? (
-            <Image source={{ uri: imageUri }} style={styles.bannerImg} resizeMode="cover" />
+            // ── NEW: Clickable wrapper for the image ──
+            <TouchableOpacity 
+              activeOpacity={0.9} 
+              onPress={() => setIsImageViewerOpen(true)}
+              style={[styles.bannerImg, isWeb && { cursor: 'zoom-in' as any }]}
+            >
+              <Image source={{ uri: imageUri }} style={styles.bannerImg} resizeMode="cover" />
+            </TouchableOpacity>
           ) : (
             <View style={[styles.bannerImg, styles.bannerFallback]}>
               <Ionicons name="image-outline" size={60} color="rgba(255,255,255,0.2)" />
@@ -93,12 +104,19 @@ export default function BannerDetailScreen() {
           )}
 
           {/* Dark gradient overlay at bottom of image */}
-          <View style={styles.bannerOverlay} />
+          <View style={styles.bannerOverlay} pointerEvents="none" />
 
           {/* SPONSORED badge */}
-          <View style={styles.sponsoredBadge}>
+          <View style={styles.sponsoredBadge} pointerEvents="none">
             <Text style={styles.sponsoredText}>SPONSORED</Text>
           </View>
+
+          {/* Expand Icon Hint (Only shows if image exists) */}
+          {imageUri && (
+            <View style={styles.expandHint} pointerEvents="none">
+              <Ionicons name="expand-outline" size={16} color="#fff" />
+            </View>
+          )}
 
           {/* Back button */}
           <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.85}>
@@ -203,6 +221,33 @@ export default function BannerDetailScreen() {
 
         </View>
       </ScrollView>
+
+      {/* ── NEW: FULL SCREEN IMAGE VIEWER MODAL ── */}
+      <Modal
+        visible={isImageViewerOpen}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setIsImageViewerOpen(false)} // Handles hardware back button on Android
+      >
+        <View style={styles.fullScreenOverlay}>
+          <TouchableOpacity 
+            style={styles.closeFullImageBtn} 
+            onPress={() => setIsImageViewerOpen(false)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="close" size={28} color="#fff" />
+          </TouchableOpacity>
+          
+          {imageUri && (
+            <Image 
+              source={{ uri: imageUri }} 
+              style={styles.fullScreenImage} 
+              resizeMode="contain" // Ensures the whole image is visible
+            />
+          )}
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -217,6 +262,12 @@ const styles = StyleSheet.create({
   bannerFallback: { alignItems: "center", justifyContent: "center", gap: 8 },
   fallbackText: { color: "rgba(255,255,255,0.4)", fontSize: 13, fontWeight: "600", letterSpacing: 1 },
   bannerOverlay: { position: "absolute", bottom: 0, left: 0, right: 0, height: 120, backgroundColor: "rgba(0,0,0,0.4)" },
+
+  expandHint: {
+    position: "absolute", bottom: 45, right: 16,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    padding: 8, borderRadius: 20
+  },
 
   sponsoredBadge: {
     position: "absolute", top: 16, right: 16,
@@ -240,7 +291,7 @@ const styles = StyleSheet.create({
     width: "100%",
     paddingHorizontal: 18,
     paddingVertical: 24,
-    marginTop: -20, // Pulls the content up slightly over the banner gradient
+    marginTop: -20,
     backgroundColor: "#F8FAFC",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
@@ -288,7 +339,7 @@ const styles = StyleSheet.create({
     borderRadius: 18, padding: 16,
     borderWidth: 1, borderColor: "#E2E8F0",
     flexGrow: 1, flexShrink: 1,
-    flexBasis: isWeb ? 150 : "45%", // Responsive native scaling
+    flexBasis: isWeb ? 150 : "45%",
     shadowColor: "#0F172A", shadowOpacity: 0.03, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 1,
   },
   tileIconBox: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center", marginBottom: 12 },
@@ -309,4 +360,25 @@ const styles = StyleSheet.create({
     shadowColor: "#4F46E5", shadowOpacity: 0.25, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 5,
   },
   ctaTxt: { color: "#fff", fontWeight: "800", fontSize: 16 },
+
+  // ── Full Screen Modal Styles ──
+  fullScreenOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.95)", // Pitch black background
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  closeFullImageBtn: {
+    position: "absolute",
+    top: Platform.OS === 'ios' ? 60 : 30, // Safely clears notches
+    right: 24,
+    zIndex: 10,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    padding: 8,
+    borderRadius: 20,
+  },
+  fullScreenImage: {
+    width: "100%",
+    height: "100%",
+  },
 });
