@@ -134,9 +134,9 @@ const transporter = nodemailer.createTransport({
 // ── REUSABLE EMAIL FUNCTION ──
 const sendWelcomeEmail = async (userEmail, fullName, tempPassword) => {
   const mailOptions = {
-    from: `"SVIMAA Alumni Association" <${process.env.EMAIL_USER}>`,
+    from: `"SVIMAA" <${process.env.EMAIL_USER}>`,
     to: userEmail,
-    subject: "Welcome to SVIMAA Alumni Network! 🎓",
+    subject: "Welcome to SVIMAA  Alumni Connect! 🎓",
     html: `
       <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #E2E8F0; border-radius: 10px;">
         <h2 style="color: #4F46E5;">Welcome to the SVIMSAA Family, ${fullName}!</h2>
