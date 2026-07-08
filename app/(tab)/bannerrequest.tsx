@@ -16,18 +16,20 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-// Base API URL dynamically loaded from .env
-const API_BASE = process.env.EXPO_PUBLIC_API_BASE || "http://127.0.0.1:2000";
+// ── STRICT ENV CHECK ──
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE;
 const API_URL  = `${API_BASE}/banner-request`;
 const isWeb    = Platform.OS === "web";
 
@@ -40,8 +42,8 @@ function TInput({ value, onChange, placeholder, keyboardType = "default", multil
     <TextInput
       style={[
         styles.input, 
-        multiline && { height: 110, textAlignVertical: "top", paddingTop: 14 },
-        error && styles.inputError // Visual red border indicator
+        multiline && { height: 110, textAlignVertical: "top", paddingTop: 16 },
+        error && styles.inputError
       ]}
       value={value}
       onChangeText={onChange}
@@ -95,16 +97,6 @@ function FieldBox({ label, hint, error, children }: { label: string; hint?: stri
   );
 }
 
-function Row2({ children }: { children: React.ReactNode }) {
-  return (
-    <View style={isWeb ? styles.rowWeb : styles.rowMob}>
-      {React.Children.map(children, child => (
-        <View style={isWeb ? { flex: 1 } : { width: "100%" }}>{child}</View>
-      ))}
-    </View>
-  );
-}
-
 const DURATION_OPTIONS = [
   { label: "1 Week",  value: "1_week"  },
   { label: "2 Weeks", value: "2_weeks" },
@@ -115,6 +107,8 @@ const DURATION_OPTIONS = [
 // ─────────────────────────────────────────────────────────────────
 export default function BannerRequestScreen() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const isDesktopLayout = width >= 850;
 
   const [loadingUser, setLoadingUser] = useState(true);
   const [submitting,  setSubmitting]  = useState(false);
@@ -122,15 +116,15 @@ export default function BannerRequestScreen() {
 
   const [form, setForm] = useState({
     full_name:          "",
-    email:               "",
-    mobile:              "",
-    organisation_name:   "",
-    banner_title:        "",
-    banner_description:  "",
-    website_link:        "",
-    preferred_duration:  "1_week",
+    email:              "",
+    mobile:             "",
+    organisation_name:  "",
+    banner_title:       "",
+    banner_description: "",
+    website_link:       "",
+    preferred_duration: "1_week",
     preferred_start_date:"",
-    additional_notes:    "",
+    additional_notes:   "",
   });
 
   const [errors, setErrors] = useState<{ [k: string]: string }>({});
@@ -140,7 +134,6 @@ export default function BannerRequestScreen() {
     setErrors(p => ({ ...p, [k]: "" }));
   };
 
-  // ── Prefill name / email / mobile from the logged-in user ──────
   useEffect(() => {
     (async () => {
       try {
@@ -162,9 +155,9 @@ export default function BannerRequestScreen() {
     })();
   }, []);
 
- const pickBannerImage = async () => {
+  const pickBannerImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'], // 🚨 Fixed the deprecation warning
+      mediaTypes: ['images'], 
       allowsEditing: true, 
       quality: 0.85, 
       aspect: [16, 9],
@@ -184,12 +177,12 @@ export default function BannerRequestScreen() {
     if (!form.banner_description.trim()) e.banner_description = "Please describe what the banner is for";
     if (!bannerImage)                    e.banner_image = "Please upload a banner image";
     if (form.preferred_duration === "custom" && !form.preferred_start_date.trim()) {
-      e.preferred_start_date = "Please specify preferred start date";
+      e.preferred_start_date = "Please specify a preferred start date";
     }
     
     setErrors(e);
     if (Object.keys(e).length > 0) {
-      showAlert("Missing information", "Please fill in all required fields highlighted in red.");
+      showAlert("Missing Information", "Please fill in all required fields highlighted in red.");
       return false;
     }
     return true;
@@ -221,281 +214,290 @@ export default function BannerRequestScreen() {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      showAlert("Request Sent ✅", "Your advertisement banner request has been sent to the admin for review. You'll be notified once it's approved.");
+      showAlert("Application Submitted ✅", "Your advertisement request has been securely sent to the administration team for review. You will be notified regarding placement confirmation and fees.");
       router.back();
     } catch {
-      showAlert("Error", "Failed to send request. Please check your connection and try again.");
+      showAlert("Error", "Failed to send the request. Please check your connection and try again.");
     } finally {
       setSubmitting(false);
     }
   };
 
+  if (!API_BASE) {
+    return (
+      <View style={styles.errorContainer}>
+        <Ionicons name="cloud-offline-outline" size={54} color="#EF4444" />
+        <Text style={styles.errorTitle}>Configuration Mismatch</Text>
+        <Text style={styles.errorSub}>The backend endpoint variable is undefined. Please ensure EXPO_PUBLIC_API_BASE is properly mapped inside your root environment configuration file.</Text>
+      </View>
+    );
+  }
+
   if (loadingUser) {
     return (
       <View style={styles.loaderWrap}>
         <ActivityIndicator size="large" color="#4F46E5" />
-        <Text style={styles.loaderTxt}>Initializing form...</Text>
+        <Text style={styles.loaderTxt}>Initializing secure application...</Text>
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#F8FAFC" }} edges={['top']}>
-     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 130 }}>
+    <SafeAreaView style={styles.screen} edges={['top']}>
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }} 
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
 
-        {/* ══ HERO HEADER ══ */}
-        <LinearGradient
-          colors={["#312EBA", "#5B21B6", "#EC1D8F"]}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-          style={styles.header}
-        >
-          <View style={styles.dec1} />
-          <View style={styles.dec2} />
+          {/* ══ HERO HEADER ══ */}
+          <LinearGradient
+            colors={["#312EBA", "#5B21B6", "#EC1D8F"]}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={styles.header}
+          >
+            <View style={styles.dec1} />
+            <View style={styles.dec2} />
 
-          <View style={styles.headerTopRow}>
-            <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.8}>
-              <Ionicons name="arrow-back" size={22} color="#fff" />
-            </TouchableOpacity>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.headerTitle}>Request Ad Banner</Text>
-              <Text style={styles.headerSub}>Feature your business or event on the SVIMSAA Home page</Text>
-            </View>
-          </View>
-        </LinearGradient>
-
-        {/* ══ FORM CONTENT ══ */}
-        <View style={styles.content}>
-
-          {/* Info banner */}
-          <View style={styles.infoBanner}>
-            <Ionicons name="information-circle" size={20} color="#5B21B6" style={{ marginTop: 2 }} />
-            <Text style={styles.infoBannerTxt}>
-              Submit your banner asset and requirements here. An admin will review your artwork and assign a placement fee for your requested duration.
-            </Text>
-          </View>
-
-          {/* Requester Info */}
-          <SectionHead icon="person-outline" title="Your Details" />
-          <View style={styles.card}>
-            <Row2>
-              <FieldBox label="Full Name *" error={errors.full_name}>
-                <TInput value={form.full_name} onChange={(t: string) => set("full_name", t)} placeholder="Rahul Sharma" error={errors.full_name} />
-              </FieldBox>
-              <FieldBox label="Mobile Number *" error={errors.mobile}>
-                <TInput value={form.mobile} onChange={(t: string) => set("mobile", t)} placeholder="98765 43210" keyboardType="phone-pad" error={errors.mobile} />
-              </FieldBox>
-            </Row2>
-            <Row2>
-              <FieldBox label="Email Address *" error={errors.email}>
-                <TInput value={form.email} onChange={(t: string) => set("email", t)} placeholder="you@example.com" keyboardType="email-address" error={errors.email} />
-              </FieldBox>
-              <FieldBox label="Organisation / Business Name" hint="Optional">
-                <TInput value={form.organisation_name} onChange={(t: string) => set("organisation_name", t)} placeholder="e.g. Infosys Ltd." />
-              </FieldBox>
-            </Row2>
-          </View>
-
-          {/* Banner details */}
-          <SectionHead icon="image-outline" title="Banner Artwork" />
-          <View style={styles.card}>
-            <FieldBox label="Banner Title *" error={errors.banner_title}>
-              <TInput value={form.banner_title} onChange={(t: string) => set("banner_title", t)} placeholder="e.g. Tech Conference 2026" error={errors.banner_title} />
-            </FieldBox>
-            
-            <FieldBox label="Description *" hint="Briefly explain the purpose of this advertisement." error={errors.banner_description}>
-              <TInput
-                value={form.banner_description}
-                onChange={(t: string) => set("banner_description", t)}
-                placeholder="We are hosting a recruitment drive and would like to..."
-                multiline
-                error={errors.banner_description}
-              />
-            </FieldBox>
-
-            <FieldBox label="Website / Target Link" hint="Optional — Where should users be redirected when they tap the banner?">
-              <TInput value={form.website_link} onChange={(t: string) => set("website_link", t)} placeholder="https://yourwebsite.com" keyboardType="url" />
-            </FieldBox>
-
-            {/* Banner image upload */}
-            <FieldBox label="Banner Image Asset *" hint="Required format: 16:9 Aspect Ratio (e.g. 1200 x 400px)" error={errors.banner_image}>
-              <TouchableOpacity 
-                style={[styles.uploadBox, !!errors.banner_image && { borderColor: "#DC2626", backgroundColor: "#FEF2F2" }]} 
-                onPress={pickBannerImage} 
-                activeOpacity={0.85}
-              >
-                {bannerImage ? (
-                  <Image source={{ uri: bannerImage }} style={styles.uploadPreview} />
-                ) : (
-                  <View style={styles.uploadEmpty}>
-                    <Ionicons name="cloud-upload-outline" size={32} color="#4F46E5" />
-                    <Text style={styles.uploadEmptyTxt}>Tap to select image from gallery</Text>
-                  </View>
-                )}
-                {bannerImage && (
-                  <View style={styles.uploadOverlay}>
-                    <Ionicons name="camera" size={14} color="#fff" />
-                    <Text style={styles.uploadOverlayTxt}>Change Image</Text>
-                  </View>
-                )}
+            <View style={styles.headerTopRow}>
+              <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.8}>
+                <Ionicons name="arrow-back" size={22} color="#fff" />
               </TouchableOpacity>
-            </FieldBox>
-          </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.headerTitle}>Advertisement Request</Text>
+                <Text style={styles.headerSub}>Submit a promotional banner for placement on the SVIMSAA dashboard.</Text>
+              </View>
+            </View>
+          </LinearGradient>
 
-          {/* Duration */}
-          <SectionHead icon="time-outline" title="Scheduling" />
-          <View style={styles.card}>
-            <FieldBox label="Requested Display Duration">
-              <ChipGroup options={DURATION_OPTIONS} value={form.preferred_duration} onChange={v => set("preferred_duration", v)} />
-            </FieldBox>
-            
-            {form.preferred_duration === "custom" && (
-              <FieldBox
-                label="Preferred Start Date *"
-                hint="Admin will review and confirm availability for this slot."
-                error={errors.preferred_start_date}
-              >
+          {/* ══ FORM CONTENT ══ */}
+          <View style={[styles.content, isDesktopLayout && styles.contentDesktop]}>
+
+            <View style={styles.infoBanner}>
+              <Ionicons name="information-circle" size={20} color="#4F46E5" style={{ marginTop: 2 }} />
+              <Text style={styles.infoBannerTxt}>
+                Submit your banner asset and parameters below. An administrator will evaluate your artwork and assign a dynamic placement fee based on your requested duration.
+              </Text>
+            </View>
+
+            {/* Requester Info */}
+            <SectionHead icon="person-outline" title="Applicant Credentials" />
+            <View style={styles.card}>
+              <View style={isDesktopLayout ? styles.rowDesktop : styles.rowMobile}>
+                <View style={styles.flexItem}>
+                  <FieldBox label="Full Name *" error={errors.full_name}>
+                    <TInput value={form.full_name} onChange={(t: string) => set("full_name", t)} placeholder="Rahul Sharma" error={errors.full_name} />
+                  </FieldBox>
+                </View>
+                <View style={styles.flexItem}>
+                  <FieldBox label="Mobile Number *" error={errors.mobile}>
+                    <TInput value={form.mobile} onChange={(t: string) => set("mobile", t)} placeholder="98765 43210" keyboardType="phone-pad" error={errors.mobile} />
+                  </FieldBox>
+                </View>
+              </View>
+
+              <View style={isDesktopLayout ? styles.rowDesktop : styles.rowMobile}>
+                <View style={styles.flexItem}>
+                  <FieldBox label="Email Address *" error={errors.email}>
+                    <TInput value={form.email} onChange={(t: string) => set("email", t)} placeholder="you@example.com" keyboardType="email-address" error={errors.email} />
+                  </FieldBox>
+                </View>
+                <View style={styles.flexItem}>
+                  <FieldBox label="Organisation / Business Name" hint="Optional">
+                    <TInput value={form.organisation_name} onChange={(t: string) => set("organisation_name", t)} placeholder="e.g. Infosys Ltd." />
+                  </FieldBox>
+                </View>
+              </View>
+            </View>
+
+            {/* Banner details */}
+            <SectionHead icon="image-outline" title="Promotional Artwork" />
+            <View style={styles.card}>
+              <FieldBox label="Banner Reference Title *" error={errors.banner_title}>
+                <TInput value={form.banner_title} onChange={(t: string) => set("banner_title", t)} placeholder="e.g. Winter Recruitment Drive 2026" error={errors.banner_title} />
+              </FieldBox>
+              
+              <FieldBox label="Asset Description *" hint="Briefly explain the primary goal of this advertisement." error={errors.banner_description}>
                 <TInput
-                  value={form.preferred_start_date}
-                  onChange={(t: string) => set("preferred_start_date", t)}
-                  placeholder="YYYY-MM-DD"
-                  error={errors.preferred_start_date}
+                  value={form.banner_description}
+                  onChange={(t: string) => set("banner_description", t)}
+                  placeholder="We are actively hiring fresh graduates and would like to route candidates to..."
+                  multiline
+                  error={errors.banner_description}
                 />
               </FieldBox>
-            )}
-          </View>
 
-          {/* Notes */}
-          <SectionHead icon="chatbox-ellipses-outline" title="Additional Notes" />
-          <View style={styles.card}>
-            <FieldBox label="Message for the Admin" hint="Optional">
-              <TInput
-                value={form.additional_notes}
-                onChange={(t: string) => set("additional_notes", t)}
-                placeholder="Any special requests or instructions..."
-                multiline
-              />
-            </FieldBox>
-          </View>
+              <FieldBox label="Target Domain / URL" hint="Optional — Destination link when a user clicks the banner.">
+                <TInput value={form.website_link} onChange={(t: string) => set("website_link", t)} placeholder="https://yourwebsite.com/apply" keyboardType="url" />
+              </FieldBox>
 
-          {/* Action Buttons */}
-          <View style={styles.btnRow}>
-            <TouchableOpacity
-              style={[styles.submitBtn, submitting && { opacity: 0.7 }]}
-              onPress={handleSubmit}
-              disabled={submitting}
-              activeOpacity={0.85}
-            >
-              <LinearGradient
-                colors={["#312EBA", "#5B21B6", "#EC1D8F"]}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={styles.submitBtnInner}
+              <FieldBox label="Artwork Image Asset *" hint="Mandatory Dimension: 16:9 Aspect Ratio (High-Resolution)" error={errors.banner_image}>
+                <TouchableOpacity 
+                  style={[styles.uploadBox, !!errors.banner_image && styles.uploadBoxError]} 
+                  onPress={pickBannerImage} 
+                  activeOpacity={0.85}
+                >
+                  {bannerImage ? (
+                    <Image source={{ uri: bannerImage }} style={styles.uploadPreview} />
+                  ) : (
+                    <View style={styles.uploadEmpty}>
+                      <View style={styles.uploadIconWrap}>
+                        <Ionicons name="cloud-upload-outline" size={32} color="#4F46E5" />
+                      </View>
+                      <Text style={styles.uploadEmptyTxt}>Tap to select an image from your device</Text>
+                      <Text style={styles.uploadEmptySub}>JPG, PNG files accepted</Text>
+                    </View>
+                  )}
+                  {bannerImage && (
+                    <View style={styles.uploadOverlay}>
+                      <Ionicons name="sync-outline" size={14} color="#fff" />
+                      <Text style={styles.uploadOverlayTxt}>Replace Asset</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </FieldBox>
+            </View>
+
+            {/* Duration */}
+            <SectionHead icon="calendar-outline" title="Allocation Scheduling" />
+            <View style={styles.card}>
+              <FieldBox label="Requested Display Duration">
+                <ChipGroup options={DURATION_OPTIONS} value={form.preferred_duration} onChange={v => set("preferred_duration", v)} />
+              </FieldBox>
+              
+              {form.preferred_duration === "custom" && (
+                <FieldBox
+                  label="Preferred Start Date *"
+                  hint="The administration team will verify and confirm final placement dates."
+                  error={errors.preferred_start_date}
+                >
+                  <TInput
+                    value={form.preferred_start_date}
+                    onChange={(t: string) => set("preferred_start_date", t)}
+                    placeholder="YYYY-MM-DD"
+                    error={errors.preferred_start_date}
+                  />
+                </FieldBox>
+              )}
+            </View>
+
+            {/* Notes */}
+            <SectionHead icon="chatbox-ellipses-outline" title="Supplementary Information" />
+            <View style={styles.card}>
+              <FieldBox label="Direct Message for the Admin" hint="Optional">
+                <TInput
+                  value={form.additional_notes}
+                  onChange={(t: string) => set("additional_notes", t)}
+                  placeholder="Include any specific demographic targets or special placement instructions here..."
+                  multiline
+                />
+              </FieldBox>
+            </View>
+
+            {/* Action Buttons */}
+            <View style={styles.btnRow}>
+              <TouchableOpacity
+                style={[styles.submitBtn, submitting && { opacity: 0.7 }]}
+                onPress={handleSubmit}
+                disabled={submitting}
+                activeOpacity={0.85}
               >
-                {submitting ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <>
-                    <Ionicons name="paper-plane" size={18} color="#fff" />
-                    <Text style={styles.submitTxt}>Submit Application</Text>
-                  </>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
+                <LinearGradient
+                  colors={["#312EBA", "#5B21B6", "#EC1D8F"]}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                  style={styles.submitBtnInner}
+                >
+                  {submitting ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <>
+                      <Ionicons name="paper-plane" size={18} color="#fff" />
+                      <Text style={styles.submitTxt}>Submit Application for Review</Text>
+                    </>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
 
-            <TouchableOpacity style={styles.cancelBtn} onPress={() => router.back()} activeOpacity={0.8}>
-              <Text style={styles.cancelTxt}>Cancel</Text>
-            </TouchableOpacity>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => router.back()} activeOpacity={0.8}>
+                <Text style={styles.cancelTxt}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+
           </View>
-
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: "#F8FAFC" },
+  scrollContainer: { flexGrow: 1, paddingBottom: 130 },
+  
   loaderWrap: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#F8FAFC" },
-  loaderTxt:  { marginTop: 14, color: "#64748B", fontSize: 15, fontWeight: "500" },
+  loaderTxt:  { marginTop: 14, color: "#64748B", fontSize: 15, fontWeight: "600" },
+
+  errorContainer: { flex: 1, backgroundColor: "#F8FAFC", justifyContent: "center", alignItems: "center", padding: 32, textAlign: "center" as any },
+  errorTitle: { fontSize: 18, fontWeight: "800", color: "#0F172A", marginTop: 16, marginBottom: 8 },
+  errorSub: { fontSize: 13.5, color: "#64748B", textAlign: "center", lineHeight: 20, maxWidth: 420 },
 
   header: {
-    paddingHorizontal: 24,
-    paddingTop: 10, // 🚨 Let SafeAreaView handle the camera notch automatically
-    paddingBottom: 40,
-    overflow: "hidden",
+    paddingHorizontal: 24, paddingTop: 20, paddingBottom: 44, overflow: "hidden",
   },
   dec1: {
-    position: "absolute", right: -60, top: -40,
-    width: 220, height: 220, borderRadius: 110,
+    position: "absolute", right: -60, top: -40, width: 220, height: 220, borderRadius: 110,
     borderWidth: 2, borderColor: "rgba(255,255,255,0.1)",
   },
   dec2: {
-    position: "absolute", right: 40, top: 50,
-    width: 140, height: 140, borderRadius: 70,
+    position: "absolute", right: 40, top: 50, width: 140, height: 140, borderRadius: 70,
     backgroundColor: "rgba(255,255,255,0.06)",
   },
-
-  headerTopRow: {
-    flexDirection: "row", alignItems: "center",
-    gap: 16, marginBottom: 10,
-  },
+  headerTopRow: { flexDirection: "row", alignItems: "center", gap: 16 },
   backBtn: {
-    width: 44, height: 44, borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.15)",
+    width: 44, height: 44, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.15)",
     justifyContent: "center", alignItems: "center",
   },
-  headerTitle: { fontSize: 24, fontWeight: "800", color: "#fff", letterSpacing: -0.5 },
-  headerSub:   { fontSize: 13.5, color: "rgba(255,255,255,0.8)", marginTop: 4, fontWeight: "500", lineHeight: 18 },
+  headerTitle: { fontSize: 24, fontWeight: "900", color: "#fff", letterSpacing: -0.5 },
+  headerSub:   { fontSize: 13.5, color: "rgba(255,255,255,0.85)", marginTop: 4, fontWeight: "500", lineHeight: 18 },
 
   content: {
-    padding: isWeb ? 32 : 16,
-    maxWidth: isWeb ? 800 : undefined,
-    alignSelf: "center",
-    width: "100%",
-    marginTop: -20, // Pulls the content up slightly to overlap the header nicely
+    padding: 16, width: "100%", alignSelf: "center", marginTop: -20,
+  },
+  contentDesktop: {
+    maxWidth: 900, padding: 32,
   },
 
   infoBanner: {
-    flexDirection: "row", alignItems: "flex-start", gap: 12,
-    backgroundColor: "#EEF2FF", borderRadius: 16,
-    padding: 16, marginBottom: 10,
-    borderWidth: 1, borderColor: "#E0E7FF"
+    flexDirection: "row", alignItems: "flex-start", gap: 12, backgroundColor: "#EEF2FF",
+    borderRadius: 16, padding: 18, marginBottom: 16, borderWidth: 1, borderColor: "#E0E7FF"
   },
-  infoBannerTxt: { flex: 1, fontSize: 13, color: "#4338CA", lineHeight: 20, fontWeight: "500" },
+  infoBannerTxt: { flex: 1, fontSize: 13.5, color: "#4338CA", lineHeight: 22, fontWeight: "600" },
 
-  secHead: {
-    flexDirection: "row", alignItems: "center", gap: 12,
-    marginTop: 24, marginBottom: 12,
-    paddingBottom: 8,
-  },
-  secIcon: {
-    width: 32, height: 32, borderRadius: 10,
-    backgroundColor: "#EEF2FF",
-    justifyContent: "center", alignItems: "center",
-  },
+  secHead: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 24, marginBottom: 12, paddingBottom: 8 },
+  secIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: "#EEF2FF", justifyContent: "center", alignItems: "center" },
   secTitle: { fontSize: 16, fontWeight: "800", color: "#0F172A", letterSpacing: -0.2 },
 
   card: {
     backgroundColor: "#fff", borderRadius: 20, padding: 20,
-    shadowColor: "#0F172A", shadowOpacity: 0.04,
-    shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 2,
+    shadowColor: "#0F172A", shadowOpacity: 0.04, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 2,
     borderWidth: 1, borderColor: "#F1F5F9"
   },
 
-  rowWeb: { flexDirection: "row", gap: 16 },
-  rowMob: { flexDirection: "column" },
+  rowDesktop: { flexDirection: "row", gap: 16 },
+  rowMobile:  { flexDirection: "column", gap: 0 },
+  flexItem:   { flex: 1 },
 
   fieldBox: { marginBottom: 18 },
   label: { fontSize: 13.5, fontWeight: "700", color: "#334155", marginBottom: 8 },
-  hint:  { fontSize: 12, color: "#94A3B8", marginTop: 6 },
-  errorTxt: { fontSize: 12, color: "#DC2626", marginTop: 6, fontWeight: "500" },
+  hint:  { fontSize: 12.5, color: "#64748B", marginTop: 6, fontWeight: "500" },
+  errorTxt: { fontSize: 12, color: "#DC2626", marginTop: 6, fontWeight: "600" },
 
   input: {
     backgroundColor: "#F8FAFC", borderWidth: 1.5, borderColor: "#E2E8F0",
-    borderRadius: 14, paddingHorizontal: 16, height: 52,
-    fontSize: 14, color: "#0F172A",
+    borderRadius: 14, paddingHorizontal: 16, height: 52, fontSize: 14, color: "#0F172A",
+    ...Platform.select({ web: { outlineStyle: "none" } as any })
   },
-  inputError: {
-    borderColor: "#FCA5A5", backgroundColor: "#FEF2F2"
-  },
+  inputError: { borderColor: "#FCA5A5", backgroundColor: "#FEF2F2" },
 
   chipRow: { flexDirection: "row", gap: 10, flexWrap: "wrap" },
   chip:    { paddingHorizontal: 18, paddingVertical: 12, borderRadius: 24, backgroundColor: "#F8FAFC", borderWidth: 1.5, borderColor: "#E2E8F0" },
@@ -504,32 +506,29 @@ const styles = StyleSheet.create({
   chipTxtOn: { color: "#4F46E5", fontWeight: "700" },
 
   uploadBox: {
-    height: 180, borderRadius: 16, overflow: "hidden",
-    backgroundColor: "#F8FAFC", borderWidth: 2, borderColor: "#E2E8F0",
-    borderStyle: "dashed", justifyContent: "center", alignItems: "center",
+    height: 200, borderRadius: 18, overflow: "hidden", backgroundColor: "#F8FAFC",
+    borderWidth: 2, borderColor: "#E2E8F0", borderStyle: "dashed",
+    justifyContent: "center", alignItems: "center", marginTop: 6
   },
-  uploadEmpty: { alignItems: "center", gap: 8 },
-  uploadEmptyTxt: { fontSize: 14, color: "#4F46E5", fontWeight: "600" },
+  uploadBoxError: { borderColor: "#DC2626", backgroundColor: "#FEF2F2" },
+  uploadEmpty: { alignItems: "center", gap: 10 },
+  uploadIconWrap: { width: 64, height: 64, borderRadius: 32, backgroundColor: "#EEF2FF", justifyContent: "center", alignItems: "center" },
+  uploadEmptyTxt: { fontSize: 14.5, color: "#4F46E5", fontWeight: "700", marginTop: 4 },
+  uploadEmptySub: { fontSize: 12.5, color: "#94A3B8", fontWeight: "600" },
   uploadPreview: { width: "100%", height: "100%", resizeMode: "cover" },
   uploadOverlay: {
-    position: "absolute", bottom: 12, right: 12,
-    flexDirection: "row", alignItems: "center", gap: 6,
-    backgroundColor: "rgba(15, 23, 42, 0.75)",
-    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20,
+    position: "absolute", bottom: 14, right: 14, flexDirection: "row", alignItems: "center", gap: 6,
+    backgroundColor: "rgba(15, 23, 42, 0.85)", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 24,
   },
-  uploadOverlayTxt: { color: "#fff", fontSize: 12, fontWeight: "600" },
+  uploadOverlayTxt: { color: "#fff", fontSize: 12, fontWeight: "700", letterSpacing: 0.5 },
 
-  btnRow: { flexDirection: "row", gap: 12, marginTop: 24 },
-  submitBtn: { flex: 2, borderRadius: 16, overflow: "hidden" },
-  submitBtnInner: {
-    flexDirection: "row", alignItems: "center",
-    justifyContent: "center", gap: 10, paddingVertical: 16,
-  },
-  submitTxt: { color: "#fff", fontWeight: "800", fontSize: 16 },
+  btnRow: { flexDirection: "row", gap: 14, marginTop: 32 },
+  submitBtn: { flex: 2.5, borderRadius: 16, overflow: "hidden", shadowColor: "#4F46E5", shadowOpacity: 0.2, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
+  submitBtnInner: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 18 },
+  submitTxt: { color: "#fff", fontWeight: "800", fontSize: 15.5 },
   cancelBtn: {
-    flex: 1, alignItems: "center", justifyContent: "center",
-    backgroundColor: "#fff", borderRadius: 16,
-    paddingVertical: 16, borderWidth: 1.5, borderColor: "#E2E8F0",
+    flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#fff",
+    borderRadius: 16, paddingVertical: 18, borderWidth: 1.5, borderColor: "#E2E8F0",
   },
   cancelTxt: { color: "#475569", fontWeight: "700", fontSize: 15 },
 });

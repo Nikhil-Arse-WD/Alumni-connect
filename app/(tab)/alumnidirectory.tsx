@@ -10,21 +10,25 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    FlatList,
-    Platform,
-    RefreshControl,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
-    useWindowDimensions,
+  ActivityIndicator,
+  FlatList,
+  Platform,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  useWindowDimensions,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-const API_URL = "http://10.254.25.118:2000/alumni";
+// ── STRICT ENV CHECK ──
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE;
+const API_URL = `${API_BASE}/alumni`;
+const isWeb = Platform.OS === "web";
 
-// ── Programme groups (same as register) ─────────────────────────────────────
+// ── Programme groups ─────────────────────────────────────
 const PROGRAMME_GROUPS = [
   {
     group: "Management",
@@ -47,7 +51,6 @@ const PROGRAMME_GROUPS = [
   },
 ];
 
-// Flat list for mobile Picker (with disabled group headers)
 type ProgrammeItem = { label: string; value: string; disabled?: boolean };
 const PROGRAMME_FLAT: ProgrammeItem[] = PROGRAMME_GROUPS.flatMap(g => [
   { label: `── ${g.group} ──`, value: `_h_${g.group}`, disabled: true },
@@ -57,35 +60,28 @@ const PROGRAMME_FLAT: ProgrammeItem[] = PROGRAMME_GROUPS.flatMap(g => [
 // ======================================================
 // AVATAR HELPERS
 // ======================================================
-const AVATAR_COLORS = ["#6D28D9","#2563EB","#10B981","#F97316","#EC4899"];
+const AVATAR_COLORS = ["#4F46E5", "#2563EB", "#059669", "#D97706", "#DB2777"];
 const getAvatarColor = (name = "") => AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length];
-const getInitials = (name = "") =>
-  name.split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase();
+const getInitials = (name = "") => name.split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase();
 
 // ======================================================
-// FILTER DROPDOWN — with grouped Programme support
+// FILTER DROPDOWN 
 // ======================================================
-function FilterDropdown({
-  label, value, onChange, options, grouped = false,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: { label: string; value: string }[];
-  grouped?: boolean;
+function FilterDropdown({ label, value, onChange, options, grouped = false }: {
+  label: string; value: string; onChange: (v: string) => void;
+  options: { label: string; value: string }[]; grouped?: boolean;
 }) {
-  if (Platform.OS === "web") {
+  if (isWeb) {
     return (
       <View style={styles.dropdownBox}>
-        {/* Inject CSS once to fix optgroup color in all selects */}
         {typeof document !== "undefined" && (() => {
           const id = "optgroup-fix-style";
           if (!document.getElementById(id)) {
             const s = document.createElement("style");
             s.id = id;
             s.textContent = `
-              .alumni-filter-select option { color: #111 !important; background: #fff !important; }
-              .alumni-filter-select optgroup { color: #5B21B6 !important; background: #fff !important; font-weight: 700 !important; font-style: normal !important; }
+              .alumni-filter-select option { color: #0F172A !important; background: #fff !important; }
+              .alumni-filter-select optgroup { color: #4F46E5 !important; background: #EEF2FF !important; font-weight: 700 !important; font-style: normal !important; }
             `;
             document.head.appendChild(s);
           }
@@ -96,59 +92,39 @@ function FilterDropdown({
           value={value}
           onChange={e => onChange(e.target.value)}
           style={{
-            width: "100%", height: 58, border: "none",
-            background: "transparent", paddingLeft: 12,
-            fontSize: 14, color: "#fff", outline: "none",
+            width: "100%", height: 50, border: "none",
+            background: "transparent", paddingLeft: 16,
+            fontSize: 14, color: "#fff", outline: "none", cursor: "pointer", fontWeight: "600"
           }}
         >
-          <option value="" style={{ color: "#111", background: "#fff" }}>
-            {label}
-          </option>
-
+          <option value="" style={{ color: "#64748B", background: "#fff" }}>{label}</option>
           {grouped ? (
             PROGRAMME_GROUPS.map(g => (
               <optgroup key={g.group} label={g.group}>
-                {g.items.map(i => (
-                  <option key={i.value} value={i.value}>{i.label}</option>
-                ))}
+                {g.items.map(i => <option key={i.value} value={i.value}>{i.label}</option>)}
               </optgroup>
             ))
           ) : (
-            options.map(o => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))
+            options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)
           )}
         </select>
       </View>
     );
   }
 
-  // ── Mobile ──
+  // ── Mobile Picker ──
   return (
     <View style={styles.dropdownBox}>
       <Picker
         selectedValue={value}
-        onValueChange={v => {
-          if (grouped && String(v).startsWith("_h_")) return;
-          onChange(v);
-        }}
+        onValueChange={v => { if (grouped && String(v).startsWith("_h_")) return; onChange(v); }}
         dropdownIconColor="#fff"
-        style={{ color: "#fff" }}
+        style={{ color: "#fff", height: 50 }}
       >
         <Picker.Item label={label} value="" />
         {grouped
-          ? PROGRAMME_FLAT.map(i => (
-              <Picker.Item
-                key={i.value}
-                label={i.label}
-                value={i.value}
-                enabled={i.disabled !== true}
-                color={i.disabled === true ? "#94A3B8" : "#111"}
-              />
-            ))
-          : options.map(o => (
-              <Picker.Item key={o.value} label={o.label} value={o.value} />
-            ))
+          ? PROGRAMME_FLAT.map(i => <Picker.Item key={i.value} label={i.label} value={i.value} enabled={i.disabled !== true} color={i.disabled === true ? "#94A3B8" : "#111"} />)
+          : options.map(o => <Picker.Item key={o.value} label={o.label} value={o.value} />)
         }
       </Picker>
     </View>
@@ -159,47 +135,46 @@ function FilterDropdown({
 // ALUMNI CARD
 // ======================================================
 function AlumniCard({ item, onPress, cardWidth }: { item: any; onPress: () => void; cardWidth?: number }) {
+  const safeImgUri = item.profile_photo ? (item.profile_photo.startsWith("http") ? item.profile_photo : `${API_BASE}/uploads/${item.profile_photo}`) : null;
+
   return (
-    <TouchableOpacity activeOpacity={0.92} onPress={onPress}
-      style={[styles.card, cardWidth ? { width: cardWidth } : null]}>
+    <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={[styles.card, cardWidth ? { width: cardWidth } : null]}>
       <View style={styles.cardTop}>
         <View style={styles.userRow}>
-          {item.profile_photo ? (
-            <Image
-              source={{ uri: `http://10.254.25.118:2000/uploads/${item.profile_photo}` }}
-              style={styles.avatarImage} contentFit="cover" />
+          {safeImgUri ? (
+            <Image source={{ uri: safeImgUri }} style={styles.avatarImage} contentFit="cover" />
           ) : (
-            <LinearGradient colors={[getAvatarColor(item.full_name), "#8B5CF6"]} style={styles.avatar}>
+            <LinearGradient colors={[getAvatarColor(item.full_name), "#312EBA"]} style={styles.avatar}>
               <Text style={styles.avatarText}>{getInitials(item.full_name)}</Text>
             </LinearGradient>
           )}
           <View style={{ flex: 1 }}>
             <Text style={styles.name} numberOfLines={1}>{item.full_name}</Text>
-            <Text style={styles.role}>{item.designation || "Software Engineer"}</Text>
+            <Text style={styles.role} numberOfLines={1}>{item.designation || "Alumni Member"}</Text>
           </View>
         </View>
       </View>
 
       <View style={styles.tagRow}>
-        <View style={styles.programTag}><Text style={styles.programText}>{item.programme}</Text></View>
-        <View style={styles.batchTag}><Text style={styles.batchText}>{item.batch_year}</Text></View>
+        {item.programme && <View style={styles.programTag}><Text style={styles.programText}>{item.programme}</Text></View>}
+        {item.batch_year && <View style={styles.batchTag}><Text style={styles.batchText}>{item.batch_year}</Text></View>}
       </View>
 
       <View style={styles.infoSection}>
         <View style={styles.infoRow}>
-          <Ionicons name="location-outline" size={15} color="#64748B" />
-          <Text style={styles.infoText}>{item.city || "Indore"}</Text>
+          <Ionicons name="location-outline" size={14} color="#64748B" />
+          <Text style={styles.infoText} numberOfLines={1}>{item.city || "Unknown Location"}</Text>
         </View>
         <View style={styles.infoRow}>
-          <Ionicons name="briefcase-outline" size={15} color="#64748B" />
-          <Text style={styles.infoText}>{item.organisation || "Infosys"}</Text>
+          <Ionicons name="briefcase-outline" size={14} color="#64748B" />
+          <Text style={styles.infoText} numberOfLines={1}>{item.organisation || "Independent"}</Text>
         </View>
       </View>
 
-      <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={{ marginTop: 24 }}>
-        <LinearGradient colors={["#5B3DF5", "#7C3AED"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.connectButton}>
-          <Ionicons name="person-outline" size={16} color="#fff" />
+      <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={{ marginTop: 24 }}>
+        <LinearGradient colors={["#EEF2FF", "#EEF2FF"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.connectButton}>
           <Text style={styles.connectText}>View Profile</Text>
+          <Ionicons name="arrow-forward" size={14} color="#4F46E5" />
         </LinearGradient>
       </TouchableOpacity>
     </TouchableOpacity>
@@ -212,31 +187,37 @@ function AlumniCard({ item, onPress, cardWidth }: { item: any; onPress: () => vo
 export default function AlumniDirectoryScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const [showFilters, setShowFilters] = useState(false);
-  const isMobile = width < 700;
-  const shouldShowFilters = Platform.OS === "web" ? true : showFilters;
-
+  const isMobile = width < 768;
+  
+  const [showFilters, setShowFilters] = useState(!isMobile); // Open by default on Web
+  
   const GAP          = 18;
-  const SIDE_PADDING = isMobile ? 16 : 12;
-  const numColumns   = width >= 1300 ? 4 : width >= 1100 ? 3 : width >= 700 ? 2 : 1;
+  const SIDE_PADDING = isMobile ? 16 : 32;
+  const numColumns   = width >= 1400 ? 4 : width >= 1000 ? 3 : width >= 700 ? 2 : 1;
   const totalGap     = GAP * (numColumns - 1);
-  const containerWidth = width * 0.94;
+  const containerWidth = isWeb ? Math.min(width * 0.94, 1600) : width * 0.94;
   const cardWidth = (containerWidth - SIDE_PADDING * 2 - totalGap) / numColumns;
 
   const [alumni,     setAlumni]     = useState<any[]>([]);
   const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  
   const [search,     setSearch]     = useState("");
   const [programme,  setProgramme]  = useState("");
   const [batchYear,  setBatchYear]  = useState("");
   const [city,       setCity]       = useState("");
 
   const fetchAlumni = async () => {
+    if (!API_BASE) {
+      setLoading(false);
+      return;
+    }
     try {
       const res = await axios.get(API_URL, {
         params: { search, programme, batch_year: batchYear, city },
       });
-      setAlumni(res.data.data);
+      // 🚨 Fallback to empty array prevents random crashes if backend sends null
+      setAlumni(res.data.data || []);
     } catch (err) {
       console.log(err);
     } finally {
@@ -246,20 +227,33 @@ export default function AlumniDirectoryScreen() {
   };
 
   useEffect(() => { fetchAlumni(); }, []);
+  
+  // ── Debounced Search Effect ──
   useEffect(() => {
-    const delay = setTimeout(() => fetchAlumni(), 500);
+    const delay = setTimeout(() => fetchAlumni(), 600);
     return () => clearTimeout(delay);
   }, [search, programme, batchYear, city]);
 
   const onRefresh = () => { setRefreshing(true); fetchAlumni(); };
 
+  // ── Missing System Error Screen ──
+  if (!API_BASE) {
+    return (
+      <View style={styles.errorContainer}>
+        <Ionicons name="cloud-offline-outline" size={54} color="#EF4444" />
+        <Text style={styles.errorTitle}>Configuration Mismatch</Text>
+        <Text style={styles.errorSub}>The backend endpoint variable is undefined. Please ensure EXPO_PUBLIC_API_BASE is properly mapped inside your root environment configuration file.</Text>
+      </View>
+    );
+  }
+
   if (loading) {
-    return <View style={styles.loader}><ActivityIndicator size="large" color="#6D28D9" /></View>;
+    return <View style={styles.loaderWrap}><ActivityIndicator size="large" color="#4F46E5" /></View>;
   }
 
   return (
-    <View style={styles.container}>
-      {/* HERO */}
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      {/* HERO SECTION */}
       <LinearGradient
         colors={["#312EBA", "#5B21B6", "#EC1D8F"]}
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
@@ -267,58 +261,46 @@ export default function AlumniDirectoryScreen() {
       >
         <View style={styles.heroContent}>
           <Text style={styles.heroTitle}>Alumni Directory</Text>
-          <Text style={styles.heroSubtitle}>Find and connect with alumni from your network</Text>
+          <Text style={styles.heroSubtitle}>Find, network, and connect with alumni worldwide</Text>
 
-          {/* SEARCH */}
+          {/* SEARCH BAR */}
           <View style={styles.searchWrapper}>
             <View style={styles.searchContainer}>
-              <Ionicons name="search" size={20} color="#9CA3AF" />
+              <Ionicons name="search" size={20} color="#64748B" />
               <TextInput
-                placeholder="Search alumni..."
-                placeholderTextColor="#9CA3AF"
+                placeholder="Search by name, company, or designation..."
+                placeholderTextColor="#94A3B8"
                 style={styles.searchInput}
                 value={search}
                 onChangeText={setSearch}
               />
-              {Platform.OS !== "web" && (
-                <TouchableOpacity style={styles.filterToggleBtn} onPress={() => setShowFilters(!showFilters)}>
+              {!isWeb && (
+                <TouchableOpacity style={styles.filterToggleBtn} onPress={() => setShowFilters(!showFilters)} activeOpacity={0.8}>
                   <Ionicons name={showFilters ? "close-outline" : "options-outline"} size={22} color="#fff" />
                 </TouchableOpacity>
               )}
             </View>
           </View>
 
-          {/* FILTERS */}
-          {shouldShowFilters && (
+          {/* EXPANDABLE FILTERS */}
+          {showFilters && (
             <View style={styles.filtersRow}>
-              {/* Programme — grouped */}
               <View style={styles.filterItem}>
-                <FilterDropdown
-                  label="Programme"
-                  value={programme}
-                  onChange={setProgramme}
-                  options={[]}
-                  grouped={true}
-                />
+                <FilterDropdown label="All Programmes" value={programme} onChange={setProgramme} options={[]} grouped={true} />
               </View>
-
-              {/* Batch Year */}
               <View style={styles.filterItem}>
                 <FilterDropdown
-                  label="Batch"
+                  label="All Batches"
                   value={batchYear}
                   onChange={setBatchYear}
-                  options={Array.from(
-                    { length: new Date().getFullYear() - 1989 + 1 },
-                    (_, i) => { const y = new Date().getFullYear() - i; return { label: String(y), value: String(y) }; }
-                  )}
+                  options={Array.from({ length: new Date().getFullYear() - 1989 + 1 }, (_, i) => { 
+                    const y = new Date().getFullYear() - i; return { label: String(y), value: String(y) }; 
+                  })}
                 />
               </View>
-
-              {/* City */}
               <View style={styles.filterItem}>
                 <FilterDropdown
-                  label="City"
+                  label="All Locations"
                   value={city}
                   onChange={setCity}
                   options={[
@@ -326,6 +308,7 @@ export default function AlumniDirectoryScreen() {
                     { label: "Delhi",     value: "Delhi"     },
                     { label: "Mumbai",    value: "Mumbai"    },
                     { label: "Bangalore", value: "Bangalore" },
+                    { label: "Pune",      value: "Pune"      },
                   ]}
                 />
               </View>
@@ -334,26 +317,25 @@ export default function AlumniDirectoryScreen() {
         </View>
       </LinearGradient>
 
-      {/* LIST */}
-      <View style={styles.space}>
+      {/* DIRECTORY LIST */}
+      <View style={[styles.space, { width: containerWidth }]}>
         <FlatList
           key={numColumns}
           data={alumni}
           numColumns={numColumns}
           keyExtractor={item => item.id.toString()}
           showsVerticalScrollIndicator={false}
-          removeClippedSubviews={false}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{
             paddingHorizontal: SIDE_PADDING,
-            paddingBottom: 120,
-            paddingTop: 12,
+            paddingBottom: 80,
+            paddingTop: 32, // Rebalanced padding to avoid clipping the hero gradient
           }}
           columnWrapperStyle={numColumns > 1 ? { justifyContent: "flex-start", marginBottom: GAP } : undefined}
           ItemSeparatorComponent={() => <View style={{ height: GAP }} />}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           renderItem={({ item, index }) => (
-            <View style={{ marginRight: (index + 1) % numColumns === 0 ? 0 : GAP, marginBottom: GAP }}>
+            <View style={{ marginRight: (index + 1) % numColumns === 0 ? 0 : GAP, marginBottom: numColumns === 1 ? GAP : 0 }}>
               <AlumniCard
                 item={item}
                 cardWidth={cardWidth}
@@ -363,13 +345,24 @@ export default function AlumniDirectoryScreen() {
           )}
           ListEmptyComponent={
             <View style={styles.emptyBox}>
-              <Ionicons name="people-outline" size={70} color="#CBD5E1" />
-              <Text style={styles.emptyText}>No alumni found</Text>
+              <View style={styles.emptyIconWrap}>
+                <Ionicons name="people-outline" size={48} color="#94A3B8" />
+              </View>
+              <Text style={styles.emptyTitle}>No Alumni Found</Text>
+              <Text style={styles.emptyText}>Try adjusting your search or filter parameters.</Text>
+              { (search || programme || batchYear || city) && (
+                <TouchableOpacity 
+                  style={styles.clearBtn} 
+                  onPress={() => { setSearch(""); setProgramme(""); setBatchYear(""); setCity(""); }}
+                >
+                  <Text style={styles.clearBtnText}>Clear All Filters</Text>
+                </TouchableOpacity>
+              )}
             </View>
           }
         />
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -377,70 +370,85 @@ export default function AlumniDirectoryScreen() {
 // STYLES
 // ======================================================
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  loader:    { flex: 1, justifyContent: "center", alignItems: "center" },
-  space: {
-    flex: 1, width: "94%", alignSelf: "center",
-    backgroundColor: "#FFFFFF",
-    borderTopLeftRadius: 36, borderTopRightRadius: 36,
-    marginTop: Platform.OS === "web" ? -160 : -99,
-    paddingTop: 18, borderWidth: 1, borderColor: "#EEF2FF",
-    shadowColor: "#312EBA", shadowOffset: { width: 0, height: -6 },
-    shadowOpacity: 0.08, shadowRadius: 16, elevation: 12,
-  },
+  container: { flex: 1, backgroundColor: "#F8FAFC" },
+  loaderWrap: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#F8FAFC" },
+  
+  // System Level Error Interfaces
+  errorContainer: { flex: 1, backgroundColor: "#F8FAFC", justifyContent: "center", alignItems: "center", padding: 32, textAlign: "center" as any },
+  errorTitle: { fontSize: 18, fontWeight: "800", color: "#0F172A", marginTop: 16, marginBottom: 8 },
+  errorSub: { fontSize: 13.5, color: "#64748B", textAlign: "center", lineHeight: 20, maxWidth: 420 },
+
   heroSection: {
-    overflow: "hidden",
-    paddingTop: Platform.OS === "web" ? 30 : 20,
-    paddingBottom: Platform.OS === "web" ? 190 : 120,
-    paddingHorizontal: Platform.OS === "web" ? 24 : 16,
+    paddingTop: 30,
+    paddingBottom: 40,
+    paddingHorizontal: isWeb ? 32 : 16,
   },
-  heroContent:   { alignItems: Platform.OS === "web" ? "center" : "flex-start" },
-  heroTitle:     { color: "#fff", fontSize: Platform.OS === "web" ? 42 : 30, fontWeight: "800", textAlign: Platform.OS === "web" ? "center" : "left" },
-  heroSubtitle:  { color: "rgba(255,255,255,0.82)", fontSize: Platform.OS === "web" ? 16 : 13, marginTop: 8, marginBottom: 24, textAlign: Platform.OS === "web" ? "center" : "left" },
+  heroContent: { alignItems: "center", maxWidth: 900, width: "100%", alignSelf: "center" },
+  heroTitle: { color: "#fff", fontSize: isWeb ? 40 : 32, fontWeight: "900", textAlign: "center", letterSpacing: -0.5 },
+  heroSubtitle: { color: "rgba(255,255,255,0.85)", fontSize: isWeb ? 16 : 14, marginTop: 8, marginBottom: 28, textAlign: "center", fontWeight: "500" },
+  
   searchWrapper: { width: "100%", alignItems: "center" },
   searchContainer: {
-    width: Platform.OS === "web" ? "78%" : "100%", height: 58,
-    backgroundColor: "#fff", borderRadius: 18,
-    flexDirection: "row", alignItems: "center", paddingHorizontal: 14,
+    width: "100%", height: 56,
+    backgroundColor: "#fff", borderRadius: 16,
+    flexDirection: "row", alignItems: "center", paddingHorizontal: 16,
     shadowColor: "#000", shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.12, shadowRadius: 12, elevation: 5,
+    shadowOpacity: 0.1, shadowRadius: 15, elevation: 6,
   },
-  searchInput: { flex: 1, marginLeft: 14, color: "#111827", fontSize: 15, outlineStyle: "none" } as any,
+  searchInput: { flex: 1, marginLeft: 12, color: "#0F172A", fontSize: 15, fontWeight: "500", ...Platform.select({ web: { outlineStyle: "none" } as any }) },
+  filterToggleBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: "#4F46E5", justifyContent: "center", alignItems: "center", marginLeft: 10 },
+  
   filtersRow: {
-    flexDirection: Platform.OS === "web" ? "row" : "column",
+    flexDirection: isWeb ? "row" : "column",
     width: "100%", justifyContent: "center", alignItems: "center",
-    marginTop: 22, gap: 12, paddingHorizontal: 16, flexWrap: "wrap",
+    marginTop: 20, gap: 12, flexWrap: "wrap",
   },
-  filterItem:      { width: Platform.OS === "web" ? 220 : "100%" },
-  filterToggleBtn: { width: 44, height: 44, borderRadius: 14, backgroundColor: "#5B3DF5", justifyContent: "center", alignItems: "center", marginLeft: 10 },
+  filterItem: { width: isWeb ? 240 : "100%" },
   dropdownBox: {
-    height: 48, backgroundColor: "rgba(255,255,255,0.10)",
-    borderRadius: 14, borderWidth: 1.5, borderColor: "rgba(255,255,255,0.18)",
+    height: 50, backgroundColor: "rgba(255,255,255,0.15)",
+    borderRadius: 14, borderWidth: 1, borderColor: "rgba(255,255,255,0.25)",
     overflow: "hidden", justifyContent: "center",
   },
-  card: {
-    backgroundColor: "#fff", borderRadius: 22, padding: 16,
-    borderWidth: 1, borderColor: "#EEF2FF",
-    shadowColor: "#000", shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06, shadowRadius: 10, elevation: 3,
+
+  space: {
+    flex: 1, alignSelf: "center",
+    backgroundColor: "#F8FAFC",
+    borderTopLeftRadius: 36, borderTopRightRadius: 36,
+    marginTop: -20, // Rebalanced negative margin for cleaner overlap
+    borderWidth: 1, borderColor: "#F1F5F9",
   },
-  cardTop:     { marginBottom: 18 },
-  userRow:     { flexDirection: "row", alignItems: "center" },
-  avatar:      { width: Platform.OS === "web" ? 60 : 58, height: Platform.OS === "web" ? 60 : 58, borderRadius: 50, justifyContent: "center", alignItems: "center", marginRight: 12 },
-  avatarImage: { width: Platform.OS === "web" ? 60 : 58, height: Platform.OS === "web" ? 60 : 58, borderRadius: 50, marginRight: 12 },
-  avatarText:  { color: "#fff", fontSize: 20, fontWeight: "800" },
-  name:        { fontSize: Platform.OS === "web" ? 20 : 18, fontWeight: "800", color: "#111827" },
-  role:        { marginTop: 4, fontSize: 14, color: "#64748B" },
-  tagRow:      { flexDirection: "row", gap: 10, marginBottom: 20 },
-  programTag:  { backgroundColor: "#F3E8FF", paddingHorizontal: 14, paddingVertical: 7, borderRadius: 50 },
-  batchTag:    { backgroundColor: "#E0F2FE", paddingHorizontal: 14, paddingVertical: 7, borderRadius: 50 },
-  programText: { color: "#6D28D9", fontWeight: "700", fontSize: 12 },
-  batchText:   { color: "#0369A1", fontWeight: "700", fontSize: 12 },
-  infoSection: { gap: 12 },
-  infoRow:     { flexDirection: "row", alignItems: "center" },
-  infoText:    { marginLeft: 10, color: "#475569", fontSize: 14 },
-  connectButton: { height: 50, borderRadius: 14, flexDirection: "row", alignItems: "center", justifyContent: "center" },
-  connectText:   { color: "#fff", marginLeft: 8, fontWeight: "700", fontSize: 14 },
-  emptyBox:    { alignItems: "center", marginTop: 120 },
-  emptyText:   { marginTop: 12, color: "#64748B", fontSize: 16, fontWeight: "600" },
+
+  card: {
+    backgroundColor: "#fff", borderRadius: 24, padding: 20,
+    borderWidth: 1, borderColor: "#E2E8F0",
+    shadowColor: "#0F172A", shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04, shadowRadius: 10, elevation: 2,
+  },
+  cardTop: { marginBottom: 18 },
+  userRow: { flexDirection: "row", alignItems: "center" },
+  avatar: { width: 56, height: 56, borderRadius: 28, justifyContent: "center", alignItems: "center", marginRight: 14 },
+  avatarImage: { width: 56, height: 56, borderRadius: 28, marginRight: 14, borderWidth: 1, borderColor: "#F1F5F9" },
+  avatarText: { color: "#fff", fontSize: 18, fontWeight: "800" },
+  name: { fontSize: 17, fontWeight: "800", color: "#0F172A", letterSpacing: -0.2 },
+  role: { marginTop: 4, fontSize: 13, color: "#64748B", fontWeight: "500" },
+  
+  tagRow: { flexDirection: "row", gap: 10, marginBottom: 20 },
+  programTag: { backgroundColor: "#F3E8FF", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+  batchTag: { backgroundColor: "#E0F2FE", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+  programText: { color: "#6D28D9", fontWeight: "700", fontSize: 11, textTransform: "uppercase" },
+  batchText: { color: "#0369A1", fontWeight: "700", fontSize: 11, textTransform: "uppercase" },
+  
+  infoSection: { gap: 10 },
+  infoRow: { flexDirection: "row", alignItems: "center" },
+  infoText: { marginLeft: 8, color: "#475569", fontSize: 13, fontWeight: "500" },
+  
+  connectButton: { height: 44, borderRadius: 14, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1, borderColor: "#C7D2FE" },
+  connectText: { color: "#4F46E5", fontWeight: "800", fontSize: 13 },
+
+  emptyBox: { alignItems: "center", paddingTop: 60 },
+  emptyIconWrap: { width: 90, height: 90, borderRadius: 45, backgroundColor: "#F1F5F9", justifyContent: "center", alignItems: "center", marginBottom: 16 },
+  emptyTitle: { fontSize: 20, color: "#0F172A", fontWeight: "800", marginBottom: 6 },
+  emptyText: { color: "#64748B", fontSize: 14, fontWeight: "500", textAlign: "center", maxWidth: 300 },
+  clearBtn: { marginTop: 24, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20, backgroundColor: "#FEE2E2" },
+  clearBtnText: { color: "#EF4444", fontWeight: "800", fontSize: 13 },
 });
