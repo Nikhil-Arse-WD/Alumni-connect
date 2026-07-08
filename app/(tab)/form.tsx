@@ -29,7 +29,6 @@ import Animated, {
   withSpring,
   withTiming,
 } from "react-native-reanimated";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 // ── STRICT ENV CHECK ──
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE;
@@ -330,7 +329,7 @@ export default function DiscussionForumScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       <FlatList
         data={filteredPosts}
         keyExtractor={(item) => item.id.toString()}
@@ -603,7 +602,7 @@ export default function DiscussionForumScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -618,7 +617,7 @@ const styles = StyleSheet.create({
   errorTitle: { fontSize: 18, fontWeight: "800", color: "#0F172A", marginTop: 16, marginBottom: 8 },
   errorSub: { fontSize: 13.5, color: "#64748B", textAlign: "center", lineHeight: 20, maxWidth: 420 },
 
-  header: { paddingTop: 20, paddingBottom: 36, paddingHorizontal: 24, overflow: "hidden" },
+  header: { width: "100%", paddingTop: 30, paddingBottom: 36, paddingHorizontal: 24, overflow: "hidden" },
   dec1: { position: "absolute", right: -60, top: -40, width: 220, height: 220, borderRadius: 110, borderWidth: 2, borderColor: "rgba(255,255,255,0.1)" },
   dec2: { position: "absolute", right: 40, top: 50, width: 140, height: 140, borderRadius: 70, backgroundColor: "rgba(255,255,255,0.06)" },
 

@@ -1,15 +1,16 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
+import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import * as ExpoLinking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import React, { useEffect, useState } from "react";
 import {
-  Alert, Image, Platform, ScrollView,
+  Alert, Platform, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+// SafeAreaView import removed as it is no longer needed
 
 // ── STRICT ENV CHECK (No hardcoded fallback IP) ──
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE;
@@ -342,10 +343,11 @@ export default function ContributionsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    // Replaced SafeAreaView with View
+    <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
 
-        {/* HERO */}
+        {/* HERO: Modified width to 100% */}
         <LinearGradient colors={["#312EBA", "#5B21B6", "#EC1D8F"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.hero}>
           <View style={styles.webContainer}>
             <Text style={styles.heroTitle}>Giving Back 💛</Text>
@@ -595,7 +597,7 @@ export default function ContributionsScreen() {
           </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -643,7 +645,10 @@ const mcStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8FAFC" },
   webContainer: { maxWidth: 900, alignSelf: "center", width: "100%" }, 
-  hero: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 32 },
+  
+  // Hero section updated to width 100% and proper padding
+  hero: { width: "100%", paddingHorizontal: 24, paddingTop: 30, paddingBottom: 32 },
+  
   heroTitle: { color: "#fff", fontSize: Platform.OS === "web" ? 32 : 28, fontWeight: "800", textAlign: Platform.OS === "web" ? "center" : "left", letterSpacing: -0.5 },
   heroSub: { color: "rgba(255,255,255,0.8)", fontSize: 14, marginTop: 6, textAlign: Platform.OS === "web" ? "center" : "left", fontWeight: "500" },
   tabsRow: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 10, gap: 10 },
