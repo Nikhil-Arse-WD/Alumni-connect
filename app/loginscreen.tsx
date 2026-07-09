@@ -233,7 +233,7 @@ export default function LoginScreen() {
               <View style={styles.leftIconBg}>
                 <Image source={require("../assets/Alumni_Pics/logo.png")} style={styles.logoImg} resizeMode="contain" />
               </View>
-              <Text style={styles.webTitle}>SVIMSAA Connect</Text>
+              <Text style={styles.webTitle}>SVIMAA Connect</Text>
               <Text style={styles.webSub}>
                 Bridging the gap between students,{'\n'}alumni, and administration in one unified platform.
               </Text>

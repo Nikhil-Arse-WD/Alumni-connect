@@ -139,7 +139,7 @@ const sendWelcomeEmail = async (userEmail, fullName, tempPassword) => {
     subject: "Welcome to SVIMAA  Alumni Connect! 🎓",
     html: `
       <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #E2E8F0; border-radius: 10px;">
-        <h2 style="color: #4F46E5;">Welcome to the SVIMSAA Family, ${fullName}!</h2>
+        <h2 style="color: #4F46E5;">Welcome to the SVIMAA Family, ${fullName}!</h2>
         <p style="color: #475569; font-size: 16px;">
           Thank you for registering with the Shri Vaishnav Institute of Management Alumni Association (SVIMAA). We are thrilled to have you!
         </p>
@@ -1052,7 +1052,7 @@ app.put("/admin/member/approve/:id", (req, res) => {
   db.query(`UPDATE alumni_members SET approved = ? WHERE id = ?`, [approved, req.params.id], (err) => {
     if (err) return res.status(500).json({ success: false });
     const msg = approved === 1
-      ? { title: "✅ Registration Approved!", message: "Welcome to SVIMSAA Alumni Network! Your profile is now live." }
+      ? { title: "✅ Registration Approved!", message: "Welcome to SVIMAA Alumni Network! Your profile is now live." }
       : { title: "❌ Registration Rejected", message: "Your registration was not approved. Please contact admin." };
     sendNotification(req.params.id, msg.title, msg.message, "general");
     res.json({ success: true });
@@ -1600,7 +1600,7 @@ app.post("/pay/initiate", async (req, res) => {
   }
 
   // ── 1. FIX SURL/FURL LOCALHOST REJECTION ──
-  let serverIp = process.env.SERVER_URL || "http://127.0.0.1:2000"; 
+  let serverIp = process.env.SERVER_URL; 
   serverIp = serverIp.replace(/\/+$/, ""); // Removes any accidental trailing slashes
   serverIp = serverIp.replace("localhost", "127.0.0.1"); // Easebuzz rejects 'localhost', so we disguise it!
   if (!serverIp.startsWith("http")) serverIp = `http://${serverIp}`;

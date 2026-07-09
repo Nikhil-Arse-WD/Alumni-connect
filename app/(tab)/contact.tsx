@@ -1,12 +1,10 @@
-import React, { useRef, useState } from "react";
-import Footer from "../components/Footer";
-import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
+import React, { useRef, useState } from "react";
 import {
   Animated,
   Easing,
-  KeyboardAvoidingView,
   Linking,
   Modal,
   Platform,
@@ -16,8 +14,9 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  useWindowDimensions,
+  useWindowDimensions
 } from "react-native";
+import Footer from "../components/Footer";
 
 export default function ContactScreen() {
   const { width } = useWindowDimensions();
@@ -36,8 +35,8 @@ export default function ContactScreen() {
     {
       name: "Mr. Upendra Jain",
       role: "Contact Person",
-      phone: "+91 9827044277",
-      whatsapp: "919827044277",
+      phone: "+91 9827044274",
+      whatsapp: "919827044274",
       location: "Indore, MP",
       color: ["#EC4899", "#DB2777"],
     },

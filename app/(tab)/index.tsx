@@ -945,7 +945,7 @@ const styles = StyleSheet.create({
   sponsoredImg:       { width: "100%", height: 130 },
   sponsoredImgEmpty:  { backgroundColor: "#F1F5F9", justifyContent: "center", alignItems: "center" },
   sponsoredBody:      { padding: 13 },
-  sponsoredTitle:     { fontSize: 14, fontWeight: "800", color: "#0f172a" },
+  sponsoredTitle:     { fontSize: 14, fontWeight: "800", color: "#fff" },
   sponsoredDesc:      { fontSize: 11.5, color: "#64748b", marginTop: 4, lineHeight: 16 },
   sponsoredLinkRow:   { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 8 },
   sponsoredLinkTxt:   { fontSize: 11, color: "#4F46E5", fontWeight: "700" },

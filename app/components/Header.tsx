@@ -21,7 +21,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-const API = "http://10.232.80.175:2000";
+const API = process.env.EXPO_PUBLIC_API_BASE;
 const DESKTOP_BP = 768;
 
 function useResponsiveWidth(): number {
@@ -68,7 +68,7 @@ function Badge({ count }: { count: number }) {
   if (count <= 0) return null;
   return (
     <View style={styles.badge}>
-      <Text style={styles.badgeText}>{count > 99 ? "99+" : count}</Text>
+     <Text style={styles.badgeText}>{count > 5000 ? "9999+" : count}</Text>
     </View>
   );
 }
