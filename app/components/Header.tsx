@@ -68,7 +68,7 @@ function Badge({ count }: { count: number }) {
   if (count <= 0) return null;
   return (
     <View style={styles.badge}>
-     <Text style={styles.badgeText}>{count > 5000 ? "9999+" : count}</Text>
+     <Text style={styles.badgeText}>{count > 99 ? "99+" : count}</Text>
     </View>
   );
 }
