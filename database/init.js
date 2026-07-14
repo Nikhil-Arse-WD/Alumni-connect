@@ -14,13 +14,20 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+if (!fs.existsSync("uploads")) fs.mkdirSync("uploads");
+if (!fs.existsSync("uploads/events")) fs.mkdirSync("uploads/events", { recursive: true });
+if (!fs.existsSync("uploads/event-gallery")) fs.mkdirSync("uploads/event-gallery", { recursive: true });
+if (!fs.existsSync("uploads/banners")) fs.mkdirSync("uploads/banners", { recursive: true });
+
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
 const rateLimit = require("express-rate-limit");
 
 // 1. General limiter: Increased to 1500 requests per 15 mins
 // (This safely allows your 5-second polling + normal app navigation)
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, 
-  max: 1500, // <-- INCREASED FROM 100 TO 1500
+  max: 15000, // <-- INCREASED FROM 100 TO 1500
   handler: (req, res) => {
     // FORCE JSON RESPONSE
     res.status(429).json({ success: false, message: "Too many requests from this IP, please try again after 15 minutes" });
@@ -45,13 +52,6 @@ app.use(generalLimiter);
 app.use("/login", strictLimiter);
 app.use("/admin/login", strictLimiter);
 app.use("/pay/initiate", strictLimiter);
-
-if (!fs.existsSync("uploads")) fs.mkdirSync("uploads");
-if (!fs.existsSync("uploads/events")) fs.mkdirSync("uploads/events", { recursive: true });
-if (!fs.existsSync("uploads/event-gallery")) fs.mkdirSync("uploads/event-gallery", { recursive: true });
-if (!fs.existsSync("uploads/banners")) fs.mkdirSync("uploads/banners", { recursive: true });
-
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 // ── 1. PROFILE PHOTOS STORAGE (UPDATED) ──
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "uploads/"),

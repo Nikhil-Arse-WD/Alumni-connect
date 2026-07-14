@@ -5,20 +5,22 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Linking,
-    Platform,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-    useWindowDimensions,
+  ActivityIndicator,
+  Alert,
+  Linking,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  useWindowDimensions,
 } from "react-native";
 
-const API_URL = "http://10.254.25.118:2000/alumni/profile";
+// ── FIXED: Use Environment Variable instead of hardcoded IP ──
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE;
+const API_URL = `${API_BASE}/alumni/profile`;
 
 const AVATAR_COLORS = ["#378ADD","#D4537E","#1D9E75","#BA7517","#7F77DD","#D85A30"];
 const getAvatarColor = (name = "") => AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length];
@@ -49,7 +51,6 @@ export default function AlumniProfileScreen() {
   if (!user)   return <View style={styles.loader}><Text>User not found</Text></View>;
 
   // ── Decide what to show ──────────────────────────────────────────
-  // Hidden/masking flags removed — always show actual values when present
   const emailDisplay  = user.email  ?? "Not provided";
   const phoneDisplay  = user.mobile ?? "Not provided";
   const cityDisplay   = user.city
@@ -90,7 +91,7 @@ export default function AlumniProfileScreen() {
             <View style={[styles.avatarBox, { backgroundColor: getAvatarColor(user.full_name) }]}>
               {user.profile_photo ? (
                 <Image
-                  source={{ uri: `http://10.254.25.118:2000/uploads/${user.profile_photo}` }}
+                  source={{ uri: `${API_BASE}/uploads/${user.profile_photo}` }}
                   style={styles.profileImage} contentFit="cover"
                 />
               ) : (
@@ -121,13 +122,13 @@ export default function AlumniProfileScreen() {
               </View>
             <View style={styles.actionRow}>
               <TouchableOpacity
-                style={[styles.primaryBtn, isEmailHidden && styles.btnDisabled]}
-                onPress={() => Linking.openURL(
-                  `https://wa.me/${user.mobile}`
-                )}
+                style={[styles.primaryBtn, isPhoneHidden && styles.btnDisabled]}
+                onPress={() => {
+                  if(user.mobile) Linking.openURL(`https://wa.me/${user.mobile}`)
+                }}
               >
-                <Ionicons name={isEmailHidden ? "mail" : "logo-whatsapp"} size={16} color="#fff" />
-                <Text style={styles.primaryBtnText}>{isEmailHidden ? "N/A" : "Message"}</Text>
+                <Ionicons name={isPhoneHidden ? "mail" : "logo-whatsapp"} size={16} color="#fff" />
+                <Text style={styles.primaryBtnText}>{isPhoneHidden ? "N/A" : "Message"}</Text>
               </TouchableOpacity>
 
               
@@ -269,7 +270,9 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  scrollContainer: { padding: 14, paddingBottom: 80 },
+  // ── FIXED: Increased paddingBottom to 140 to clear the mobile tab bar ──
+  scrollContainer: { padding: 14, paddingBottom: 140 },
+  
   mainLayout:      { flexDirection: "column", gap: 16 },
   mainLayoutWide:  { flexDirection: "row", alignItems: "flex-start" },
 
@@ -312,7 +315,7 @@ const styles = StyleSheet.create({
   btnDisabled:          { backgroundColor: "#e5e7eb" },
   btnDisabledSecondary: { borderColor: "#e5e7eb", backgroundColor: "#f9fafb" },
 
-  detailsColumn: { flex: 1, gap: 16 , marginBottom: 44},
+  detailsColumn: { flex: 1, gap: 16 },
   infoCard: { backgroundColor: "#fff", borderRadius: 24, padding: 22, borderWidth: 1, borderColor: "rgba(0,0,0,0.05)" },
   sectionLabel: { fontSize: 12, color: "#6b7280", fontWeight: "700", marginBottom: 18, letterSpacing: 0.5 },
   infoGrid:  { gap: 18 },

@@ -7,12 +7,11 @@ import * as ExpoLinking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import React, { useEffect, useState } from "react";
 import {
-  Alert, Platform, ScrollView,
+  Alert, Modal, Platform, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View
 } from "react-native";
-// SafeAreaView import removed as it is no longer needed
 
-// ── STRICT ENV CHECK (No hardcoded fallback IP) ──
+// ── STRICT ENV CHECK ──
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE;
 const isWeb = Platform.OS === "web";
 
@@ -101,19 +100,19 @@ function CommunityCard({ item }: { item: any }) {
   );
 }
 
-// ── My Contribution Card ──
-function MyContribCard({ item, type }: { item: any; type: "lecture" | "mentor" | "donation" }) {
+// ── My Contribution Card (Modified for Modal Trigger) ──
+function MyContribCard({ item, type, onPress }: { item: any; type: "lecture" | "mentor" | "donation", onPress?: () => void }) {
   const statusColor = (s: string) => {
-    if (s === "Approved") return { bg: "#DCFCE7", text: "#16A34A" };
-    if (s === "Rejected") return { bg: "#FEE2E2", text: "#DC2626" };
+    if (s === "Approved" || s === "Paid") return { bg: "#DCFCE7", text: "#16A34A" };
+    if (s === "Rejected" || s === "Failed") return { bg: "#FEE2E2", text: "#DC2626" };
     return { bg: "#FEF3C7", text: "#D97706" };
   };
 
   const icon = type === "lecture" ? "🎤" : type === "mentor" ? "🧑‍🏫" : "💛";
-  const title = type === "lecture" ? item.topic || item.title : type === "mentor" ? item.expertise : item.donation_type === "Money" ? `₹${item.amount}` : item.donation_type || "Donation";
+  const title = type === "lecture" ? item.topic || item.title : type === "mentor" ? item.expertise : item.donation_type === "Money" ? `₹${item.amount} Donation` : item.donation_type || "Donation";
   const sub = type === "lecture" ? `Mode: ${item.mode || "—"} · ${item.created_at?.split("T")[0]}` : type === "mentor" ? `Max ${item.max_mentees} mentees` : item.receipt_number ? `🧾 ${item.receipt_number}` : item.created_at?.split("T")[0];
 
-  return (
+  const CardBody = (
     <View style={mcStyles.card}>
       <View style={mcStyles.left}>
         <View style={mcStyles.iconBox}><Text style={{ fontSize: 20 }}>{icon}</Text></View>
@@ -127,6 +126,12 @@ function MyContribCard({ item, type }: { item: any; type: "lecture" | "mentor" |
       </View>
     </View>
   );
+
+  return onPress ? (
+    <TouchableOpacity activeOpacity={0.7} onPress={onPress}>
+      {CardBody}
+    </TouchableOpacity>
+  ) : CardBody;
 }
 
 // ─── Main Screen ───
@@ -158,6 +163,10 @@ export default function ContributionsScreen() {
   const [scholarshipDesc, setScholarshipDesc] = useState("");
   const [donationMsg, setDonationMsg] = useState("");
   const [myDonations, setMyDonations] = useState<any[]>([]);
+  
+  // Modal States
+  const [selectedDonation, setSelectedDonation] = useState<any>(null);
+  const [modalVisible, setModalVisible] = useState(false);
 
   useEffect(() => { loadUser(); fetchCommunityContributions(); }, []);
 
@@ -233,18 +242,14 @@ export default function ContributionsScreen() {
     setIsSubmitting(true);
     
     try {
-      // Step 1: Save the donation record
       const res = await axios.post(`${API_BASE}/contributions/donate`, {
         alumni_id: user.id, donation_type: donationType,
         amount: donationType === "Money" ? Number(finalAmount) : null,
         equipment_description: equipmentDesc, scholarship_description: scholarshipDesc, message: donationMsg,
       });
 
-      // Step 2: Trigger Payment Gateway if Money
       if (donationType === "Money" && res.data.donation_id) {
-        
-        const returnUrl = ExpoLinking.createURL(""); // Current route fallback
-        
+        const returnUrl = ExpoLinking.createURL(""); 
         const safeName = (user.full_name || "Alumni").trim().replace(/[^a-zA-Z\s]/g, "").slice(0, 50);
         const safePhone = user.mobile ? user.mobile.replace(/\D/g, "").slice(-10) : "9999999999";
 
@@ -263,7 +268,6 @@ export default function ContributionsScreen() {
           const checkoutUrl = initRes.data.checkout_url;
 
           if (isWeb) {
-            // ── WEB: Open Mini Window Popup ──
             const width = 500; const height = 750;
             const left = (window.innerWidth - width) / 2;
             const top = (window.innerHeight - height) / 2;
@@ -294,7 +298,6 @@ export default function ContributionsScreen() {
             }, 1000);
 
           } else {
-            // ── MOBILE: In-App Browser ──
             const browserResult = await WebBrowser.openAuthSessionAsync(checkoutUrl, returnUrl);
             setIsSubmitting(false);
 
@@ -311,11 +314,10 @@ export default function ContributionsScreen() {
               showAlert("Payment Cancelled", "You closed the gateway before completing the payment.");
             }
           }
-          return; // Halts function to wait for checkout completion
+          return;
         }
       }
 
-      // Step 3: Standard success fallback for Equipment/Scholarships
       setIsSubmitting(false);
       showAlert("Success ✅", `${res.data.message}${res.data.receipt_number ? "\nReceipt: " + res.data.receipt_number : ""}`);
       setSelectedAmount(""); setCustomAmount(""); setEquipmentDesc(""); setScholarshipDesc(""); setDonationMsg("");
@@ -331,7 +333,11 @@ export default function ContributionsScreen() {
     setList((prev: string[]) => prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val]);
   };
 
-  // ── Missing System Error Screen ──
+  const openDonationModal = (donation: any) => {
+    setSelectedDonation(donation);
+    setModalVisible(true);
+  };
+
   if (!API_BASE) {
     return (
       <View style={styles.errorContainer}>
@@ -343,11 +349,10 @@ export default function ContributionsScreen() {
   }
 
   return (
-    // Replaced SafeAreaView with View
     <View style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 140 }}>
 
-        {/* HERO: Modified width to 100% */}
+        {/* HERO */}
         <LinearGradient colors={["#312EBA", "#5B21B6", "#EC1D8F"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.hero}>
           <View style={styles.webContainer}>
             <Text style={styles.heroTitle}>Giving Back 💛</Text>
@@ -355,9 +360,7 @@ export default function ContributionsScreen() {
           </View>
         </LinearGradient>
 
-        {/* WEB OPTIMIZED WRAPPER */}
         <View style={styles.webContainer}>
-
           {/* TABS */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsRow}>
             {TABS.map(tab => (
@@ -368,7 +371,6 @@ export default function ContributionsScreen() {
           </ScrollView>
 
           <View style={styles.content}>
-
             {/* ════════ GUEST LECTURE ════════ */}
             {activeTab === "Lecture" && (
               <>
@@ -537,7 +539,14 @@ export default function ContributionsScreen() {
                 {myDonations.length > 0 && (
                   <>
                     <Text style={styles.sectionLabel}>My Donations</Text>
-                    {myDonations.map(item => <MyContribCard key={item.id} item={item} type="donation" />)}
+                    {myDonations.map(item => (
+                      <MyContribCard 
+                        key={item.id} 
+                        item={item} 
+                        type="donation" 
+                        onPress={() => openDonationModal(item)}
+                      />
+                    ))}
                   </>
                 )}
               </>
@@ -589,7 +598,15 @@ export default function ContributionsScreen() {
                   <View style={cStyles.grid}>
                     {myLectures.map(item => <View key={item.id} style={cStyles.gridItem}><MyContribCard item={item} type="lecture" /></View>)}
                     {myMentor && <View style={cStyles.gridItem}><MyContribCard item={myMentor} type="mentor" /></View>}
-                    {myDonations.map(item => <View key={item.id} style={cStyles.gridItem}><MyContribCard item={item} type="donation" /></View>)}
+                    {myDonations.map(item => (
+                      <View key={item.id} style={cStyles.gridItem}>
+                        <MyContribCard 
+                          item={item} 
+                          type="donation" 
+                          onPress={() => openDonationModal(item)}
+                        />
+                      </View>
+                    ))}
                   </View>
                 )}
               </>
@@ -597,6 +614,60 @@ export default function ContributionsScreen() {
           </View>
         </View>
       </ScrollView>
+
+      {/* ── DONATION DETAILS MODAL ── */}
+      <Modal visible={modalVisible} animationType="fade" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Donation Details</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            {selectedDonation && (
+              <View style={styles.modalBody}>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Type:</Text>
+                  <Text style={styles.detailValue}>{selectedDonation.title}</Text>
+                </View>
+                
+                {selectedDonation.title === "Money" && (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Amount:</Text>
+                    <Text style={styles.detailValue}>₹{Number(selectedDonation.amount).toLocaleString('en-IN')}</Text>
+                  </View>
+                )}
+
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Status:</Text>
+                  <View style={[mcStyles.badge, { backgroundColor: selectedDonation.status === 'Paid' || selectedDonation.status === 'Approved' ? '#DCFCE7' : selectedDonation.status === 'Failed' ? '#FEE2E2' : '#FEF3C7', alignSelf: 'flex-start' }]}>
+                    <Text style={[mcStyles.badgeText, { color: selectedDonation.status === 'Paid' || selectedDonation.status === 'Approved' ? '#16A34A' : selectedDonation.status === 'Failed' ? '#DC2626' : '#D97706' }]}>{selectedDonation.status}</Text>
+                  </View>
+                </View>
+
+                {selectedDonation.receipt_number && (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Receipt / Txn ID:</Text>
+                    <Text style={styles.detailValue} selectable={true}>{selectedDonation.receipt_number}</Text>
+                  </View>
+                )}
+
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Date:</Text>
+                  <Text style={styles.detailValue}>{new Date(selectedDonation.created_at).toLocaleDateString()}</Text>
+                </View>
+              </View>
+            )}
+
+            <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setModalVisible(false)}>
+              <Text style={styles.modalCloseBtnText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }
@@ -606,9 +677,9 @@ const cStyles = StyleSheet.create({
   sectionHeader: { marginBottom: 18 },
   sectionTitle: { fontSize: 20, fontWeight: "900", color: "#0F172A" },
   sectionSub: { fontSize: 13, color: "#64748B", marginTop: 3 },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: 14 , marginBottom: 50},
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 14 },
   gridItem: { flex: 1, minWidth: 280 }, 
-  card: { backgroundColor: "#fff", borderRadius: 20, padding: 18,marginBottom: 10, borderWidth: 1, borderColor: "#E2E8F0", shadowColor: "#4F46E5", shadowOpacity: 0.07, shadowRadius: 14, shadowOffset: { width: 0, height: 5 }, elevation: 3 },
+  card: { backgroundColor: "#fff", borderRadius: 20, padding: 18, marginBottom: 14, borderWidth: 1, borderColor: "#E2E8F0", shadowColor: "#4F46E5", shadowOpacity: 0.07, shadowRadius: 14, shadowOffset: { width: 0, height: 5 }, elevation: 3 },
   cardHeader: { flexDirection: "row", alignItems: "center", marginBottom: 14 },
   name: { fontSize: 16, fontWeight: "800", color: "#0F172A" },
   designation: { fontSize: 13, color: "#64748B", marginTop: 2, fontWeight: "500" },
@@ -632,7 +703,7 @@ const cStyles = StyleSheet.create({
 
 // ─── My Contribution card styles ───
 const mcStyles = StyleSheet.create({
-  card: { backgroundColor: "#fff", borderRadius: 16, padding: 14, marginBottom: 60, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 1, borderColor: "#E2E8F0", shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
+  card: { backgroundColor: "#fff", borderRadius: 16, padding: 14, marginBottom: 10, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 1, borderColor: "#E2E8F0", shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
   left: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
   iconBox: { width: 44, height: 44, borderRadius: 12, backgroundColor: "#F8FAFC", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E2E8F0" },
   title: { fontSize: 14, fontWeight: "700", color: "#0F172A", marginBottom: 3 },
@@ -645,10 +716,7 @@ const mcStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8FAFC" },
   webContainer: { maxWidth: 900, alignSelf: "center", width: "100%" }, 
-  
-  // Hero section updated to width 100% and proper padding
   hero: { width: "100%", paddingHorizontal: 24, paddingTop: 30, paddingBottom: 32 },
-  
   heroTitle: { color: "#fff", fontSize: Platform.OS === "web" ? 32 : 28, fontWeight: "800", textAlign: Platform.OS === "web" ? "center" : "left", letterSpacing: -0.5 },
   heroSub: { color: "rgba(255,255,255,0.8)", fontSize: 14, marginTop: 6, textAlign: Platform.OS === "web" ? "center" : "left", fontWeight: "500" },
   tabsRow: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 10, gap: 10 },
@@ -656,8 +724,8 @@ const styles = StyleSheet.create({
   activeTab: { backgroundColor: "#4F46E5", borderColor: "#4F46E5" },
   tabText: { color: "#64748B", fontWeight: "700", fontSize: 13.5 },
   activeTabText: { color: "#fff" },
-  content: { padding: 16, paddingBottom: 60 },
-  card: { backgroundColor: "#fff", borderRadius: 20, padding: 20, marginBottom: 60, elevation: 2, shadowColor: "#0F172A", shadowOpacity: 0.04, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, borderWidth: 1, borderColor: "#F1F5F9" },
+  content: { padding: 16 },
+  card: { backgroundColor: "#fff", borderRadius: 20, padding: 20, marginBottom: 20, elevation: 2, shadowColor: "#0F172A", shadowOpacity: 0.04, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, borderWidth: 1, borderColor: "#F1F5F9" },
   cardHead: { flexDirection: "row", alignItems: "center", gap: 14, marginBottom: 18 },
   iconBox: { width: 48, height: 48, borderRadius: 14, justifyContent: "center", alignItems: "center" },
   cardTitle: { fontSize: 18, fontWeight: "800", color: "#0F172A", letterSpacing: -0.2 },
@@ -672,12 +740,24 @@ const styles = StyleSheet.create({
   submitBtn: { backgroundColor: "#4F46E5", paddingVertical: 16, borderRadius: 16, alignItems: "center", marginTop: 8},
   submitBtnDisabled: { opacity: 0.7 },
   submitText: { color: "#fff", fontWeight: "800", fontSize: 15 },
-  sectionLabel: { fontSize: 14, fontWeight: "700", color: "#64748B", marginBottom: 40, marginTop: 8, textTransform: "uppercase", letterSpacing: 0.5 },
+  sectionLabel: { fontSize: 14, fontWeight: "700", color: "#64748B", marginBottom: 15, marginTop: 8, textTransform: "uppercase", letterSpacing: 0.5 },
   statusBanner: { borderRadius: 14, padding: 14, marginBottom: 16 },
   emptyBox: { alignItems: "center", paddingVertical: 60 },
   emptyTitle: { fontSize: 20, fontWeight: "800", color: "#0F172A", marginTop: 16 },
   emptySub: { fontSize: 14, color: "#64748B", marginTop: 6, fontWeight: "500" },
   errorContainer: { flex: 1, backgroundColor: "#F8FAFC", justifyContent: "center", alignItems: "center", padding: 32, textAlign: "center" as any },
   errorTitle: { fontSize: 18, fontWeight: "800", color: "#0F172A", marginTop: 16, marginBottom: 8 },
-  errorSub: { fontSize: 13.5, color: "#64748B", textAlign: "center", lineHeight: 20, maxWidth: 420 }
+  errorSub: { fontSize: 13.5, color: "#64748B", textAlign: "center", lineHeight: 20, maxWidth: 420 },
+
+  // Modal Styles
+  modalOverlay: { flex: 1, backgroundColor: "rgba(15, 23, 42, 0.6)", justifyContent: "center", padding: 20 },
+  modalContent: { backgroundColor: "#fff", borderRadius: 24, padding: 24, width: "100%", maxWidth: 450, alignSelf: "center", shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 20, elevation: 10 },
+  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20, borderBottomWidth: 1, borderBottomColor: "#F1F5F9", paddingBottom: 16 },
+  modalTitle: { fontSize: 18, fontWeight: "900", color: "#0F172A" },
+  modalBody: { gap: 16, marginBottom: 24 },
+  detailRow: { flexDirection: "column", gap: 4 },
+  detailLabel: { fontSize: 12, color: "#64748B", fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
+  detailValue: { fontSize: 15, color: "#0F172A", fontWeight: "600" },
+  modalCloseBtn: { backgroundColor: "#F1F5F9", paddingVertical: 14, borderRadius: 14, alignItems: "center" },
+  modalCloseBtnText: { color: "#475569", fontWeight: "800", fontSize: 14 }
 });
