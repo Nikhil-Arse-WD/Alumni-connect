@@ -59,7 +59,7 @@ export default function AlumniDirectoryScreen() {
         key={numColumns}
         data={filteredAlumni}
         numColumns={numColumns}
-        contentContainerStyle={{ paddingBottom: 90 }} 
+        contentContainerStyle={{ paddingBottom: 100 }} 
         ListHeaderComponent={
           <LinearGradient 
             colors={["#312EBA", "#5B21B6", "#EC1D8F"]} 

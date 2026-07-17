@@ -243,7 +243,7 @@ export default function BannerRequestScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.screen} edges={['top']}>
+    <SafeAreaView style={styles.screen} edges={['bottom', 'left', 'right']}>
       <KeyboardAvoidingView 
         style={{ flex: 1 }} 
         behavior={Platform.OS === "ios" ? "padding" : undefined}
