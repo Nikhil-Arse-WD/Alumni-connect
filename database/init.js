@@ -82,7 +82,7 @@ const galleryStorage = multer.diskStorage({
 });
 const uploadGallery = multer({ storage: galleryStorage });
 
-// ── 4. BANNER AD STORAGE (ALREADY GOOD - KEPT CLEAN) ──
+// ── 4. BANNER AD STORAGE (UPDATED FOR FIXED SIZE / RESTRICTIONS) ──
 const bannerStorage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "uploads/banners"),
   filename: (req, file, cb) => {
@@ -90,7 +90,18 @@ const bannerStorage = multer.diskStorage({
     cb(null, uniqueSuffix + path.extname(file.originalname));
   },
 });
-const uploadBanner = multer({ storage: bannerStorage });
+const uploadBanner = multer({
+  storage: bannerStorage,
+  limits: { fileSize: 2 * 1024 * 1024 }, // Strictly limit to 2MB
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith("image/")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only image files are allowed!"), false);
+    }
+  }
+});
+
 // ── Helper: notification insert
 const sendNotification = (alumni_id, title, message, type = "general") => {
   db.query(
@@ -284,6 +295,7 @@ try { isMatch = await bcrypt.compare(String(password), String(user.password)); }
     });
   });
 });
+
 // =====================================
 // CHANGE PASSWORD
 // =====================================
@@ -553,7 +565,7 @@ app.get("/forum/count/:userId", (req, res) => {
       }
 
       const seenAt = result[0].seen_at;
-      console.log(`[forum/count] userId=${userId} seenAt=${seenAt}`);
+      //console.log(`[forum/count] userId=${userId} seenAt=${seenAt}`);
 
       db.query(
         `SELECT COUNT(*) AS count FROM forum_posts
@@ -563,7 +575,7 @@ app.get("/forum/count/:userId", (req, res) => {
         [userId, seenAt],
         (err2, r) => {
           if (err2) return res.json({ success: true, count: 0 });
-          console.log(`[forum/count] count=${r[0].count}`);
+          //console.log(`[forum/count] count=${r[0].count}`);
           res.json({ success: true, count: r[0].count });
         }
       );
@@ -1185,7 +1197,7 @@ app.get("/contributions/community", (req, res) => {
     JOIN alumni_members a ON d.alumni_id = a.id
 
     WHERE d.status = 'Approved'
-   
+    
 
     ORDER BY d.created_at DESC
   `;
@@ -1340,47 +1352,66 @@ app.put("/admin/delete-request/:id", (req, res) => {
 // BANNER ROUTES
 // =====================================
 
-// ── ALUMNI: naya banner request submit karo ──
-app.post("/banner-request", uploadBanner.single("banner_image"), (req, res) => {
-  const {
-    full_name, email, mobile, organisation_name, banner_title,
-    banner_description, website_link, preferred_duration,
-    preferred_start_date, additional_notes,
-  } = req.body;
- 
-  if (!full_name || !email || !mobile || !banner_title || !banner_description) {
-    return res.status(400).json({ success: false, message: "Required fields missing" });
-  }
- 
-  const banner_image = req.file ? `/uploads/banners/${req.file.filename}` : null;
- 
-  db.query(
-    `INSERT INTO banner_requests
-      (full_name, email, mobile, organisation_name, banner_title, banner_description,
-       website_link, preferred_duration, preferred_start_date, additional_notes, banner_image)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      full_name, email, mobile, organisation_name || null, banner_title, banner_description,
-      website_link || null, preferred_duration || null, preferred_start_date || null,
-      additional_notes || null, banner_image,
-    ],
-    (err, result) => {
-      if (err) return res.status(500).json({ success: false, message: "Database Error", error: err });
- 
-      db.query("SELECT id FROM alumni_members WHERE email = ?", [email], (e2, rows) => {
-        if (!e2 && rows.length > 0) {
-          sendNotification(
-            rows[0].id,
-            "📢 Banner Request Received",
-            "Your ad banner request has been sent to admin for review.",
-            "general"
-          );
-        }
-      });
- 
-      res.json({ success: true, message: "Banner request submitted ✅", id: result.insertId });
+// ── ALUMNI: naya banner request submit karo (AUTO-APPROVAL UPDATED) ──
+app.post("/banner-request", (req, res) => {
+  // Wrap multer to handle file size errors gracefully
+  uploadBanner.single("banner_image")(req, res, function (err) {
+    if (err) {
+      return res.status(400).json({ success: false, message: err.message });
     }
-  );
+
+    const {
+      full_name, email, mobile, organisation_name, banner_title,
+      banner_description, website_link, preferred_duration,
+      preferred_start_date, additional_notes, amount_to_pay 
+    } = req.body;
+    
+    if (!full_name || !email || !mobile || !banner_title || !banner_description) {
+      return res.status(400).json({ success: false, message: "Required fields missing" });
+    }
+    
+    const banner_image = req.file ? `/uploads/banners/${req.file.filename}` : null;
+
+    // --- THE AUTO-APPROVAL LOGIC ---
+    // If the frontend sends an amount > 0, route to payment.
+    // If it's free, instantly approve it for the homepage.
+    const isPaid = amount_to_pay && Number(amount_to_pay) > 0;
+    const initialStatus = isPaid ? 'Payment Requested' : 'Approved';
+    const initialPaymentStatus = isPaid ? 'Pending' : 'Not Required';
+    const amountRequested = isPaid ? amount_to_pay : 0;
+    
+    db.query(
+      `INSERT INTO banner_requests
+        (full_name, email, mobile, organisation_name, banner_title, banner_description,
+         website_link, preferred_duration, preferred_start_date, additional_notes, banner_image, status, payment_status, amount_requested)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        full_name, email, mobile, organisation_name || null, banner_title, banner_description,
+        website_link || null, preferred_duration || null, preferred_start_date || null,
+        additional_notes || null, banner_image, initialStatus, initialPaymentStatus, amountRequested
+      ],
+      (errDB, result) => {
+        if (errDB) return res.status(500).json({ success: false, message: "Database Error", error: errDB });
+    
+        // Send appropriate notification based on whether payment is required
+        db.query("SELECT id FROM alumni_members WHERE email = ?", [email], (e2, rows) => {
+          if (!e2 && rows.length > 0) {
+            const notifMsg = isPaid 
+              ? "Your banner request is saved. Please complete the payment to make it live."
+              : "Your banner has been automatically approved and is now live on the homepage!";
+            sendNotification(rows[0].id, "📢 Banner Status Update", notifMsg, "general");
+          }
+        });
+    
+        res.json({ 
+          success: true, 
+          message: isPaid ? "Banner saved, awaiting payment" : "Banner submitted and instantly approved ✅", 
+          id: result.insertId,
+          status: initialStatus 
+        });
+      }
+    );
+  });
 });
  
 // ── ALUMNI: apni request(s) ka status/payment dekhna ──
