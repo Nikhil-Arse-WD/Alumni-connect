@@ -15,7 +15,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Sidebar from "./components/sidebar";
 import SidebarWeb from "./components/SidebarWeb";
-const API = process.env.EXPO_PUBLIC_API_BASE
+const API = process.env.EXPO_PUBLIC_API_BASE;
 const PRIMARY = "#5B5FEF";
 
 const TABS = ["Pending", "Lectures", "Mentors", "Match", "Donations"];

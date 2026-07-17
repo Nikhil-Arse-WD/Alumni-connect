@@ -1,6 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
@@ -15,8 +14,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import Svg, { Path, Ellipse, Circle, Line } from "react-native-svg";
+import Svg, { Ellipse, Path } from "react-native-svg";
 
 const isWeb = Platform.OS === "web";
 
@@ -39,7 +37,6 @@ const TEAM = [
     phone: "+91 7067236880",
     github: "https://github.com/Divya-Bhawsar",
     linkedin: "https://www.linkedin.com/in/divya-bhawsar-166309258",
-    instagram: "https://instagram.com/divyabhawsar",
     linkedinLabel: "linkedin.com/in/\ndivya-bhawsar",
     githubLabel: "github.com/\ndivya-bhawsar",
     stats: [
@@ -69,10 +66,9 @@ const TEAM = [
     location: "Madhya Pradesh, India",
     email: "jagritigupta160203@example.com",
     phone: "+91 9098138316",
-    github: "https://github.com/jagritigupta",
-    linkedin: "https://linkedin.com/in/jagritigupta",
-    instagram: "https://instagram.com/jagritigupta",
-    linkedinLabel: "linkedin.com/in/\njagriti-gupta",
+    github: "https://github.com/jagritigupta160203-alt",
+    linkedin: "https://www.linkedin.com/in/jagriti-gupta-955a26341?utm_source=share_via&utm_content=profile&utm_medium=member_android",
+    linkedinLabel: "https://github.com/jagritigupta160203-alt",
     githubLabel: "github.com/\njagriti-gupta",
     stats: [
       { icon: "server-outline", n: "3 Roles", l: "DB, Docs & Support" },
@@ -322,7 +318,6 @@ function ProfileDetail({ member, onClose, openLink }: {
 
               <View style={{ flexDirection: "row", gap: 10, marginTop: 18 }}>
                 <SocialIcon icon="logo-github"    color="#1E1B4B" bg="#F1F5F9" onPress={() => openLink(member.github)} />
-                <SocialIcon icon="logo-instagram" color="#DB2777" bg="#FDF2F8" onPress={() => openLink(member.instagram)} />
                 <SocialIcon icon="logo-linkedin"  color="#2563EB" bg="#EFF6FF" onPress={() => openLink(member.linkedin)} />
               </View>
             </View>

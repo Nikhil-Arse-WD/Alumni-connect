@@ -6,15 +6,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator, Alert, Animated, Modal, Platform,
-    Pressable, ScrollView, StatusBar, StyleSheet,
-    Text, TextInput, TouchableOpacity, View, useWindowDimensions,
+  ActivityIndicator, Alert, Animated, Modal, Platform,
+  Pressable, ScrollView, StatusBar, StyleSheet,
+  Text, TextInput, TouchableOpacity, View, useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Sidebar from './components/sidebar';
 import SidebarWeb from './components/SidebarWeb';
 
-const API        = 'http://10.254.25.118:2000';
+const API        = process.env.EXPO_PUBLIC_API_BASE;
 const BREAKPOINT = 768;
 
 const C = {

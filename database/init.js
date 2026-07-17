@@ -21,37 +21,37 @@ if (!fs.existsSync("uploads/banners")) fs.mkdirSync("uploads/banners", { recursi
 
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-const rateLimit = require("express-rate-limit");
+// const rateLimit = require("express-rate-limit");
 
-// 1. General limiter: Increased to 1500 requests per 15 mins
-// (This safely allows your 5-second polling + normal app navigation)
-const generalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, 
-  max: 15000, // <-- INCREASED FROM 100 TO 1500
-  handler: (req, res) => {
-    // FORCE JSON RESPONSE
-    res.status(429).json({ success: false, message: "Too many requests from this IP, please try again after 15 minutes" });
-  }
-});
+// // 1. General limiter: Increased to 1500 requests per 15 mins
+// // (This safely allows your 5-second polling + normal app navigation)
+// const generalLimiter = rateLimit({
+//   windowMs: 15 * 60 * 1000, 
+//   max: 15000, // <-- INCREASED FROM 100 TO 1500
+//   handler: (req, res) => {
+//     // FORCE JSON RESPONSE
+//     res.status(429).json({ success: false, message: "Too many requests from this IP, please try again after 15 minutes" });
+//   }
+// });
 
-// 2. Strict limiter specifically for Login and Payment routes to prevent brute-forcing
-const strictLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, 
-  max: 10, // Only 10 attempts allowed
-  handler: (req, res) => {
-    // FORCE JSON RESPONSE
-    res.status(429).json({ success: false, message: "Too many attempts, please try again later." });
-  }
-});
+// // 2. Strict limiter specifically for Login and Payment routes to prevent brute-forcing
+// const strictLimiter = rateLimit({
+//   windowMs: 15 * 60 * 1000, 
+//   max: 10, // Only 10 attempts allowed
+//   handler: (req, res) => {
+//     // FORCE JSON RESPONSE
+//     res.status(429).json({ success: false, message: "Too many attempts, please try again later." });
+//   }
+// });
 
-// Apply general limiter to all routes
-app.use(generalLimiter);
+// // Apply general limiter to all routes
+// app.use(generalLimiter);
 
-// Apply strict limiter ONLY to sensitive routes
-// Note: These routes will hit BOTH limiters, but the strict one (10 max) will trigger first.
-app.use("/login", strictLimiter);
-app.use("/admin/login", strictLimiter);
-app.use("/pay/initiate", strictLimiter);
+// // Apply strict limiter ONLY to sensitive routes
+// // Note: These routes will hit BOTH limiters, but the strict one (10 max) will trigger first.
+// app.use("/login", strictLimiter);
+// app.use("/admin/login", strictLimiter);
+// app.use("/pay/initiate", strictLimiter);
 // ── 1. PROFILE PHOTOS STORAGE (UPDATED) ──
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "uploads/"),

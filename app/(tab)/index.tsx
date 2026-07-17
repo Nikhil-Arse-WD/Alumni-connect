@@ -8,6 +8,7 @@ import {
   Animated,
   FlatList,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,7 +17,7 @@ import {
   useWindowDimensions
 } from "react-native";
 import Footer from "../components/Footer";
-import Header from "../components/Header";
+// NOTE: Header import removed. We rely on the global layout now!
 import BirthdayModal from "./birthdaymodel";
 import FeaturedAdCarousel from "./livead";
 
@@ -116,7 +117,7 @@ function SectionHeader({ title, sub, label = "View all →", onPress }: { title:
 
 function Divider() { 
   const { px } = useResponsive();
-  return <View style={{ height: 1, backgroundColor: "#f1f5f9", marginHorizontal: px }} />; 
+  return <View style={{ height: 1, backgroundColor: "#e2e8f0", marginHorizontal: px, marginVertical: 10 }} />; 
 }
 
 function getYearsTogether(anniversaryDateStr: string | null | undefined): number | null {
@@ -158,11 +159,11 @@ function OfficeBearerCard({ item, index, fadeAnim }: { item: typeof OFFICE_BEARE
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function HomeScreen() {
-  const router   = useRouter();
+  const router = useRouter();
   const { W, isMobile, isTablet, isDesktop, px } = useResponsive();
   
-  const scrollY  = useRef(new Animated.Value(0)).current;
-  const floatY   = useRef(new Animated.Value(0)).current;
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const floatY = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const bearerFade = useRef(new Animated.Value(0)).current;
 
@@ -236,7 +237,6 @@ export default function HomeScreen() {
     finally { setLoading(false); }
   };
 
-  const headerBg = scrollY.interpolate({ inputRange: [0, 140], outputRange: ["transparent", "rgba(13,27,62,0.98)"], extrapolate: "clamp" });
   const eW = isDesktop ? (W - px * 2 - 36) / 3 : isTablet ? 280 : 230;
 
   if (!API_BASE) {
@@ -251,19 +251,10 @@ export default function HomeScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: "#f8fafc" }}>
-      
-      {/* ── FIX: Hide the top Header on Mobile so it doesn't block the screen ── */}
-      {!isMobile && (
-        <Animated.View style={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 99, backgroundColor: headerBg }}>
-          <Header /> 
-        </Animated.View>
-      )}
-
       <Animated.ScrollView
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
-        // ── FIX: 40px for Web (removes white gap), 140px for Mobile (clears tab bar) ──
-        contentContainerStyle={{ paddingBottom: isWeb ? 40 : 140 }} 
+        contentContainerStyle={{ paddingBottom: isWeb ? 0 : 110 }}
         onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: false })}
       >
         {/* ══════════════ HERO ══════════════ */}
@@ -313,7 +304,7 @@ export default function HomeScreen() {
           </View>
         </LinearGradient>
 
-        {/* ── FIX: Ad Banners moved OUTSIDE the Hero, with a Max Width to stop stretching ── */}
+        {/* ── Ad Banners moved OUTSIDE the Hero, with a Max Width to stop stretching ── */}
         {bannerAds.length > 0 && (
           <View style={{ width: "100%", maxWidth: 1350, alignSelf: "center", paddingHorizontal: px, marginTop: 24, zIndex: 10 }}>
             <FeaturedAdCarousel ads={bannerAds} />
@@ -338,11 +329,14 @@ export default function HomeScreen() {
                 const years = isBday ? null : getYearsTogether(item.anniversary_date);
 
                 return (
-                  <TouchableOpacity
+                  <Pressable
                     key={`${item.__type}-${item.id}`}
-                    style={styles.birthdayCard}
-                    activeOpacity={0.85}
                     onPress={() => router.push({ pathname: "/alumniprofile", params: { id: item.id } })}
+                    style={({ pressed, hovered }: any) => [
+                      styles.birthdayCard,
+                      pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
+                      hovered && isWeb && { transform: [{ translateY: -4 }], shadowOpacity: 0.2 }
+                    ]}
                   >
                     <LinearGradient colors={isBday ? ["#fff", "#fdf2f8"] : ["#fff", "#eff6ff"]} style={styles.birthdayCardInner}>
                       <View style={styles.confettiDot1} />
@@ -378,7 +372,7 @@ export default function HomeScreen() {
                         </View>
                       )}
                     </LinearGradient>
-                  </TouchableOpacity>
+                  </Pressable>
                 );
               })}
             </ScrollView>
@@ -399,7 +393,7 @@ export default function HomeScreen() {
                 <Text style={styles.highlightSub}>Explore networking sessions, reunions, workshops and alumni activities.</Text>
               </View>
               {!isMobile && (
-                <TouchableOpacity style={styles.highlightBtn} onPress={() => router.push("/event_detail")}>
+                <TouchableOpacity style={styles.highlightBtn} onPress={() => router.push("/event_detail")} activeOpacity={0.85}>
                   <Text style={[styles.highlightBtnText, { color: "#ea580c" }]}>Explore Events</Text>
                   <Ionicons name="arrow-forward" size={16} color="#ea580c" />
                 </TouchableOpacity>
@@ -415,14 +409,21 @@ export default function HomeScreen() {
               data={events}
               keyExtractor={i => i.event_id.toString()}
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: px, gap: 16, paddingBottom: 4 }}
+              contentContainerStyle={{ paddingHorizontal: px, gap: 16, paddingBottom: 10 }}
               renderItem={({ item, index }) => {
                 const p = EVENT_PALETTES[index % EVENT_PALETTES.length];
                 return (
-                  <TouchableOpacity style={[styles.eventCard, { width: eW }]} onPress={() => router.push("/event_detail")} activeOpacity={0.88}>
+                  <Pressable
+                    onPress={() => router.push("/event_detail")}
+                    style={({ pressed, hovered }: any) => [
+                      styles.eventCard, { width: eW },
+                      pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
+                      hovered && isWeb && { transform: [{ translateY: -5 }], shadowOpacity: 0.15 }
+                    ]}
+                  >
                     <View style={[styles.eventThumb, { backgroundColor: p.bg }]}>
                       {item.cover_photo
-                        ? <Image source={{ uri: API + item.cover_photo }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
+                        ? <Image source={{ uri: API + item.cover_photo }} style={StyleSheet.absoluteFillObject} contentFit="cover" transition={300}/>
                         : <Ionicons name="calendar-outline" size={42} color={p.icon} />}
                       <View style={styles.eventDateBadge}><Text style={styles.eventDateBadgeText}>{formatDate(item.event_date)}</Text></View>
                     </View>
@@ -438,7 +439,7 @@ export default function HomeScreen() {
                         <View style={[styles.rsvpBtn, { backgroundColor: p.bg }]}><Text style={[styles.rsvpText, { color: p.icon }]}>RSVP</Text></View>
                       </View>
                     </View>
-                  </TouchableOpacity>
+                  </Pressable>
                 );
               }}
             />
@@ -464,7 +465,7 @@ export default function HomeScreen() {
                 <Text style={styles.highlightSub}>Find jobs, internships, referrals and hiring opportunities shared by alumni.</Text>
               </View>
               {!isMobile && (
-                <TouchableOpacity style={styles.highlightBtn} onPress={() => router.push("/job")}>
+                <TouchableOpacity style={styles.highlightBtn} onPress={() => router.push("/job")} activeOpacity={0.85}>
                   <Text style={[styles.highlightBtnText, { color: "#16a34a" }]}>Explore Jobs</Text>
                   <Ionicons name="arrow-forward" size={16} color="#16a34a" />
                 </TouchableOpacity>
@@ -479,11 +480,14 @@ export default function HomeScreen() {
               {jobs.map((job, i) => {
                 const p = JOB_PALETTES[i % JOB_PALETTES.length];
                 return (
-                  <TouchableOpacity
+                  <Pressable
                     key={job.id}
-                    style={[styles.jobItem, isDesktop && { width: "48%" }]}
                     onPress={() => router.push("/job")}
-                    activeOpacity={0.88}
+                    style={({ pressed, hovered }: any) => [
+                      styles.jobItem, isDesktop && { width: "48%" },
+                      pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
+                      hovered && isWeb && { transform: [{ translateY: -2 }], shadowOpacity: 0.1 }
+                    ]}
                   >
                     <LinearGradient colors={[p.bg, "#fff"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.jobGrad}>
                       <View style={[styles.jobIconBox, { backgroundColor: p.bg }]}><Ionicons name="briefcase-outline" size={22} color={p.icon} /></View>
@@ -497,7 +501,7 @@ export default function HomeScreen() {
                       </View>
                       <TouchableOpacity style={styles.bookmarkBtn} activeOpacity={0.7}><Ionicons name="bookmark-outline" size={16} color="#94a3b8" /></TouchableOpacity>
                     </LinearGradient>
-                  </TouchableOpacity>
+                  </Pressable>
                 );
               })}
             </View>
@@ -539,7 +543,7 @@ export default function HomeScreen() {
             </View>
           )}
 
-          <TouchableOpacity activeOpacity={0.9} onPress={() => router.push("/office")} style={styles.viewMoreBtn}>
+          <TouchableOpacity activeOpacity={0.85} onPress={() => router.push("/office")} style={styles.viewMoreBtn}>
             <Text style={styles.viewMoreText}>View Details</Text>
             <Ionicons name="arrow-forward" size={18} color="#2563eb" />
           </TouchableOpacity>
@@ -554,7 +558,7 @@ export default function HomeScreen() {
               <View style={styles.mentorBadge}><Ionicons name="star" size={12} color="#fbbf24" /><Text style={styles.mentorBadgeText}>Featured Program</Text></View>
               <Text style={[styles.mentorTitle, isDesktop && { fontSize: 30 }]}>Mentorship Program</Text>
               <Text style={styles.mentorDesc}>Connect with experienced alumni mentors for career guidance, interview prep, and industry networking.</Text>
-              <TouchableOpacity style={styles.mentorBtn} onPress={() => router.push("/donation")} activeOpacity={0.88}>
+              <TouchableOpacity style={styles.mentorBtn} onPress={() => router.push("/donation")} activeOpacity={0.85}>
                 <Ionicons name="arrow-forward-circle" size={18} color="#1e1b4b" /><Text style={styles.mentorBtnText}>Find a Mentor</Text>
               </TouchableOpacity>
             </View>
@@ -629,15 +633,12 @@ const styles = StyleSheet.create({
   errorSub: { fontSize: 13.5, color: "#64748B", textAlign: "center", lineHeight: 20, maxWidth: 420 },
 
   // HERO
-  hero:           { paddingTop: Platform.OS === 'web' ? 80 : 100, paddingBottom: 30, overflow: "hidden" },
-  blob1:          { position: "absolute", width: 400, height: 400, borderRadius: 200, backgroundColor: "rgba(255,255,255,0.05)", right: -120, top: -100 },
-  blob2:          { position: "absolute", width: 250, height: 250, borderRadius: 125, backgroundColor: "rgba(251,191,36,0.08)", left: -60, bottom: -60 },
-  blob3:          { position: "absolute", width: 160, height: 160, borderRadius: 80,  backgroundColor: "rgba(255,255,255,0.04)", left: 200, top: 30 },
+  hero:           { paddingTop: 20, paddingBottom: 30, overflow: "hidden" },
   heroInner:      { gap: 30 },
   greetingBadge:  { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(255,255,255,0.1)", alignSelf: "flex-start", paddingHorizontal: 14, paddingVertical: 7, borderRadius: 100, marginBottom: 18, borderWidth: 1, borderColor: "rgba(255,255,255,0.15)" },
   pingDot:        { width: 8, height: 8, borderRadius: 4, backgroundColor: "#fbbf24" },
   greetingText:   { fontSize: 20, color: "#e2d9f3", fontWeight: "600" },
-  heroH1:         { fontSize: isWeb ? 44 : 34, fontWeight: "900", color: "#fff", lineHeight: isWeb ? 54 : 42, letterSpacing: -1.5, marginBottom: 14 },
+  heroH1:         { fontSize: 34, fontWeight: "900", color: "#fff", lineHeight: 42, letterSpacing: -1.5, marginBottom: 14 },
   heroDesc:       { fontSize: 14, color: "#c4b5fd", lineHeight: 22, maxWidth: 440, marginBottom: 28 },
   heroBtns:       { flexDirection: "row", gap: 12, flexWrap: "wrap", marginBottom: 32 },
   heroBtnGold:    { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#fbbf24", paddingHorizontal: 22, paddingVertical: 13, borderRadius: 14, shadowColor: "#fbbf24", shadowOpacity: 0.4, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 6 },

@@ -7,7 +7,6 @@ export default function Layout() {
 
   // Using a more precise check: ensure we handle potentially empty strings
   const hideHeader = 
-    pathname === "/" ||
     pathname.includes("change_password") || 
     pathname.includes("loginscreen") || 
     pathname.includes("register");

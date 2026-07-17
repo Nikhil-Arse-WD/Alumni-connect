@@ -6,16 +6,17 @@ import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   FlatList,
+  Platform,
   RefreshControl,
   StyleSheet,
   Text,
   TouchableOpacity,
   View
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 // ── STRICT ENV CHECK ──
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE;
+const isWeb = Platform.OS === "web";
 
 const iconMap: any = {
   lecture:    { icon: "mic",           bg: "#EEF2FF", color: "#4F46E5" },
@@ -44,7 +45,6 @@ export default function NotificationsScreen() {
       const res = await axios.get(`${API_BASE}/notifications/${user.id}`);
       if (res.data.success) {
         setNotifications(res.data.data || []);
-        // Mark all read
         axios.put(`${API_BASE}/notifications/read/${user.id}`).catch(() => {});
       }
     } catch (err) {
@@ -73,62 +73,67 @@ export default function NotificationsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
+      {/* HEADER WITH CORRECT SPACING FOR BOTH MOBILE AND WEB */}
       <LinearGradient
         colors={["#312EBA", "#5B21B6", "#EC1D8F"]}
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-        style={styles.header}
+        style={[styles.header, { paddingTop: isWeb ? 24 : 20 }]}
       >
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.7}>
           <Ionicons name="arrow-back" size={20} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Notifications</Text>
       </LinearGradient>
 
-      <FlatList
-        data={notifications}
-        keyExtractor={(item) => item.id.toString()}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchNotifications} />}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={
-          <View style={styles.emptyBox}>
-            <Ionicons name="notifications-off-outline" size={56} color="#CBD5E1" />
-            <Text style={styles.emptyTitle}>All caught up!</Text>
-            <Text style={styles.emptySub}>You don't have any new notifications.</Text>
-          </View>
-        }
-        renderItem={({ item }) => {
-          const meta = iconMap[item.type] || iconMap.general;
-          return (
-            <View style={[styles.card, !item.is_read && styles.unread]}>
-              <View style={[styles.iconBox, { backgroundColor: meta.bg }]}>
-                <Ionicons name={meta.icon} size={22} color={meta.color} />
-              </View>
-              <View style={styles.notifBody}>
-                <Text style={styles.notifTitle}>{item.title}</Text>
-                <Text style={styles.notifMsg}>{item.message}</Text>
-                <Text style={styles.notifTime}>{timeAgo(item.created_at)}</Text>
-              </View>
-              {!item.is_read && <View style={styles.blueDot} />}
+      {/* WRAPPER DESIGN MATCHING THE PROGRESS BASE */}
+      <View style={styles.webContainer}>
+        <FlatList
+          data={notifications}
+          keyExtractor={(item) => item.id.toString()}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchNotifications} />}
+          contentContainerStyle={[styles.listContent, { paddingBottom: isWeb ? 40 : 140 }]}
+          ListEmptyComponent={
+            <View style={styles.emptyBox}>
+              <Ionicons name="notifications-off-outline" size={56} color="#CBD5E1" />
+              <Text style={styles.emptyTitle}>All caught up!</Text>
+              <Text style={styles.emptySub}>You don't have any new notifications.</Text>
             </View>
-          );
-        }}
-      />
-    </SafeAreaView>
+          }
+          renderItem={({ item }) => {
+            const meta = iconMap[item.type] || iconMap.general;
+            return (
+              <View style={[styles.card, !item.is_read && styles.unread]}>
+                <View style={[styles.iconBox, { backgroundColor: meta.bg }]}>
+                  <Ionicons name={meta.icon} size={22} color={meta.color} />
+                </View>
+                <View style={styles.notifBody}>
+                  <Text style={styles.notifTitle}>{item.title}</Text>
+                  <Text style={styles.notifMsg}>{item.message}</Text>
+                  <Text style={styles.notifTime}>{timeAgo(item.created_at)}</Text>
+                </View>
+                {!item.is_read && <View style={styles.blueDot} />}
+              </View>
+            );
+          }}
+        />
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8FAFC" },
+  webContainer: { flex: 1, width: "100%", maxWidth: 900, alignSelf: "center" },
   loaderWrap: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#F8FAFC" },
   errorText: { color: "#EF4444", fontWeight: "700" },
   
-  header: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 32, flexDirection: "row", alignItems: "center", gap: 16 },
+  header: { paddingHorizontal: 20, paddingBottom: 28, flexDirection: "row", alignItems: "center", gap: 16 },
   backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.15)", justifyContent: "center", alignItems: "center" },
-  headerTitle: { fontSize: 22, fontWeight: "900", color: "#fff" },
+  headerTitle: { fontSize: 22, fontWeight: "900", color: "#fff", letterSpacing: -0.5 },
 
-  listContent: { padding: 16, paddingBottom: 40 },
-  card: { backgroundColor: "#fff", borderRadius: 18, padding: 16, marginBottom: 12, flexDirection: "row", gap: 14, alignItems: "flex-start", borderWidth: 1, borderColor: "#F1F5F9", shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  listContent: { padding: 18, paddingTop: 20 },
+  card: { backgroundColor: "#fff", borderRadius: 18, padding: 16, marginBottom: 12, flexDirection: "row", gap: 14, alignItems: "flex-start", borderWidth: 1, borderColor: "#F1F5F9", shadowColor: "#000", shadowOpacity: 0.03, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
   unread: { borderLeftWidth: 4, borderLeftColor: "#4F46E5" },
   
   iconBox: { width: 48, height: 48, borderRadius: 16, justifyContent: "center", alignItems: "center", flexShrink: 0 },
