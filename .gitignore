@@ -43,4 +43,4 @@ app-example
 /android
 
 # Local environment variables
-.env
+config.bat

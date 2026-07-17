@@ -32,38 +32,32 @@ type BannerReq = {
   created_at: string;
 };
 
-const STEPS = ["Pending", "Payment Requested", "Approved"];
+// ── HELPER: CALCULATE EXPIRY DATE ──
+const calculateExpiry = (createdAt: string, duration: string): Date | string => {
+  const startDate = new Date(createdAt);
+  let expiryDate = new Date(startDate);
 
-function StatusStepper({ status }: { status: string }) {
-  if (status === "Rejected") {
-    return (
-      <View style={styles.rejectedBar}>
-        <Ionicons name="close-circle" size={16} color="#B91C1C" />
-        <Text style={styles.rejectedBarTxt}>Request Rejected</Text>
-      </View>
-    );
+  if (duration === "1_week") expiryDate.setDate(startDate.getDate() + 7);
+  else if (duration === "2_weeks") expiryDate.setDate(startDate.getDate() + 14);
+  else if (duration === "1_month") expiryDate.setMonth(startDate.getMonth() + 1);
+  else return "Custom Duration"; 
+
+  return expiryDate;
+};
+
+// ── HELPER: DETERMINE BANNER STATUS ──
+const getBannerStatus = (banner: BannerReq) => {
+  if (banner.status !== "Approved") return { isLive: false, statusText: banner.status, expiryDate: null };
+
+  const expiryDate = calculateExpiry(banner.created_at, banner.preferred_duration);
+  const now = new Date();
+
+  if (expiryDate instanceof Date && now > expiryDate) {
+    return { isLive: false, statusText: "Expired", expiryDate };
   }
-  const activeIdx = STEPS.indexOf(status);
-  return (
-    <View style={styles.stepperRow}>
-      {STEPS.map((s, i) => (
-        <React.Fragment key={s}>
-          <View style={styles.stepItem}>
-            <View style={[styles.stepDot, i <= activeIdx && styles.stepDotOn]}>
-              {i < activeIdx ? (
-                <Ionicons name="checkmark" size={12} color="#fff" />
-              ) : (
-                <Text style={[styles.stepDotTxt, i <= activeIdx && { color: "#fff" }]}>{i + 1}</Text>
-              )}
-            </View>
-            <Text style={[styles.stepLabel, i <= activeIdx && styles.stepLabelOn]}>{s}</Text>
-          </View>
-          {i < STEPS.length - 1 && <View style={[styles.stepLine, i < activeIdx && styles.stepLineOn]} />}
-        </React.Fragment>
-      ))}
-    </View>
-  );
-}
+
+  return { isLive: true, statusText: "Active", expiryDate };
+};
 
 export default function MyBannerRequestsScreen() {
   const router = useRouter();
@@ -98,12 +92,26 @@ export default function MyBannerRequestsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <LinearGradient colors={["#312EBA", "#5B21B6", "#EC1D8F"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={20} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Banner Requests</Text>
+    <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
+      
+      {/* ── UPGRADED HERO HEADER ── */}
+      <LinearGradient 
+        colors={["#312EBA", "#5B21B6", "#EC1D8F"]} 
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} 
+        style={styles.header}
+      >
+        <View style={styles.dec1} />
+        <View style={styles.dec2} />
+
+        <View style={styles.headerTopRow}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.8}>
+            <Ionicons name="arrow-back" size={22} color="#fff" />
+          </TouchableOpacity>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headerTitle}>My Banners</Text>
+            <Text style={styles.headerSub}>Manage your advertisement requests and track their live status.</Text>
+          </View>
+        </View>
       </LinearGradient>
 
       <FlatList
@@ -114,46 +122,69 @@ export default function MyBannerRequestsScreen() {
         ListEmptyComponent={
           <View style={styles.emptyBox}>
             <Ionicons name="megaphone-outline" size={48} color="#CBD5E1" />
-            <Text style={styles.emptyTitle}>No requests found</Text>
-            <TouchableOpacity style={styles.emptyBtn} onPress={() => router.push("/bannerrequest")}>
+            <Text style={styles.emptyTitle}>No banners found</Text>
+            <TouchableOpacity style={styles.emptyBtn} onPress={() => router.push("/bannerrequest" as any)}>
               <Text style={styles.emptyBtnTxt}>Request Ad Banner</Text>
             </TouchableOpacity>
           </View>
         }
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <View style={styles.cardTop}>
-              <View style={[styles.thumb, !item.banner_image && styles.thumbEmpty]}>
-                 {item.banner_image ? <Ionicons name="image" size={24} color="#6366F1"/> : <Ionicons name="image-outline" size={20} color="#94A3B8" />}
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.title} numberOfLines={1}>{item.banner_title}</Text>
-                <Text style={styles.desc} numberOfLines={2}>{item.banner_description}</Text>
-              </View>
-            </View>
+        renderItem={({ item }) => {
+          const { isLive, statusText, expiryDate } = getBannerStatus(item);
 
-            <StatusStepper status={item.status} />
-
-            {item.status === "Payment Requested" && (
-              <View style={styles.payBox}>
-                <Ionicons name="cash-outline" size={18} color="#1D4ED8" />
+          return (
+            <View style={styles.card}>
+              <View style={styles.cardTop}>
+                <View style={[styles.thumb, !item.banner_image && styles.thumbEmpty]}>
+                   {item.banner_image ? <Ionicons name="image" size={24} color="#6366F1"/> : <Ionicons name="image-outline" size={20} color="#94A3B8" />}
+                </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.payBoxTitle}>₹{item.amount_requested} payment required</Text>
-                  <TouchableOpacity style={styles.payNowBtn} onPress={() => router.push({ pathname: "/Paybanner", params: { id: String(item.id), amount: String(item.amount_requested), title: item.banner_title } })}>
-                    <Text style={styles.payNowBtnTxt}>Complete Payment</Text>
-                  </TouchableOpacity>
+                  <Text style={styles.title} numberOfLines={1}>{item.banner_title}</Text>
+                  <Text style={styles.desc} numberOfLines={2}>{item.banner_description}</Text>
                 </View>
               </View>
-            )}
 
-            {item.status === "Approved" && (
-              <View style={styles.successBox}>
-                <Ionicons name="checkmark-circle" size={18} color="#15803D" />
-                <Text style={styles.successTxt}>Banner is live on Home Page</Text>
+              {/* DYNAMIC STATUS DISPLAY */}
+              <View style={styles.statusContainer}>
+                {item.status === "Rejected" ? (
+                  <View style={styles.rejectedBar}>
+                    <Ionicons name="close-circle" size={16} color="#B91C1C" />
+                    <Text style={styles.rejectedBarTxt}>Request Rejected</Text>
+                  </View>
+                ) : item.status === "Payment Requested" ? (
+                  <View style={styles.payBox}>
+                    <Ionicons name="cash-outline" size={18} color="#1D4ED8" />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.payBoxTitle}>₹{item.amount_requested} payment required</Text>
+                      <TouchableOpacity style={styles.payNowBtn} onPress={() => router.push({ pathname: "/Paybanner" as any, params: { id: String(item.id), amount: String(item.amount_requested), title: item.banner_title } })}>
+                        <Text style={styles.payNowBtnTxt}>Complete Payment</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ) : (
+                  // APPROVED / LIVE / EXPIRED STATE
+                  <View style={[styles.statusBadge, isLive ? styles.statusLive : styles.statusExpired]}>
+                    <Ionicons 
+                      name={isLive ? "checkmark-circle" : "time-outline"} 
+                      size={18} 
+                      color={isLive ? "#15803D" : "#B91C1C"} 
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.statusMainTxt, { color: isLive ? "#15803D" : "#B91C1C" }]}>
+                        {isLive ? "Banner is Live!" : "Banner Expired"}
+                      </Text>
+                      {expiryDate instanceof Date && (
+                        <Text style={[styles.statusSubTxt, { color: isLive ? "#166534" : "#991B1B" }]}>
+                          Valid until: {expiryDate.toLocaleDateString()}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                )}
               </View>
-            )}
-          </View>
-        )}
+
+            </View>
+          );
+        }}
       />
     </SafeAreaView>
   );
@@ -162,37 +193,41 @@ export default function MyBannerRequestsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8FAFC" },
   loaderWrap: { flex: 1, justifyContent: "center", alignItems: "center" },
-  header: { padding: 24, paddingTop: 10, paddingBottom: 32 },
-  headerTopRow: { flexDirection: "row", alignItems: "center" },
-  headerTitle: { fontSize: 22, fontWeight: "900", color: "#fff", marginTop: 12 },
-  backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.15)", justifyContent: "center", alignItems: "center" },
-  listContent: { padding: 16, paddingBottom: 40 },
+  
+  // ── HERO HEADER STYLES ──
+  header: { paddingHorizontal: 24, paddingTop: 20, paddingBottom: 44, overflow: "hidden" },
+  dec1: { position: "absolute", right: -60, top: -40, width: 220, height: 220, borderRadius: 110, borderWidth: 2, borderColor: "rgba(255,255,255,0.1)" },
+  dec2: { position: "absolute", right: 40, top: 50, width: 140, height: 140, borderRadius: 70, backgroundColor: "rgba(255,255,255,0.06)" },
+  headerTopRow: { flexDirection: "row", alignItems: "center", gap: 16 },
+  backBtn: { width: 44, height: 44, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.15)", justifyContent: "center", alignItems: "center" },
+  headerTitle: { fontSize: 24, fontWeight: "900", color: "#fff", letterSpacing: -0.5 },
+  headerSub: { fontSize: 13.5, color: "rgba(255,255,255,0.85)", marginTop: 4, fontWeight: "500", lineHeight: 18 },
+  
+  listContent: { padding: 16, paddingBottom: 40, marginTop: -20 }, // Added negative margin to pull list up slightly over the header
   card: { backgroundColor: "#fff", borderRadius: 20, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: "#F1F5F9", shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
   cardTop: { flexDirection: "row", gap: 14, marginBottom: 16 },
   thumb: { width: 56, height: 56, borderRadius: 12, backgroundColor: "#EEF2FF", justifyContent: "center", alignItems: "center" },
   thumbEmpty: { backgroundColor: "#F1F5F9" },
   title: { fontSize: 15, fontWeight: "800", color: "#0F172A" },
   desc: { fontSize: 13, color: "#64748B", marginTop: 4 },
-  stepperRow: { flexDirection: "row", alignItems: "center", marginBottom: 16, justifyContent: "space-between" },
-  stepItem: { alignItems: "center", flex: 1 },
-  stepDot: { width: 24, height: 24, borderRadius: 12, backgroundColor: "#E2E8F0", justifyContent: "center", alignItems: "center", marginBottom: 6 },
-  stepDotOn: { backgroundColor: "#4F46E5" },
-  stepDotTxt: { fontSize: 11, fontWeight: "700", color: "#94A3B8" },
-  stepLabel: { fontSize: 10, color: "#94A3B8", fontWeight: "700", textTransform: "uppercase" },
-  stepLabelOn: { color: "#4F46E5" },
-  stepLine: { flex: 1, height: 2, backgroundColor: "#E2E8F0", marginHorizontal: 8, marginBottom: 12 },
-  stepLineOn: { backgroundColor: "#4F46E5" },
-  rejectedBar: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 16, backgroundColor: "#FEF2F2", padding: 10, borderRadius: 8 },
+  
+  statusContainer: { marginTop: 4 },
+  statusBadge: { flexDirection: "row", alignItems: "center", gap: 10, padding: 14, borderRadius: 14 },
+  statusLive: { backgroundColor: "#DCFCE7", borderColor: "#BBF7D0", borderWidth: 1 },
+  statusExpired: { backgroundColor: "#FEF2F2", borderColor: "#FECACA", borderWidth: 1 },
+  statusMainTxt: { fontSize: 14, fontWeight: "800" },
+  statusSubTxt: { fontSize: 12, fontWeight: "600", marginTop: 2 },
+
+  rejectedBar: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#FEF2F2", padding: 12, borderRadius: 12, borderWidth: 1, borderColor: "#FECACA" },
   rejectedBarTxt: { fontSize: 13, fontWeight: "700", color: "#B91C1C" },
-  payBox: { flexDirection: "row", gap: 10, backgroundColor: "#EFF6FF", padding: 14, borderRadius: 14, marginTop: 4 },
+  
+  payBox: { flexDirection: "row", gap: 10, backgroundColor: "#EFF6FF", padding: 14, borderRadius: 14, borderWidth: 1, borderColor: "#BFDBFE" },
   payBoxTitle: { fontSize: 13, fontWeight: "800", color: "#1D4ED8" },
   payNowBtn: { backgroundColor: "#1D4ED8", paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, marginTop: 8, alignSelf: "flex-start" },
   payNowBtnTxt: { color: "#fff", fontWeight: "700", fontSize: 12 },
-  successBox: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#DCFCE7", padding: 12, borderRadius: 12 },
-  successTxt: { fontSize: 13, fontWeight: "700", color: "#15803D" },
+  
   emptyBox: { alignItems: "center", marginTop: 80 },
   emptyTitle: { fontSize: 16, fontWeight: "800", color: "#334155", marginTop: 12 },
-  emptySub: { fontSize: 13, color: "#94A3B8", textAlign: "center", marginTop: 4, marginBottom: 16 },
-  emptyBtn: { backgroundColor: "#4F46E5", paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, flexDirection: "row", alignItems: "center", gap: 8 },
+  emptyBtn: { backgroundColor: "#4F46E5", paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, flexDirection: "row", alignItems: "center", gap: 8, marginTop: 16 },
   emptyBtnTxt: { color: "#fff", fontWeight: "700" },
 });
