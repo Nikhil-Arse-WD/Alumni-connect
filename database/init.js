@@ -14,10 +14,11 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-if (!fs.existsSync("uploads")) fs.mkdirSync("uploads");
-if (!fs.existsSync("uploads/events")) fs.mkdirSync("uploads/events", { recursive: true });
-if (!fs.existsSync("uploads/event-gallery")) fs.mkdirSync("uploads/event-gallery", { recursive: true });
-if (!fs.existsSync("uploads/banners")) fs.mkdirSync("uploads/banners", { recursive: true });
+const uploadsDir = path.join(__dirname, "uploads");
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
+if (!fs.existsSync(path.join(uploadsDir, "events"))) fs.mkdirSync(path.join(uploadsDir, "events"), { recursive: true });
+if (!fs.existsSync(path.join(uploadsDir, "event-gallery"))) fs.mkdirSync(path.join(uploadsDir, "event-gallery"), { recursive: true });
+if (!fs.existsSync(path.join(uploadsDir, "banners"))) fs.mkdirSync(path.join(uploadsDir, "banners"), { recursive: true });
 
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
@@ -52,15 +53,18 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 // app.use("/login", strictLimiter);
 // app.use("/admin/login", strictLimiter);
 // app.use("/pay/initiate", strictLimiter);
-// ── 1. PROFILE PHOTOS STORAGE (UPDATED) ──
+// ── 1. PROFILE PHOTOS STORAGE (FIXED WITH ABSOLUTE DIRECTORY) ──  
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, "uploads/"),
+  destination: (req, file, cb) => {
+    // This forces the file into the exact uploads folder using an absolute path
+    cb(null, path.join(__dirname, "uploads")); 
+  },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
     cb(null, uniqueSuffix + path.extname(file.originalname));
   },
 });
-const upload = multer({ storage });
+const upload = multer({ storage })
 
 // ── 2. EVENT COVER PHOTOS STORAGE (UPDATED) ──
 const eventStorage = multer.diskStorage({
@@ -82,14 +86,18 @@ const galleryStorage = multer.diskStorage({
 });
 const uploadGallery = multer({ storage: galleryStorage });
 
-// ── 4. BANNER AD STORAGE (UPDATED FOR FIXED SIZE / RESTRICTIONS) ──
+// ── 4. BANNER AD STORAGE (UPDATED FOR ABSOLUTE PATH) ──
 const bannerStorage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, "uploads/banners"),
+  destination: (req, file, cb) => {
+    // This forces the file into the exact uploads/banners folder next to init.js
+    cb(null, path.join(__dirname, "uploads/banners")); 
+  },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
     cb(null, uniqueSuffix + path.extname(file.originalname));
   },
 });
+
 const uploadBanner = multer({
   storage: bannerStorage,
   limits: { fileSize: 2 * 1024 * 1024 }, // Strictly limit to 2MB

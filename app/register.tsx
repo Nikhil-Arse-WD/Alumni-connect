@@ -404,8 +404,13 @@ export default function RegisterScreen() {
             </Row2>
 
             <Row2>
-              {isWeb ? <WebDatePicker value={form.dob} onChange={v => set("dob", v)} /> : <MobileDateField label="Date of Birth" value={form.dob} onChange={v => set("dob", v)} />}
-              
+             {isWeb ? (
+                <Field label="Date of Birth">
+                 <WebDatePicker value={form.dob} onChange={v => set("dob", v)} />
+                </Field>
+                 ) : (
+                       <MobileDateField label="Date of Birth" value={form.dob} onChange={v => set("dob", v)} />
+                   )}
               {isWeb ? (
                 <Field label="Batch Year">
                   <WebYearPicker value={form.batch_year} onChange={v => set("batch_year", v)} />

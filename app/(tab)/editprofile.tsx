@@ -395,8 +395,15 @@ export default function EditProfileScreen() {
     try {
       setSaving(true);
       const fd = new FormData();
-      Object.entries(form).forEach(([k, v]) => fd.append(k, v));
+      
+      // 1. Append text fields securely
+      Object.entries(form).forEach(([k, v]) => {
+        if (v !== null && v !== undefined) {
+          fd.append(k, String(v));
+        }
+      });
 
+      // 2. Append the image securely
       if (image) {
         if (isWeb) {
           const res  = await fetch(image);
@@ -405,17 +412,37 @@ export default function EditProfileScreen() {
         } else {
           const filename = image.split("/").pop() || "photo.jpg";
           const match    = /\.(\w+)$/.exec(filename);
+          let ext = match ? match[1].toLowerCase() : "jpeg";
+          if (ext === "jpg") ext = "jpeg";
+
+          // Safely strip 'file://' for iOS compatibility if needed, while keeping Android intact
+          const safeUri = Platform.OS === 'android' ? image : image.replace('file://', '');
+
           fd.append("profile_photo", {
-            uri: image, name: filename,
-            type: match ? `image/${match[1]}` : "image/jpeg",
+            uri: safeUri, 
+            name: filename,
+            type: `image/${ext}`,
           } as any);
         }
       }
 
-      await axios.put(`${API_BASE}/member/update/${email}`, fd, {
-        headers: { "Content-Type": "multipart/form-data" },
+      // 3. THE FIX: Use native fetch instead of Axios for FormData
+      const response = await fetch(`${API_BASE}/member/update/${email}`, {
+        method: "PUT",
+        body: fd,
+        headers: {
+          Accept: "application/json",
+          // DO NOT explicitly set Content-Type here; fetch sets the multipart boundary automatically!
+        },
       });
 
+      const responseData = await response.json();
+
+      if (!response.ok || !responseData.success) {
+         throw new Error(responseData.message || "Failed to update profile.");
+      }
+
+      // 4. Refresh User Data
       const updatedUser = await fetchUser();
       if (updatedUser) await syncAsyncStorageUser(updatedUser);
 
@@ -427,11 +454,11 @@ export default function EditProfileScreen() {
           { text: "OK", onPress: () => router.back() },
         ]);
       }
-    } catch {
-      showAlert("Error", "Update failed. Please check your connection and try again.");
+    } catch (err: any) {
+      showAlert("Error", err.message || "Update failed. Please check your connection and try again.");
     } finally {
       setSaving(false);
-    }
+    } 
   };
 
   const showMobileDatePicker = async () => {

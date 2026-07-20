@@ -1,8 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage"; // FIXED: Added this import
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Linking from "expo-linking";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
@@ -30,9 +32,18 @@ export default function PayBannerScreen() {
     try {
       const res = await axios.get(`${API_BASE}/pay/verify/${txnid}`);
       if (res.data.status === 'Success') {
-        router.replace("/mybannerrequests" as any);
+        Alert.alert(
+          "Payment Successful! 🎉", 
+          "Your transaction is complete. Your banner has been automatically approved and is now live on the homepage!",
+          [
+            { 
+              text: "Awesome!", 
+              onPress: () => router.replace("/mybannerrequests" as any) 
+            }
+          ]
+        );
       } else {
-        Alert.alert("Payment Status", "Payment is still " + res.data.status + ". Please wait a moment.");
+        Alert.alert("Payment Status", "Payment is still " + res.data.status + ". Please wait a moment or try again if it failed.");
       }
     } catch (e) {
       Alert.alert("Verification Error", "Could not verify payment status.");
@@ -47,19 +58,28 @@ export default function PayBannerScreen() {
       const user = await AsyncStorage.getItem("user");
       const uData = user ? JSON.parse(user) : {};
 
+      // Removes all spaces and special characters, leaving only letters and numbers
+      const safeProductInfo = (title || "BannerAd").replace(/[^a-zA-Z0-9]/g, "");
+      
+      // Safely handle the return URL depending on the platform
+      const returnUrl = Platform.OS === 'web' 
+        ? window.location.href 
+        : Linking.createURL('/mybannerrequests');
+
       const res = await axios.post(`${API_BASE}/pay/initiate`, {
         amount,
         firstname: uData.full_name || "Alumni",
         email: uData.email,
         phone: uData.mobile || "9999999999",
-        productinfo: title,
+        productinfo: safeProductInfo,
         payment_type: "BAN",
         reference_id: id,
-        return_url: window.location.href 
+        return_url: returnUrl 
       });
 
       if (res.data.success) {
         if (Platform.OS === 'web') {
+          // --- WEB LOGIC ---
           const handleMessage = (event: any) => {
             const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
             if (data.type === 'PAYMENT_RETURN') {
@@ -74,7 +94,12 @@ export default function PayBannerScreen() {
           window.addEventListener("message", handleMessage);
           window.open(res.data.checkout_url, "_blank", "width=600,height=700");
         } else {
-          Alert.alert("Note", "Mobile payment redirection logic needs to be handled via Webview or Linking.");
+          // --- MOBILE LOGIC ---
+          // Opens an secure in-app browser overlay for the payment
+          await WebBrowser.openBrowserAsync(res.data.checkout_url);
+          
+          // Once the user closes the WebBrowser overlay, instantly check the server for the transaction status
+          verifyStatusWithServer(res.data.txnid);
         }
       }
     } catch (err) {
