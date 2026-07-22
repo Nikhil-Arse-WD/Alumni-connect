@@ -54,17 +54,17 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 // app.use("/admin/login", strictLimiter);
 // app.use("/pay/initiate", strictLimiter);
 // ── 1. PROFILE PHOTOS STORAGE (FIXED WITH ABSOLUTE DIRECTORY) ──  
-const storage = multer.diskStorage({
+const getStorage = (folder) => multer.diskStorage({
   destination: (req, file, cb) => {
-    // This forces the file into the exact uploads folder using an absolute path
-    cb(null, path.join(__dirname, "uploads")); 
+    const dir = path.join(__dirname, "uploads", folder);
+    cb(null, dir);
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
     cb(null, uniqueSuffix + path.extname(file.originalname));
   },
 });
-const upload = multer({ storage })
+const upload = multer({ storage: getStorage("") });
 
 // ── 2. EVENT COVER PHOTOS STORAGE (UPDATED) ──
 const eventStorage = multer.diskStorage({
