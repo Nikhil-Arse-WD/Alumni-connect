@@ -1401,11 +1401,17 @@ app.post("/banner-request", (req, res) => {
     const initialPaymentStatus = isPaid ? 'Pending' : 'Not Required';
     const amountRequested = isPaid ? amount_to_pay : 0;
     
+    let weeks = 1;
+    if (preferred_duration) {
+      const match = preferred_duration.match(/(\d+)/);
+      if (match) weeks = parseInt(match[1], 10);
+    }
+    
     db.query(
       `INSERT INTO banner_requests
         (full_name, email, mobile, organisation_name, banner_title, banner_description,
-         website_link, preferred_duration, preferred_start_date, additional_notes, banner_image, status, payment_status, amount_requested)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         website_link, preferred_duration, preferred_start_date, additional_notes, banner_image, status, payment_status, amount_requested, expires_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${!isPaid ? `DATE_ADD(NOW(), INTERVAL ${weeks} WEEK)` : 'NULL'})`,
       [
         full_name, email, mobile, organisation_name || null, banner_title, banner_description,
         website_link || null, preferred_duration || null, preferred_start_date || null,
@@ -1451,9 +1457,9 @@ app.get("/banner-request/mine/:email", (req, res) => {
 app.get("/banners/active", (req, res) => {
   db.query(
     `SELECT id, banner_title, banner_description, website_link, banner_image,
-            organisation_name, preferred_start_date, additional_notes
+            organisation_name, preferred_start_date, additional_notes, expires_at
      FROM banner_requests
-     WHERE status = 'Approved'
+     WHERE status = 'Approved' AND (expires_at > NOW() OR expires_at IS NULL)
      ORDER BY id DESC`,
     (err, result) => {
       if (err) {
@@ -1511,13 +1517,23 @@ app.put("/admin/banner-request/request-payment/:id", (req, res) => {
 // ── ADMIN: payment mil gaya, ab banner approve karo ──
 app.put("/admin/banner-request/approve/:id", (req, res) => {
   db.query(
-    `UPDATE banner_requests SET status = 'Approved', payment_status = 'Paid' WHERE id = ?`,
+    "SELECT preferred_duration, email FROM banner_requests WHERE id = ?",
     [req.params.id],
-    (err) => {
+    (err, rows) => {
       if (err) return res.status(500).json({ success: false });
- 
-      db.query("SELECT email FROM banner_requests WHERE id = ?", [req.params.id], (e2, rows) => {
-        if (!e2 && rows.length > 0) {
+      if (rows.length === 0) return res.status(404).json({ success: false, message: "Banner not found" });
+
+      const durationStr = rows[0].preferred_duration || "1_weeks";
+      let weeks = 1;
+      const match = durationStr.match(/(\d+)/);
+      if (match) weeks = parseInt(match[1], 10);
+
+      db.query(
+        `UPDATE banner_requests SET status = 'Approved', payment_status = 'Paid', expires_at = DATE_ADD(NOW(), INTERVAL ? WEEK) WHERE id = ?`,
+        [weeks, req.params.id],
+        (updateErr) => {
+          if (updateErr) return res.status(500).json({ success: false });
+
           db.query("SELECT id FROM alumni_members WHERE email = ?", [rows[0].email], (e3, urows) => {
             if (!e3 && urows.length > 0) {
               sendNotification(
@@ -1528,10 +1544,10 @@ app.put("/admin/banner-request/approve/:id", (req, res) => {
               );
             }
           });
+
+          res.json({ success: true, message: "Banner Approved ✅" });
         }
-      });
- 
-      res.json({ success: true, message: "Banner Approved ✅" });
+      );
     }
   );
 });

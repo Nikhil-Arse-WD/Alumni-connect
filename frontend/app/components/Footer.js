@@ -67,17 +67,20 @@ export default function Footer() {
           {/* 🔥 SOCIAL (Now fully interactive) */}
           <Text style={[styles.sectionHeading, { marginTop: 24 }]}>FOLLOW US</Text>
           <View style={styles.socialRow}>
-            <TouchableOpacity activeOpacity={0.7} style={styles.socialBtn}>
-              <FontAwesome name="facebook" size={18} color="#fff" />
+            <TouchableOpacity onPress={() => Linking.openURL('https://www.facebook.com/sviomi?mibextid=ZbWKwL')} activeOpacity={0.7} style={styles.socialBtn}>
+              <FontAwesome name="facebook" size={18} color="#1877F2" />
             </TouchableOpacity>
-            <TouchableOpacity activeOpacity={0.7} style={styles.socialBtn}>
-              <FontAwesome name="instagram" size={18} color="#fff" />
+            <TouchableOpacity onPress={() => Linking.openURL('https://twitter.com/SVIM_Indore')} activeOpacity={0.7} style={styles.socialBtn}>
+              <FontAwesome name="twitter" size={18} color="#1DA1F2" />
             </TouchableOpacity>
-            <TouchableOpacity activeOpacity={0.7} style={styles.socialBtn}>
-              <FontAwesome name="linkedin" size={18} color="#fff" />
+            <TouchableOpacity onPress={() => Linking.openURL('https://www.youtube.com/channel/UCfjAFpKMiHvLuY52_CD6-kQ')} activeOpacity={0.7} style={styles.socialBtn}>
+              <FontAwesome name="youtube-play" size={18} color="#FF0000" />
             </TouchableOpacity>
-            <TouchableOpacity activeOpacity={0.7} style={styles.socialBtn}>
-              <FontAwesome name="twitter" size={18} color="#fff" />
+            <TouchableOpacity onPress={() => Linking.openURL('https://www.linkedin.com/school/shri-vaishnav-institute-of-management-indore/')} activeOpacity={0.7} style={styles.socialBtn}>
+              <FontAwesome name="linkedin" size={18} color="#0A66C2" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => Linking.openURL('https://www.instagram.com/invites/contact/?i=146de2ff48qaz&utm_content=omlcer4')} activeOpacity={0.7} style={styles.socialBtn}>
+              <FontAwesome name="instagram" size={18} color="#E4405F" />
             </TouchableOpacity>
           </View>
         </View>

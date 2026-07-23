@@ -3,7 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
-import { useUser } from "./context/UserContext";
+import { useUser } from "../context/UserContext";
 import {
   Alert,
   Image,

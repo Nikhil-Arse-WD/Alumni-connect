@@ -13,7 +13,7 @@ import { io } from "socket.io-client";
 import { LinearGradient } from "expo-linear-gradient";
 import { usePathname, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useUser } from "../context/UserContext";
+import { useUser } from "../../context/UserContext";
 import {
   Alert, Image, Modal, Platform, StyleSheet,
   Text, TouchableOpacity, useWindowDimensions, View,

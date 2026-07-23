@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -18,6 +18,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from "react-native";
 import Animated, {
   useAnimatedStyle,
@@ -26,8 +27,10 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
+import { useUser } from "../../context/UserContext";
 
 const API_URL = process.env.EXPO_PUBLIC_API_BASE;
+const isWeb = Platform.OS === "web";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface UserType {
@@ -35,7 +38,7 @@ interface UserType {
   full_name: string;
   email: string;
   profile_photo?: string;
-  role?: string; // "admin" | "user"
+  role?: string;
 }
 
 interface JobType {
@@ -57,58 +60,33 @@ interface JobType {
   is_closed?: boolean;
 }
 
-// ─── Clearbit auto logo ───────────────────────────────────────────────────────
-
-
-// ─── Company Logo with building icon fallback ─────────────────────────────────
-const CompanyLogo = ({
-  size = 56,
-  radius = 14,
-}: {
-  size?: number;
-  radius?: number;
-}) => {
-  return (
-    <View
-      style={{
-        width: size,
-        height: size,
-        borderRadius: radius,
-        backgroundColor: "#EEF2FF",
-        justifyContent: "center",
-        alignItems: "center",
-      }}
-    >
-      <Ionicons
-        name="business-outline"
-        size={28}
-        color="#4F46E5"
-      />
-    </View>
-  );
-};
-
-// ─── Filter options ───────────────────────────────────────────────────────────
+// ─── Filter & Form Constants ─────────────────────────────────────────────────
 const LOCATIONS = [
-  "All", "Mumbai", "Bangalore", "Hyderabad", "Pune", "Delhi", "Indore", "Remote",
+  "Mumbai", "Bangalore", "Hyderabad", "Pune", "Delhi", "Indore", "Remote",
 ];
 const EXPERIENCES = [
-  "All", "0-1 Years", "1-3 Years", "3-6 Years", "6+ Years",
+  "0-1 Years", "1-3 Years", "3-6 Years", "6+ Years",
 ];
 const FUNCTIONS = [
-  "All", "Engineering", "Design", "Product", "Data", "Marketing", "Finance", "Operations",
+  "Engineering", "Design", "Product", "Data", "Marketing", "Finance", "Operations",
 ];
 
-// ─── Filter Pill ──────────────────────────────────────────────────────────────
-const FilterPill = ({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) => (
+const CompanyLogo = ({ size = 50, radius = 14 }: { size?: number; radius?: number }) => (
+  <View
+    style={{
+      width: size,
+      height: size,
+      borderRadius: radius,
+      backgroundColor: "#EEF2FF",
+      justifyContent: "center",
+      alignItems: "center",
+    }}
+  >
+    <Ionicons name="business-outline" size={26} color="#4F46E5" />
+  </View>
+);
+
+const FilterPill = ({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) => (
   <TouchableOpacity
     style={[styles.filterPill, active && styles.filterPillActive]}
     onPress={onPress}
@@ -119,68 +97,59 @@ const FilterPill = ({
   </TouchableOpacity>
 );
 
-// ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function JobBoardScreen() {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+
+  const { user } = useUser() as { user: UserType | null };
   const [jobs, setJobs] = useState<JobType[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
-  const [user, setUser] = useState<UserType | null>(null);
 
-  // ── filters
+  // ── Filter States
   const [filterLoc, setFilterLoc] = useState("All");
   const [filterExp, setFilterExp] = useState("All");
   const [filterFn, setFilterFn] = useState("All");
   const [showFilters, setShowFilters] = useState(false);
 
-  // ── modal
+  // ── Modal States
   const [showModal, setShowModal] = useState(false);
   const [editingJob, setEditingJob] = useState<JobType | null>(null);
 
-  // ── form fields
+  // ── Form Fields
   const [title, setTitle] = useState("");
   const [company, setCompany] = useState("");
-  const [jobLocation, setJobLocation] = useState("");
-  const [experienceRange, setExperienceRange] = useState("");
-  const [functionName, setFunctionName] = useState("");
+  const [jobLocation, setJobLocation] = useState("Mumbai");
+  const [customLocation, setCustomLocation] = useState("");
+  const [experienceRange, setExperienceRange] = useState("1-3 Years");
+  const [functionName, setFunctionName] = useState("Engineering");
   const [skills, setSkills] = useState("");
   const [jobDescription, setJobDescription] = useState("");
   const [applyEmail, setApplyEmail] = useState("");
   const [applyUrl, setApplyUrl] = useState("");
   const [expiresOn, setExpiresOn] = useState("");
 
-  // ── logo preview (only in modal — not saved to DB)
-  const [previewLogoUrl, setPreviewLogoUrl] = useState("");
-  const [logoValid, setLogoValid] = useState<boolean | null>(null);
-
-  // ── animation
   const scale = useSharedValue(1);
   useEffect(() => {
-    scale.value = withRepeat(withTiming(1.08, { duration: 900 }), -1, true);
+    scale.value = withRepeat(withTiming(1.06, { duration: 900 }), -1, true);
   }, []);
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
 
   useEffect(() => {
-    loadUser();
     fetchJobs();
   }, []);
-
-  // logo preview when company name typed in form
-  
-  const loadUser = async () => {
-    const data = await AsyncStorage.getItem("user");
-    if (data) setUser(JSON.parse(data));
-  };
 
   const fetchJobs = async () => {
     try {
       const res = await axios.get(`${API_URL}/jobs`);
-      setJobs(res.data.jobs || []);
+      const data = res.data?.jobs || res.data?.data || (Array.isArray(res.data) ? res.data : []);
+      setJobs(data);
     } catch (err) {
-      console.log(err);
+      console.log("Error fetching jobs:", err);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -192,72 +161,92 @@ export default function JobBoardScreen() {
     fetchJobs();
   };
 
-  // ── helpers
-  const isOwner = (job: JobType) =>
-  !!user && job.posted_by_user_id === user.id;
+  const isOwner = (job: JobType) => !!user && job.posted_by_user_id === user.id;
   const isNew = (dateStr?: string) =>
     !!dateStr && Date.now() - new Date(dateStr).getTime() < 3 * 24 * 60 * 60 * 1000;
-
-  const isExpired = (dateStr?: string) =>
-    !!dateStr && new Date(dateStr) < new Date();
+  const isExpired = (dateStr?: string) => !!dateStr && new Date(dateStr) < new Date();
 
   const formatDateTime = (dateStr?: string) => {
     if (!dateStr) return "";
-    return new Date(dateStr).toLocaleString("en-IN", {
+    return new Date(dateStr).toLocaleDateString("en-IN", {
       day: "2-digit",
       month: "short",
       year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
     });
   };
 
-  // ── stats
+  // Stats
   const totalJobs = jobs.length;
-  const activeJobs = jobs.filter(
-    (j) => !j.is_closed && !isExpired(j.expires_on)
-  ).length;
-
+  const activeJobs = jobs.filter((j) => !j.is_closed && !isExpired(j.expires_on)).length;
   const today = new Date().toDateString();
   const newToday = jobs.filter(
     (j) => j.created_at && new Date(j.created_at).toDateString() === today
   ).length;
 
-  // ── filtered list
-  const filteredJobs = jobs.filter((item) => {
-    const q = search.toLowerCase();
-    const matchSearch =
-      !q ||
-      item.title?.toLowerCase().includes(q) ||
-      item.company?.toLowerCase().includes(q) ||
-      item.skills?.toLowerCase().includes(q) ||
-      item.location?.toLowerCase().includes(q);
-    const matchLoc = filterLoc === "All" || item.location === filterLoc;
-    const matchExp = filterExp === "All" || item.experience_range === filterExp;
-    const matchFn = filterFn === "All" || item.function_name === filterFn;
-    return matchSearch && matchLoc && matchExp && matchFn;
-  });
+  // ── FILTERING LOGIC ──────────────────────────────────────────────────────────
+  const filteredJobs = useMemo(() => {
+    const cleanSearch = search.toLowerCase().trim();
+    const searchTerms = cleanSearch ? cleanSearch.split(/\s+/) : [];
 
-  const activeFiltersCount = [filterLoc, filterExp, filterFn].filter(
-    (f) => f !== "All"
-  ).length;
+    return jobs.filter((item) => {
+      if (!item) return false;
 
-  // ── open modal
+      const searchableContent = [
+        item.title,
+        item.company,
+        item.skills,
+        item.location,
+        item.function_name,
+        item.job_description,
+        item.posted_by_name,
+        item.experience_range,
+      ]
+        .map((val) => String(val || "").toLowerCase())
+        .join(" ");
+
+      const matchSearch =
+        searchTerms.length === 0 ||
+        searchTerms.every((term) => searchableContent.includes(term));
+
+      const matchLoc =
+        filterLoc === "All" ||
+        String(item.location || "").toLowerCase().includes(filterLoc.toLowerCase());
+
+      const matchExp =
+        filterExp === "All" ||
+        String(item.experience_range || "").toLowerCase().includes(filterExp.toLowerCase());
+
+      const matchFn =
+        filterFn === "All" ||
+        String(item.function_name || "").toLowerCase().includes(filterFn.toLowerCase());
+
+      return matchSearch && matchLoc && matchExp && matchFn;
+    });
+  }, [search, filterLoc, filterExp, filterFn, jobs]);
+
+  const activeFiltersCount = [filterLoc, filterExp, filterFn].filter((f) => f !== "All").length;
+
+  const handleResetFilters = () => {
+    setFilterLoc("All");
+    setFilterExp("All");
+    setFilterFn("All");
+    setSearch("");
+  };
+
+  // Modal Handlers
   const openCreateModal = () => {
     setEditingJob(null);
     setTitle("");
     setCompany("");
-    setJobLocation("");
-    setExperienceRange("");
-    setFunctionName("");
+    setJobLocation("Mumbai");
+    setCustomLocation("");
+    setExperienceRange("1-3 Years");
+    setFunctionName("Engineering");
     setSkills("");
     setJobDescription("");
     setApplyEmail("");
     setApplyUrl("");
     setExpiresOn("");
-    setPreviewLogoUrl("");
-    setLogoValid(null);
     setShowModal(true);
   };
 
@@ -265,46 +254,45 @@ export default function JobBoardScreen() {
     setEditingJob(job);
     setTitle(job.title);
     setCompany(job.company);
-    setJobLocation(job.location);
-    setExperienceRange(job.experience_range);
-    setFunctionName(job.function_name || "");
-    setSkills(job.skills);
-    setJobDescription(job.job_description);
+
+    // Check if location exists in standard options
+    if (LOCATIONS.includes(job.location)) {
+      setJobLocation(job.location);
+      setCustomLocation("");
+    } else {
+      setJobLocation("Other");
+      setCustomLocation(job.location);
+    }
+
+    setExperienceRange(job.experience_range || "1-3 Years");
+    setFunctionName(job.function_name || "Engineering");
+    setSkills(job.skills || "");
+    setJobDescription(job.job_description || "");
     setApplyEmail(job.apply_email || "");
     setApplyUrl(job.apply_url || "");
     setExpiresOn(job.expires_on || "");
-    // logo preview from Clearbit using company name
- 
-    setLogoValid(null);
     setShowModal(true);
   };
 
-  // ── submit (create / edit)
-  // FIX: company_logo, posted_by_name, posted_by_photo removed from payload
-  // DB mein ye columns nahi hain — JOIN se aata hai
   const submitJob = async () => {
-    if (!title || !company || !jobLocation || !jobDescription) {
-      if (Platform.OS === "web") {
-        window.alert("Please fill all required fields");
-      } else {
-        Alert.alert("Validation", "Please fill all required fields");
-      }
+    const finalLocation = jobLocation === "Other" ? customLocation.trim() : jobLocation;
+
+    if (!title || !company || !finalLocation || !jobDescription) {
+      const msg = "Please fill all required fields";
+      Platform.OS === "web" ? window.alert(msg) : Alert.alert("Validation", msg);
       return;
     }
-  
+
     if (!user) {
-      if (Platform.OS === "web") {
-        window.alert("User not found");
-      } else {
-        Alert.alert("Error", "User not found");
-      }
+      const msg = "User session not found";
+      Platform.OS === "web" ? window.alert(msg) : Alert.alert("Error", msg);
       return;
     }
-  
+
     const payload = {
       title,
       company,
-      location: jobLocation,
+      location: finalLocation,
       experience_range: experienceRange,
       function_name: functionName || "General",
       skills,
@@ -312,147 +300,65 @@ export default function JobBoardScreen() {
       apply_email: applyEmail,
       apply_url: applyUrl,
       expires_on: expiresOn
-      ? new Date(expiresOn)
-          .toISOString()
-          .split("T")[0]
-      : "2026-12-31",
+        ? new Date(expiresOn).toISOString().split("T")[0]
+        : "2026-12-31",
       posted_by_user_id: user.id,
     };
-  
+
     try {
-        if (editingJob) {
-      
-          const res = await axios.put(
-            `${API_URL}/jobs/${editingJob.id}`,
-            payload
-          );
-      
-          console.log("UPDATE RESPONSE:", res.data);
-      
-          if (Platform.OS === "web") {
-            window.alert("Job updated successfully ✅");
-          } else {
-            Alert.alert(
-              "Success ✅",
-              "Job updated successfully"
-            );
-          }
-      
-        } else {
-      
-          const res = await axios.post(
-            `${API_URL}/jobs/create`,
-            payload
-          );
-      
-          console.log("CREATE RESPONSE:", res.data);
-      
-          if (Platform.OS === "web") {
-            window.alert("Job posted successfully ✅");
-          } else {
-            Alert.alert(
-              "Success ✅",
-              "Job posted successfully"
-            );
-          }
-        }
-      
-        setShowModal(false);
-      
-        fetchJobs();
-      
-      } catch (error: any) {
-      
-        console.log(
-          "UPDATE ERROR:",
-          error.response?.data || error.message
-        );
-      
-        if (Platform.OS === "web") {
-          window.alert(
-            error.response?.data?.message ||
-            "Failed to update job"
-          );
-        } else {
-          Alert.alert(
-            "Error ❌",
-            error.response?.data?.message ||
-            "Failed to update job"
-          );
-        }
-      }
-  };
-  // ── close (mark filled)
-  const closeJob = async (job: JobType) => {
-    const confirmed =
-      Platform.OS === "web"
-        ? window.confirm(
-            "Mark this position as filled?"
-          )
-        : true;
-  
-    if (!confirmed) return;
-  
-    try {
-      await axios.patch(
-        `${API_URL}/jobs/${job.id}/close`
-      );
-  
-      setJobs(prev =>
-        prev.map(j =>
-          j.id === job.id
-            ? { ...j, is_closed: true }
-            : j
-        )
-      );
-  
-      if (Platform.OS === "web") {
-        window.alert(
-          "Job marked as filled successfully"
-        );
+      if (editingJob) {
+        await axios.put(`${API_URL}/jobs/${editingJob.id}`, payload);
+        const msg = "Job updated successfully ✅";
+        Platform.OS === "web" ? window.alert(msg) : Alert.alert("Success ✅", msg);
       } else {
-        Alert.alert(
-          "Success ✅",
-          "Job marked as filled"
-        );
+        await axios.post(`${API_URL}/jobs/create`, payload);
+        const msg = "Job posted successfully ✅";
+        Platform.OS === "web" ? window.alert(msg) : Alert.alert("Success ✅", msg);
       }
-  
-      setTimeout(() => fetchJobs(), 300);
+      setShowModal(false);
+      fetchJobs();
     } catch (error: any) {
-      console.log(error.response?.data);
-  
-      if (Platform.OS === "web") {
-        window.alert("Failed to close job");
-      } else {
-        Alert.alert(
-          "Error ❌",
-          "Failed to close job"
-        );
-      }
+      const errMsg = error.response?.data?.message || "Failed to save job";
+      Platform.OS === "web" ? window.alert(errMsg) : Alert.alert("Error ❌", errMsg);
     }
   };
-  // ── apply
+
+  const closeJob = async (job: JobType) => {
+    const confirmed =
+      Platform.OS === "web" ? window.confirm("Mark position as filled?") : true;
+    if (!confirmed) return;
+
+    try {
+      await axios.patch(`${API_URL}/jobs/${job.id}/close`);
+      setJobs((prev) =>
+        prev.map((j) => (j.id === job.id ? { ...j, is_closed: true } : j))
+      );
+      fetchJobs();
+    } catch (error) {
+      const errMsg = "Failed to close position";
+      Platform.OS === "web" ? window.alert(errMsg) : Alert.alert("Error ❌", errMsg);
+    }
+  };
+
   const handleApply = async (item: JobType) => {
     try {
       if (item.apply_url) await Linking.openURL(item.apply_url);
-      else if (item.apply_email)
-        await Linking.openURL(`mailto:${item.apply_email}`);
+      else if (item.apply_email) await Linking.openURL(`mailto:${item.apply_email}`);
     } catch (err) {
       console.log(err);
     }
   };
 
-  if (loading)
+  if (loading) {
     return (
       <View style={styles.loader}>
-        <ActivityIndicator size="large" color="#4f46e5" />
+        <ActivityIndicator size="large" color="#4F46E5" />
       </View>
     );
+  }
 
   return (
     <View style={styles.container}>
-    
-
       <FlatList
         data={filteredJobs}
         keyExtractor={(item) => item.id.toString()}
@@ -463,25 +369,22 @@ export default function JobBoardScreen() {
         contentContainerStyle={{ paddingBottom: 120 }}
         ListHeaderComponent={
           <>
-            {/* ── HERO ── */}
+            {/* HERO BANNER */}
             <LinearGradient
-             colors={["#312EBA", "#5B21B6", "#EC1D8F"]}
+              colors={["#312EBA", "#5B21B6", "#EC1D8F"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
-              style={styles.header}
+              style={[styles.header, isMobile && styles.headerMobile]}
             >
-              <View style={styles.topHeaderRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.heading}>Job Board</Text>
-                  <Text style={styles.subHeading}>
-                    Discover alumni opportunities
+              <View style={[styles.topHeaderRow, isWeb && styles.topHeaderRowWeb]}>
+                <View style={[{ flex: 1 }, isWeb && { alignItems: "center", width: "100%" }]}>
+                  <Text style={[styles.heading, isMobile && styles.headingMobile, isWeb && styles.textCenter]}>
+                    Job Board
                   </Text>
+                  <Text style={[styles.subHeading, isWeb && styles.textCenter]}>Discover alumni opportunities</Text>
                 </View>
-                <Animated.View style={animatedStyle}>
-                  <TouchableOpacity
-                    style={styles.postMiniBtn}
-                    onPress={openCreateModal}
-                  >
+                <Animated.View style={[animatedStyle, isWeb && { marginBottom: 16 }]}>
+                  <TouchableOpacity style={styles.postMiniBtn} onPress={openCreateModal}>
                     <Ionicons name="add" size={20} color="#fff" />
                     <Text style={styles.postMiniText}>Post Job</Text>
                   </TouchableOpacity>
@@ -502,38 +405,31 @@ export default function JobBoardScreen() {
                 ))}
               </View>
 
-              {/* SEARCH + FILTER TOGGLE */}
+              {/* SEARCH & FILTER CONTROLS */}
               <View style={styles.searchRow}>
                 <View
                   style={[
                     styles.searchBox,
-                    searchFocused && {
-                      borderWidth: 2,
-                      borderColor: "#818cf8",
-                    },
+                    searchFocused && { borderWidth: 2, borderColor: "#818cf8" },
                   ]}
                 >
-                  <Ionicons name="search" size={20} color="#64748b" />
+                  <Ionicons name="search" size={20} color="#64748B" />
                   <TextInput
                     placeholder="Search jobs, companies, skills..."
-                    placeholderTextColor="#94a3b8"
+                    placeholderTextColor="#94A3B8"
                     style={styles.searchInput}
                     value={search}
                     onChangeText={setSearch}
                     onFocus={() => setSearchFocused(true)}
-                    onBlur={() =>
-                      setTimeout(() => setSearchFocused(false), 150)
-                    }
+                    onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
                   />
-                  {search.trim().length > 0 && (
-                    <TouchableOpacity
-                      onPress={() => setSearch("")}
-                      style={styles.clearBtn}
-                    >
+                  {search.length > 0 && (
+                    <TouchableOpacity onPress={() => setSearch("")} style={styles.clearBtn}>
                       <Ionicons name="close" size={16} color="#64748B" />
                     </TouchableOpacity>
                   )}
                 </View>
+
                 <TouchableOpacity
                   style={[
                     styles.filterToggleBtn,
@@ -543,97 +439,33 @@ export default function JobBoardScreen() {
                 >
                   <Ionicons
                     name="options-outline"
-                    size={20}
-                    color={activeFiltersCount > 0 ? "#4f46e5" : "#64748b"}
+                    size={22}
+                    color={activeFiltersCount > 0 ? "#4F46E5" : "#64748B"}
                   />
                   {activeFiltersCount > 0 && (
                     <View style={styles.filterBadge}>
-                      <Text style={styles.filterBadgeText}>
-                        {activeFiltersCount}
-                      </Text>
+                      <Text style={styles.filterBadgeText}>{activeFiltersCount}</Text>
                     </View>
                   )}
                 </TouchableOpacity>
               </View>
-
-              {/* SEARCH DROPDOWN */}
-              {search.trim().length > 0 && (
-                <View style={styles.searchDropdown}>
-                  <View style={styles.dropdownHeader}>
-                    <Text style={styles.dropdownHeaderLeft}>RESULTS</Text>
-                    <Text style={styles.dropdownHeaderRight}>
-                      {filteredJobs.length} found
-                    </Text>
-                  </View>
-                  {filteredJobs.length === 0 ? (
-                    <View style={{ padding: 24, alignItems: "center" }}>
-                      <Ionicons
-                        name="briefcase-outline"
-                        size={32}
-                        color="#CBD5E1"
-                      />
-                      <Text style={styles.noResultText}>No jobs found</Text>
-                    </View>
-                  ) : (
-                    filteredJobs.slice(0, 5).map((item) => (
-                      <TouchableOpacity
-                        key={item.id}
-                        style={styles.dropdownItem}
-                        onPress={() => setSearch("")}
-                      >
-                       
-                        <View style={styles.dropdownInfo}>
-                          <Text
-                            style={styles.dropdownTitle}
-                            numberOfLines={1}
-                          >
-                            {item.title}
-                          </Text>
-                          <Text style={styles.dropdownMeta}>
-                            {item.company} · {item.location} ·{" "}
-                            {item.experience_range}
-                          </Text>
-                        </View>
-                        <View style={styles.dropdownBadge}>
-                          <Text
-                            style={styles.dropdownBadgeText}
-                            numberOfLines={1}
-                          >
-                            {item.skills?.split(",")[0]?.trim()}
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
-                    ))
-                  )}
-                </View>
-              )}
             </LinearGradient>
 
-            {/* ── FILTERS PANEL ── */}
+            {/* EXPANDABLE FILTERS PANEL */}
             {showFilters && (
               <View style={styles.filtersPanel}>
                 <View style={styles.filtersPanelHeader}>
                   <Text style={styles.filtersPanelTitle}>Filters</Text>
-                  {activeFiltersCount > 0 && (
-                    <TouchableOpacity
-                      onPress={() => {
-                        setFilterLoc("All");
-                        setFilterExp("All");
-                        setFilterFn("All");
-                      }}
-                    >
+                  {(activeFiltersCount > 0 || search) && (
+                    <TouchableOpacity onPress={handleResetFilters}>
                       <Text style={styles.clearFiltersText}>Clear all</Text>
                     </TouchableOpacity>
                   )}
                 </View>
 
                 <Text style={styles.filterLabel}>Location</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  style={styles.pillScroll}
-                >
-                  {LOCATIONS.map((l) => (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pillScroll}>
+                  {["All", ...LOCATIONS].map((l) => (
                     <FilterPill
                       key={l}
                       label={l}
@@ -644,12 +476,8 @@ export default function JobBoardScreen() {
                 </ScrollView>
 
                 <Text style={styles.filterLabel}>Experience</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  style={styles.pillScroll}
-                >
-                  {EXPERIENCES.map((e) => (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pillScroll}>
+                  {["All", ...EXPERIENCES].map((e) => (
                     <FilterPill
                       key={e}
                       label={e}
@@ -660,12 +488,8 @@ export default function JobBoardScreen() {
                 </ScrollView>
 
                 <Text style={styles.filterLabel}>Function</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  style={styles.pillScroll}
-                >
-                  {FUNCTIONS.map((f) => (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pillScroll}>
+                  {["All", ...FUNCTIONS].map((f) => (
                     <FilterPill
                       key={f}
                       label={f}
@@ -677,77 +501,50 @@ export default function JobBoardScreen() {
               </View>
             )}
 
-{filteredJobs.length > 0 ? (
-  <Text style={styles.resultCount}>
-    {filteredJobs.length} listing
-    {filteredJobs.length !== 1 ? "s" : ""}
-  </Text>
-) : null}
+            {filteredJobs.length > 0 && (
+              <Text style={styles.resultCount}>
+                {filteredJobs.length} listing{filteredJobs.length !== 1 ? "s" : ""} found
+              </Text>
+            )}
           </>
         }
         ListEmptyComponent={
           <View style={{ alignItems: "center", paddingVertical: 60 }}>
             <Ionicons name="briefcase-outline" size={64} color="#CBD5E1" />
-            <Text
-              style={{
-                fontSize: 18,
-                fontWeight: "700",
-                color: "#94A3B8",
-                marginTop: 16,
-              }}
-            >
-              No jobs found
+            <Text style={{ fontSize: 18, fontWeight: "700", color: "#94A3B8", marginTop: 16 }}>
+              No jobs match your criteria
             </Text>
-            {activeFiltersCount > 0 && (
-              <TouchableOpacity
-                style={styles.clearFiltersBtn}
-                onPress={() => {
-                  setFilterLoc("All");
-                  setFilterExp("All");
-                  setFilterFn("All");
-                }}
-              >
-                <Text style={styles.clearFiltersBtnText}>Clear filters</Text>
+            {(activeFiltersCount > 0 || search) && (
+              <TouchableOpacity style={styles.clearFiltersBtn} onPress={handleResetFilters}>
+                <Text style={styles.clearFiltersBtnText}>Reset all filters</Text>
               </TouchableOpacity>
             )}
           </View>
         }
         renderItem={({ item }) => {
-            if (!item) return null;
+          if (!item) return null;
           const mine = isOwner(item);
           const expired = isExpired(item.expires_on);
           const closed = item.is_closed;
 
           return (
-            <View
-              style={[
-                styles.card,
-                (item?.is_closed || expired) ? styles.cardClosed : null,
-              ]}
-            >
-              {/* BANNERS */}
-              
-        
+            <View style={[styles.card, (closed || expired) ? styles.cardClosed : null]}>
               {(closed || expired) && (
                 <View style={styles.closedBanner}>
-                  <Ionicons name="lock-closed" size={11} color="#64748b" />
+                  <Ionicons name="lock-closed" size={11} color="#64748B" />
                   <Text style={styles.closedText}>
                     {closed ? "Position filled" : "Expired"}
                   </Text>
                 </View>
               )}
 
-              {/* COMPANY ROW */}
               <View style={styles.companyRow}>
-  
-              <CompanyLogo size={52} />
-  <View style={{ marginLeft: 12, flex: 1 }}>
-    <Text style={styles.jobTitle}>{item.title}</Text>
-
-    {/* company name always visible */}
-    <Text style={styles.company} numberOfLines={1}>
-      {item.company || "Unknown Company"}
-    </Text>
+                <CompanyLogo size={50} />
+                <View style={{ marginLeft: 12, flex: 1 }}>
+                  <Text style={styles.jobTitle}>{item.title}</Text>
+                  <Text style={styles.company} numberOfLines={1}>
+                    {item.company || "Unknown Company"}
+                  </Text>
                   {isNew(item.created_at) && !closed && !expired && (
                     <View style={styles.newBadge}>
                       <Text style={styles.newBadgeText}>🟢 New</Text>
@@ -756,52 +553,41 @@ export default function JobBoardScreen() {
                 </View>
               </View>
 
-              {/* INFO CHIPS */}
               <View style={styles.infoChipsRow}>
                 <View style={styles.infoChip}>
-                  <Ionicons name="location-outline" size={13} color="#4f46e5" />
+                  <Ionicons name="location-outline" size={13} color="#4F46E5" />
                   <Text style={styles.infoChipText}>{item.location}</Text>
                 </View>
                 <View style={styles.infoChip}>
-                  <Ionicons name="briefcase-outline" size={13} color="#4f46e5" />
+                  <Ionicons name="briefcase-outline" size={13} color="#4F46E5" />
                   <Text style={styles.infoChipText}>{item.experience_range}</Text>
                 </View>
                 {item.function_name ? (
                   <View style={styles.infoChip}>
-                    <Ionicons name="layers-outline" size={13} color="#4f46e5" />
+                    <Ionicons name="layers-outline" size={13} color="#4F46E5" />
                     <Text style={styles.infoChipText}>{item.function_name}</Text>
                   </View>
                 ) : null}
-                <View style={styles.infoChip}>
-                  <Ionicons name="calendar-outline" size={13} color="#ef4444" />
-                  <Text style={[styles.infoChipText, { color: "#ef4444" }]}>
-                    {formatDateTime(item.expires_on)}
-                  </Text>
+              </View>
+
+              {item.skills ? (
+                <View style={styles.skillRow}>
+                  {item.skills.split(",").slice(0, 4).map((skill, i) => (
+                    <View key={i} style={styles.skillChip}>
+                      <Text style={styles.skillText}>{skill.trim()}</Text>
+                    </View>
+                  ))}
                 </View>
-              </View>
+              ) : null}
 
-              {/* SKILLS */}
-              <View style={styles.skillRow}>
-                {item.skills?.split(",").slice(0, 4).map((skill, i) => (
-                  <View key={i} style={styles.skillChip}>
-                    <Text style={styles.skillText}>{skill.trim()}</Text>
-                  </View>
-                ))}
-              </View>
-
-              {/* DESCRIPTION */}
               <Text style={styles.description} numberOfLines={3}>
                 {item.job_description}
               </Text>
 
-              {/* OWNER ACTIONS */}
               {mine && (
                 <View style={styles.ownerActions}>
-                  <TouchableOpacity
-                    style={styles.ownerBtn}
-                    onPress={() => openEditModal(item)}
-                  >
-                    <Ionicons name="create-outline" size={15} color="#4f46e5" />
+                  <TouchableOpacity style={styles.ownerBtn} onPress={() => openEditModal(item)}>
+                    <Ionicons name="create-outline" size={15} color="#4F46E5" />
                     <Text style={styles.ownerBtnText}>Edit</Text>
                   </TouchableOpacity>
                   {!closed && (
@@ -809,12 +595,8 @@ export default function JobBoardScreen() {
                       style={[styles.ownerBtn, styles.ownerBtnDanger]}
                       onPress={() => closeJob(item)}
                     >
-                      <Ionicons
-                        name="checkmark-circle-outline"
-                        size={15}
-                        color="#ef4444"
-                      />
-                      <Text style={[styles.ownerBtnText, { color: "#ef4444" }]}>
+                      <Ionicons name="checkmark-circle-outline" size={15} color="#EF4444" />
+                      <Text style={[styles.ownerBtnText, { color: "#EF4444" }]}>
                         Mark Filled
                       </Text>
                     </TouchableOpacity>
@@ -822,9 +604,6 @@ export default function JobBoardScreen() {
                 </View>
               )}
 
-            
-              
-              {/* CARD FOOTER */}
               <View style={styles.cardFooter}>
                 <View style={styles.userRow}>
                   <Image
@@ -836,24 +615,14 @@ export default function JobBoardScreen() {
                     style={styles.userImage}
                   />
                   <View>
-                    <Text style={styles.postedBy}>{item.posted_by_name}</Text>
-                    <Text style={styles.expire}>
-                      Expires {formatDateTime(item.expires_on)}
-                    </Text>
+                    <Text style={styles.postedBy}>{item.posted_by_name || "Alumni Member"}</Text>
+                    <Text style={styles.expire}>Expires {formatDateTime(item.expires_on)}</Text>
                   </View>
                 </View>
                 {!closed && !expired && (
-                  <TouchableOpacity
-                    style={styles.applyBtn}
-                    onPress={() => handleApply(item)}
-                  >
+                  <TouchableOpacity style={styles.applyBtn} onPress={() => handleApply(item)}>
                     <Text style={styles.applyText}>Apply Now</Text>
-                    <Ionicons
-                      name="arrow-forward"
-                      size={16}
-                      color="#fff"
-                      style={{ marginLeft: 6 }}
-                    />
+                    <Ionicons name="arrow-forward" size={16} color="#fff" style={{ marginLeft: 6 }} />
                   </TouchableOpacity>
                 )}
               </View>
@@ -862,375 +631,325 @@ export default function JobBoardScreen() {
         }}
       />
 
-      {/* ── POST / EDIT MODAL ── */}
-      <Modal
-        visible={showModal}
-        animationType="slide"
-        presentationStyle="pageSheet"
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setShowModal(false)}>
-              <Ionicons name="close" size={24} color="#0f172a" />
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>
-              {editingJob ? "Edit Job" : "Post a New Job"}
-            </Text>
-            <TouchableOpacity
-              style={styles.modalSubmitBtn}
-              onPress={submitJob}
-            >
-              <Text style={styles.modalSubmitText}>
-                {editingJob ? "Update" : "Post"}
+      {/* CREATE / EDIT MODAL (RESPONSIVE PC & MOBILE) */}
+      <Modal visible={showModal} transparent animationType={isMobile ? "slide" : "fade"}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isMobile && styles.modalCardMobile]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {editingJob ? "Edit Job Listing" : "Post a New Job"}
               </Text>
-            </TouchableOpacity>
+              <TouchableOpacity onPress={() => setShowModal(false)} hitSlop={10}>
+                <Ionicons name="close" size={24} color="#0F172A" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled">
+              {/* BASIC INFO SECTION */}
+              <Text style={styles.sectionLabel}>BASIC INFO</Text>
+              <View style={!isMobile && styles.formGridRow}>
+                <View style={!isMobile && styles.formGridCol}>
+                  <Text style={styles.inputFieldLabel}>Job Title *</Text>
+                  <TextInput
+                    placeholder="e.g. Senior Frontend Engineer"
+                    placeholderTextColor="#94A3B8"
+                    style={styles.input}
+                    value={title}
+                    onChangeText={setTitle}
+                  />
+                </View>
+                <View style={!isMobile && styles.formGridCol}>
+                  <Text style={styles.inputFieldLabel}>Company Name *</Text>
+                  <TextInput
+                    placeholder="e.g. Google, TechCorp"
+                    placeholderTextColor="#94A3B8"
+                    style={styles.input}
+                    value={company}
+                    onChangeText={setCompany}
+                  />
+                </View>
+              </View>
+
+              {/* CLASSIFICATION SELECTORS */}
+              <Text style={styles.sectionLabel}>JOB CATEGORIZATION</Text>
+
+              {/* Location Choice */}
+              <Text style={styles.inputFieldLabel}>Location *</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                {[...LOCATIONS, "Other"].map((loc) => (
+                  <TouchableOpacity
+                    key={loc}
+                    style={[styles.selectorChip, jobLocation === loc && styles.selectorChipActive]}
+                    onPress={() => setJobLocation(loc)}
+                  >
+                    <Text style={[styles.selectorChipText, jobLocation === loc && styles.selectorChipTextActive]}>
+                      {loc}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              {jobLocation === "Other" && (
+                <TextInput
+                  placeholder="Type custom location (e.g. Chennai, Hybrid)"
+                  placeholderTextColor="#94A3B8"
+                  style={styles.input}
+                  value={customLocation}
+                  onChangeText={setCustomLocation}
+                />
+              )}
+
+              {/* Experience Choice */}
+              <Text style={styles.inputFieldLabel}>Experience Range *</Text>
+              <View style={styles.selectorGrid}>
+                {EXPERIENCES.map((exp) => (
+                  <TouchableOpacity
+                    key={exp}
+                    style={[styles.selectorChip, experienceRange === exp && styles.selectorChipActive]}
+                    onPress={() => setExperienceRange(exp)}
+                  >
+                    <Text style={[styles.selectorChipText, experienceRange === exp && styles.selectorChipTextActive]}>
+                      {exp}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Function Choice */}
+              <Text style={[styles.inputFieldLabel, { marginTop: 12 }]}>Department / Function *</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                {FUNCTIONS.map((fn) => (
+                  <TouchableOpacity
+                    key={fn}
+                    style={[styles.selectorChip, functionName === fn && styles.selectorChipActive]}
+                    onPress={() => setFunctionName(fn)}
+                  >
+                    <Text style={[styles.selectorChipText, functionName === fn && styles.selectorChipTextActive]}>
+                      {fn}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              {/* DETAILS & APPLICATION */}
+              <Text style={styles.sectionLabel}>DETAILS & APPLICATION</Text>
+
+              <Text style={styles.inputFieldLabel}>Skills (comma separated)</Text>
+              <TextInput
+                placeholder="e.g. React Native, TypeScript, Node.js"
+                placeholderTextColor="#94A3B8"
+                style={styles.input}
+                value={skills}
+                onChangeText={setSkills}
+              />
+
+              <Text style={styles.inputFieldLabel}>Job Description *</Text>
+              <TextInput
+                placeholder="Detailed job responsibilities, qualifications..."
+                placeholderTextColor="#94A3B8"
+                multiline
+                style={styles.textArea}
+                value={jobDescription}
+                onChangeText={setJobDescription}
+              />
+
+              <View style={!isMobile && styles.formGridRow}>
+                <View style={!isMobile && styles.formGridCol}>
+                  <Text style={styles.inputFieldLabel}>Apply Email</Text>
+                  <TextInput
+                    placeholder="careers@company.com"
+                    placeholderTextColor="#94A3B8"
+                    style={styles.input}
+                    value={applyEmail}
+                    onChangeText={setApplyEmail}
+                  />
+                </View>
+                <View style={!isMobile && styles.formGridCol}>
+                  <Text style={styles.inputFieldLabel}>Apply URL</Text>
+                  <TextInput
+                    placeholder="https://company.com/jobs/apply"
+                    placeholderTextColor="#94A3B8"
+                    style={styles.input}
+                    value={applyUrl}
+                    onChangeText={setApplyUrl}
+                  />
+                </View>
+              </View>
+
+              <Text style={styles.inputFieldLabel}>Expiry Date (YYYY-MM-DD)</Text>
+              <TextInput
+                placeholder="2026-12-31"
+                placeholderTextColor="#94A3B8"
+                style={styles.input}
+                value={expiresOn}
+                onChangeText={setExpiresOn}
+              />
+
+              <View style={{ height: 20 }} />
+            </ScrollView>
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowModal(false)}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.submitBtn} onPress={submitJob}>
+                <Text style={styles.submitBtnText}>{editingJob ? "Update Job" : "Post Job"}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-
-          <ScrollView
-            style={styles.modalScroll}
-            keyboardShouldPersistTaps="handled"
-          >
-           
-            
-            <Text style={styles.sectionLabel}>Basic Info</Text>
-            {[
-              { ph: "Job Title *", val: title, fn: setTitle },
-              { ph: "Company Name *", val: company, fn: setCompany },
-            ].map((f, i) => (
-              <TextInput
-                key={i}
-                placeholder={f.ph}
-                placeholderTextColor="#94a3b8"
-                style={styles.input}
-                value={f.val}
-                onChangeText={f.fn}
-              />
-            ))}
-
-            <Text style={styles.sectionLabel}>Details</Text>
-            {[
-              { ph: "Location *", val: jobLocation, fn: setJobLocation },
-              {
-                ph: "Experience (e.g. 1-3 Years)",
-                val: experienceRange,
-                fn: setExperienceRange,
-              },
-              {
-                ph: "Function (Engineering, Design, Product…)",
-                val: functionName,
-                fn: setFunctionName,
-              },
-              {
-                ph: "Skills (React, Node, Python…)",
-                val: skills,
-                fn: setSkills,
-              },
-            ].map((f, i) => (
-              <TextInput
-                key={i}
-                placeholder={f.ph}
-                placeholderTextColor="#94a3b8"
-                style={styles.input}
-                value={f.val}
-                onChangeText={f.fn}
-              />
-            ))}
-
-            <TextInput
-              placeholder="Job Description *"
-              placeholderTextColor="#94a3b8"
-              multiline
-              style={styles.textArea}
-              value={jobDescription}
-              onChangeText={setJobDescription}
-            />
-
-            <Text style={styles.sectionLabel}>Application</Text>
-            {[
-              { ph: "Apply Email", val: applyEmail, fn: setApplyEmail },
-              { ph: "Apply URL", val: applyUrl, fn: setApplyUrl },
-              {
-                ph: "Expiry Date (2026-12-31)",
-                val: expiresOn,
-                fn: setExpiresOn,
-              },
-            ].map((f, i) => (
-              <TextInput
-                key={i}
-                placeholder={f.ph}
-                placeholderTextColor="#94a3b8"
-                style={styles.input}
-                value={f.val}
-                onChangeText={f.fn}
-              />
-            ))}
-
-            <View style={{ height: 40 }} />
-          </ScrollView>
         </View>
       </Modal>
     </View>
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f1f5f9" },
+  container: { flex: 1, backgroundColor: "#F1F5F9" },
   loader: { flex: 1, justifyContent: "center", alignItems: "center" },
 
-  // HEADER
-  header: {
-    paddingHorizontal: Platform.OS === "web" ? 60:20,
-    paddingTop: 20,
-    paddingBottom: 28,
-   
-   
-  },
-  topHeaderRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-   
-  },
-  heading: { color: "#fff",  fontSize: Platform.OS === "web" ? 42 : 30, fontWeight: "800" ,textAlign:  Platform.OS === "web" ?"center":"left",},
-  subHeading: { color: "#cbd5e1", marginTop: 5, marginBottom: 16, fontSize: 15,textAlign:  Platform.OS === "web" ?"center":"left", },
+  header: { paddingHorizontal: 32, paddingTop: 24, paddingBottom: 28 },
+  headerMobile: { paddingHorizontal: 16 },
+  topHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  topHeaderRowWeb: { flexDirection: "column", justifyContent: "center", alignItems: "center", textAlign: "center" },
+  textCenter: { textAlign: "center" },
+  heading: { color: "#fff", fontSize: 36, fontWeight: "900" },
+  headingMobile: { fontSize: 26 },
+  subHeading: { color: "#CBD5E1", marginTop: 4, marginBottom: 16, fontSize: 14 },
+
   postMiniBtn: {
-    backgroundColor: "#4f46e5",
+    backgroundColor: "#4F46E5",
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingVertical: 11,
+    paddingVertical: 10,
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: "#818cf8",
+    borderColor: "#818CF8",
   },
-  postMiniText: {
-    color: "#fff",
-    fontWeight: "800",
-    marginLeft: 6,
-    fontSize: 14,
-  },
+  postMiniText: { color: "#fff", fontWeight: "800", marginLeft: 6, fontSize: 14 },
 
-  // STATS
-  statsRow: { flexDirection: "row", gap: 8, marginBottom: 16 },
+  statsRow: { flexDirection: "row", gap: 10, marginBottom: 16 },
   statBox: {
     flex: 1,
-  
-    backgroundColor: "rgba(255,255,255,0.1)",
+    backgroundColor: "rgba(255, 255, 255, 0.12)",
     borderRadius: 14,
     paddingVertical: 10,
     alignItems: "center",
   },
   statNum: { color: "#fff", fontSize: 18, fontWeight: "800" },
-  statLbl: { color: "#fff", fontSize: 10, marginTop: 2 },
+  statLbl: { color: "rgba(255,255,255,0.8)", fontSize: 11, marginTop: 2 },
 
-  // SEARCH
   searchRow: { flexDirection: "row", gap: 10, alignItems: "center" },
   searchBox: {
-    width: Platform.OS === "web" ? "95%" : "85%",
-    height: 58,
-  
+    flex: 1,
+    height: 52,
     backgroundColor: "#fff",
-    borderRadius: 18,
-  
+    borderRadius: 14,
     flexDirection: "row",
     alignItems: "center",
-  
     paddingHorizontal: 14,
-  
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 6,
-    },
-  
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-  
-    elevation: 5,
   },
-  searchInput: { flex: 1, marginLeft: 10, fontSize: 15, color: "#111827",outlineStyle: "none"  }as any,
-  clearBtn: {
-    width: 26,
-    height: 26,
-    backgroundColor: "#F1F5F9",
-    borderRadius: 13,
-    justifyContent: "center",
-    alignItems: "center",
-  },
+  searchInput: { flex: 1, marginLeft: 10, fontSize: 14, color: "#0F172A", outlineStyle: "none" } as any,
+  clearBtn: { padding: 4 },
+
   filterToggleBtn: {
-    width: 54,
-    height: 54,
+    width: 52,
+    height: 52,
     backgroundColor: "#fff",
-    borderRadius: 16,
+    borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
   },
   filterToggleBtnActive: {
-    backgroundColor: "#eef2ff",
+    backgroundColor: "#EEF2FF",
     borderWidth: 1.5,
-    borderColor: "#818cf8",
+    borderColor: "#818CF8",
   },
   filterBadge: {
     position: "absolute",
-    top: 8,
-    right: 8,
-    width: 16,
-    height: 16,
-    backgroundColor: "#4f46e5",
-    borderRadius: 8,
+    top: 6,
+    right: 6,
+    width: 18,
+    height: 18,
+    backgroundColor: "#4F46E5",
+    borderRadius: 9,
     justifyContent: "center",
     alignItems: "center",
   },
-  filterBadgeText: { color: "#fff", fontSize: 9, fontWeight: "800" },
+  filterBadgeText: { color: "#fff", fontSize: 10, fontWeight: "800" },
 
-  // DROPDOWN
-  searchDropdown: {
-    marginTop: 10,
-    backgroundColor: "#fff",
-    borderRadius: 18,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-  },
-  dropdownHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F1F5F9",
-  },
-  dropdownHeaderLeft: { fontSize: 11, fontWeight: "700", color: "#94A3B8" },
-  dropdownHeaderRight: { fontSize: 11, fontWeight: "600", color: "#94A3B8" },
-  dropdownItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 12,
-    gap: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F8FAFC",
-  },
-  dropdownInfo: { flex: 1 },
-  dropdownTitle: { fontSize: 14, fontWeight: "700", color: "#0F172A" },
-  dropdownMeta: { fontSize: 12, color: "#64748B", marginTop: 2 },
-  dropdownBadge: {
-    backgroundColor: "#EDE9FE",
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-    borderRadius: 20,
-  },
-  dropdownBadgeText: { fontSize: 10, fontWeight: "700", color: "#6D28D9" },
-  noResultText: {
-    color: "#94A3B8",
-    fontSize: 14,
-    marginTop: 8,
-    fontWeight: "600",
-  },
-
-  // FILTERS PANEL
   filtersPanel: {
     backgroundColor: "#fff",
     marginHorizontal: 16,
     marginTop: 14,
-    borderRadius: 20,
+    borderRadius: 18,
     padding: 16,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
   },
   filtersPanelHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 10,
   },
-  filtersPanelTitle: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: "#0f172a",
-  },
-  clearFiltersText: { fontSize: 13, color: "#4f46e5", fontWeight: "700" },
-  filterLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#94a3b8",
-    marginBottom: 8,
-    marginTop: 4,
-  },
+  filtersPanelTitle: { fontSize: 16, fontWeight: "800", color: "#0F172A" },
+  clearFiltersText: { fontSize: 13, color: "#4F46E5", fontWeight: "700" },
+  filterLabel: { fontSize: 12, fontWeight: "700", color: "#94A3B8", marginBottom: 6, marginTop: 8 },
   pillScroll: { marginBottom: 4 },
   filterPill: {
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 20,
-    backgroundColor: "#f1f5f9",
+    backgroundColor: "#F1F5F9",
     marginRight: 8,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#E2E8F0",
   },
-  filterPillActive: { backgroundColor: "#eef2ff", borderColor: "#818cf8" },
-  filterPillText: { fontSize: 13, fontWeight: "600", color: "#64748b" },
-  filterPillTextActive: { color: "#4f46e5" },
+  filterPillActive: { backgroundColor: "#EEF2FF", borderColor: "#818CF8" },
+  filterPillText: { fontSize: 13, fontWeight: "600", color: "#64748B" },
+  filterPillTextActive: { color: "#4F46E5", fontWeight: "700" },
 
-  resultCount: {
-    fontSize: 12,
-    color: "#94a3b8",
-    fontWeight: "600",
-    marginHorizontal: 20,
-    marginTop: 14,
-  },
-  clearFiltersBtn: {
-    marginTop: 16,
-    backgroundColor: "#eef2ff",
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 12,
-  },
-  clearFiltersBtnText: { color: "#4f46e5", fontWeight: "700", fontSize: 14 },
+  resultCount: { fontSize: 13, color: "#64748B", fontWeight: "600", marginHorizontal: 20, marginTop: 14 },
+  clearFiltersBtn: { marginTop: 16, backgroundColor: "#EEF2FF", paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12 },
+  clearFiltersBtnText: { color: "#4F46E5", fontWeight: "700", fontSize: 14 },
 
-  // JOB CARD
   card: {
     backgroundColor: "#fff",
-    marginHorizontal: Platform.OS === "web" ?30:20,
-    marginTop: 16,
-    borderRadius: 22,
-    padding: 19,
-    elevation: 3,
-    overflow: "hidden",
+    marginHorizontal: Platform.OS === "web" ? 32 : 16,
+    marginTop: 14,
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
   },
-  cardClosed: { opacity: 0.6 },
-
-  
-
+  cardClosed: { opacity: 0.65 },
   closedBanner: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "#f1f5f9",
+    backgroundColor: "#F1F5F9",
     alignSelf: "flex-start",
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 20,
     marginBottom: 10,
   },
-  closedText: { fontSize: 11, fontWeight: "700", color: "#64748b" },
+  closedText: { fontSize: 11, fontWeight: "700", color: "#64748B" },
 
   companyRow: { flexDirection: "row", alignItems: "flex-start" },
-  jobTitle: { fontSize: 17, fontWeight: "800", color: "#0f172a" },
-  company: { marginTop: 4, color: "#64748b", fontSize: 13 },
+  jobTitle: { fontSize: 17, fontWeight: "800", color: "#0F172A" },
+  company: { marginTop: 2, color: "#64748B", fontSize: 13 },
   newBadge: {
     backgroundColor: "#DCFCE7",
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 2,
     borderRadius: 20,
     alignSelf: "flex-start",
-    marginTop: 6,
+    marginTop: 4,
   },
   newBadgeText: { color: "#16A34A", fontSize: 11, fontWeight: "700" },
 
-  infoChipsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 14,
-  },
+  infoChipsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 },
   infoChip: {
     flexDirection: "row",
     alignItems: "center",
@@ -1240,158 +959,201 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 20,
   },
-  infoChipText: { fontSize: 12, color: "#4f46e5", fontWeight: "600" },
+  infoChipText: { fontSize: 12, color: "#4F46E5", fontWeight: "600" },
 
-  skillRow: { flexDirection: "row", flexWrap: "wrap", marginTop: 12, gap: 8 },
-  skillChip: {
-    backgroundColor: "#ede9fe",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 10,
-  },
-  skillText: { color: "#6d28d9", fontWeight: "700", fontSize: 12 },
+  skillRow: { flexDirection: "row", flexWrap: "wrap", marginTop: 10, gap: 6 },
+  skillChip: { backgroundColor: "#EDE9FE", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+  skillText: { color: "#6D28D9", fontWeight: "700", fontSize: 12 },
 
-  description: { marginTop: 12, color: "#475569", lineHeight: 22, fontSize: 14 },
+  description: { marginTop: 12, color: "#475569", lineHeight: 20, fontSize: 13 },
 
-  // OWNER ACTIONS
   ownerActions: {
     flexDirection: "row",
     gap: 8,
-    marginTop: 14,
+    marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: "#f1f5f9",
+    borderTopColor: "#F1F5F9",
   },
   ownerBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    backgroundColor: "#eef2ff",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#c7d2fe",
+    backgroundColor: "#EEF2FF",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
   },
-  ownerBtnDanger: { backgroundColor: "#fef2f2", borderColor: "#fecaca" },
-  ownerBtnText: { fontSize: 13, fontWeight: "700", color: "#4f46e5" },
+  ownerBtnDanger: { backgroundColor: "#FEF2F2" },
+  ownerBtnText: { fontSize: 12, fontWeight: "700", color: "#4F46E5" },
 
-  // ADMIN ACTIONS
-  
-  // CARD FOOTER
   cardFooter: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginTop: 16,
-    paddingTop: 14,
+    marginTop: 14,
+    paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: "#f1f5f9",
+    borderTopColor: "#F1F5F9",
   },
   userRow: { flexDirection: "row", alignItems: "center" },
-  userImage: { width: 36, height: 36, borderRadius: 18, marginRight: 10 },
+  userImage: { width: 34, height: 34, borderRadius: 17, marginRight: 8 },
   postedBy: { color: "#334155", fontWeight: "700", fontSize: 13 },
-  expire: { color: "#ef4444", marginTop: 2, fontSize: 11 },
+  expire: { color: "#EF4444", marginTop: 1, fontSize: 11 },
   applyBtn: {
-    backgroundColor: "#4f46e5",
-    paddingVertical: 11,
-    paddingHorizontal: 18,
-    borderRadius: 14,
+    backgroundColor: "#4F46E5",
+    paddingVertical: 9,
+    paddingHorizontal: 16,
+    borderRadius: 12,
     flexDirection: "row",
     alignItems: "center",
   },
-  applyText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  applyText: { color: "#fff", fontWeight: "700", fontSize: 13 },
 
-  // MODAL
-  modalContainer: { flex: 1, backgroundColor: "#fff" },
+  // RESPONSIVE MODAL STYLES
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.55)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalCard: {
+    backgroundColor: "#fff",
+    width: "100%",
+    maxWidth: 720,
+    maxHeight: "90%",
+    borderRadius: 24,
+    elevation: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    overflow: "hidden",
+  },
+  modalCardMobile: {
+    maxWidth: "100%",
+    maxHeight: "100%",
+    borderRadius: 0,
+    flex: 1,
+  },
   modalHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 18,
-    paddingVertical: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 18,
     borderBottomWidth: 1,
-    borderBottomColor: "#e2e8f0",
+    borderBottomColor: "#E2E8F0",
   },
-  modalTitle: { fontSize: 18, fontWeight: "800", color: "#0f172a" },
-  modalSubmitBtn: {
-    backgroundColor: "#4f46e5",
-    paddingHorizontal: 18,
-    paddingVertical: 8,
-    borderRadius: 12,
+  modalTitle: { fontSize: 18, fontWeight: "800", color: "#0F172A" },
+  modalScroll: { flex: 1, paddingHorizontal: 24, paddingTop: 16 },
+
+  formGridRow: {
+    flexDirection: "row",
+    gap: 16,
   },
-  modalSubmitText: { color: "#fff", fontWeight: "800", fontSize: 14 },
-  modalScroll: { flex: 1, paddingHorizontal: 18, paddingTop: 18 },
+  formGridCol: {
+    flex: 1,
+  },
 
   sectionLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "800",
-    color: "#94a3b8",
+    color: "#94A3B8",
     letterSpacing: 0.5,
-    marginBottom: 10,
-    marginTop: 4,
+    marginBottom: 12,
+    marginTop: 16,
+  },
+  inputFieldLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#334155",
+    marginBottom: 6,
   },
   input: {
-    backgroundColor: "#f8fafc",
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    height: 54,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    height: 48,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#CBD5E1",
     fontSize: 14,
-    color: "#0f172a",
+    color: "#0F172A",
   },
   textArea: {
-    backgroundColor: "#f8fafc",
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    height: 120,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    height: 100,
     textAlignVertical: "top",
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#CBD5E1",
     fontSize: 14,
-    color: "#0f172a",
+    color: "#0F172A",
   },
 
-  // AUTO LOGO (modal only)
-  logoSection: {
+  // SELECTOR CHIPS FOR FORM
+  selectorGrid: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    backgroundColor: "#f8fafc",
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 16,
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  selectorChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: "#F1F5F9",
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#CBD5E1",
+    marginRight: 6,
   },
-  logoPreviewBox: {
-    width: 60,
-    height: 60,
-    borderRadius: 14,
-    overflow: "hidden",
-    backgroundColor: "#e2e8f0",
-    justifyContent: "center",
+  selectorChipActive: {
+    backgroundColor: "#EEF2FF",
+    borderColor: "#4F46E5",
+  },
+  selectorChipText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#475569",
+  },
+  selectorChipTextActive: {
+    color: "#4F46E5",
+    fontWeight: "800",
+  },
+
+  modalFooter: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
     alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#E2E8F0",
+    backgroundColor: "#F8FAFC",
   },
-  logoPreviewImg: { width: 60, height: 60, borderRadius: 14 },
-  logoPlaceholderBox: {
-    width: 60,
-    height: 60,
-    justifyContent: "center",
-    alignItems: "center",
+  cancelBtn: {
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 12,
   },
-  logoSectionTitle: {
-    fontSize: 14,
+  cancelBtnText: {
+    color: "#64748B",
     fontWeight: "700",
-    color: "#0f172a",
-    marginBottom: 4,
+    fontSize: 14,
   },
-  logoHint: { fontSize: 12, color: "#64748b" },
-  logoLoading: { fontSize: 12, color: "#f59e0b", fontWeight: "600" },
-  logoFound: { fontSize: 12, color: "#16a34a", fontWeight: "700" },
-  logoNotFound: { fontSize: 12, color: "#ef4444", fontWeight: "600" },
+  submitBtn: {
+    backgroundColor: "#4F46E5",
+    paddingHorizontal: 22,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  submitBtnText: {
+    color: "#fff",
+    fontWeight: "800",
+    fontSize: 14,
+  },
 });

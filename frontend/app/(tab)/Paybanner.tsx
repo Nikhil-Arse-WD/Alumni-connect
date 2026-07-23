@@ -1,9 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage"; // FIXED: Added this import
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
+import * as WebBrowser from "expo-web-browser";
+import * as ExpoLinking from "expo-linking";
 import {
   ActivityIndicator,
   Alert,
@@ -30,7 +32,16 @@ export default function PayBannerScreen() {
     try {
       const res = await axios.get(`${API_BASE}/pay/verify/${txnid}`);
       if (res.data.status === 'Success') {
-        router.replace("/mybannerrequests" as any);
+        const title = "Payment Successful";
+        const msg = "Your banner is live!";
+        if (Platform.OS === "web") {
+          window.alert(`${title}\n${msg}`);
+          router.replace("/mybanner" as any);
+        } else {
+          Alert.alert(title, msg, [
+            { text: "OK", onPress: () => router.replace("/mybanner" as any) }
+          ]);
+        }
       } else {
         Alert.alert("Payment Status", "Payment is still " + res.data.status + ". Please wait a moment.");
       }
@@ -47,15 +58,20 @@ export default function PayBannerScreen() {
       const user = await AsyncStorage.getItem("user");
       const uData = user ? JSON.parse(user) : {};
 
+      const safeName = (uData.full_name || "Alumni").trim().replace(/[^a-zA-Z\s]/g, "").slice(0, 50);
+      const safePhone = uData.mobile ? uData.mobile.replace(/\D/g, "").slice(-10) : "9999999999";
+
+      const returnUrl = Platform.OS === 'web' ? window.location.href : ExpoLinking.createURL("");
+
       const res = await axios.post(`${API_BASE}/pay/initiate`, {
         amount,
-        firstname: uData.full_name || "Alumni",
+        firstname: safeName,
         email: uData.email,
-        phone: uData.mobile || "9999999999",
+        phone: safePhone,
         productinfo: title,
         payment_type: "BAN",
         reference_id: id,
-        return_url: window.location.href 
+        return_url: returnUrl 
       });
 
       if (res.data.success) {
@@ -74,7 +90,18 @@ export default function PayBannerScreen() {
           window.addEventListener("message", handleMessage);
           window.open(res.data.checkout_url, "_blank", "width=600,height=700");
         } else {
-          Alert.alert("Note", "Mobile payment redirection logic needs to be handled via Webview or Linking.");
+          const browserResult = await WebBrowser.openAuthSessionAsync(res.data.checkout_url, returnUrl);
+          
+          if (browserResult.type === 'success' && browserResult.url) {
+            const parsed = ExpoLinking.parse(browserResult.url);
+            if (parsed.queryParams?.status === 'success') {
+              verifyStatusWithServer(res.data.txnid);
+            } else {
+              Alert.alert("Payment Failed", "Transaction was cancelled or failed.");
+            }
+          } else {
+            Alert.alert("Payment Cancelled", "You closed the gateway before completing the payment.");
+          }
         }
       }
     } catch (err) {
