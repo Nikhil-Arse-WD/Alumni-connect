@@ -4,6 +4,7 @@ import axios from "axios";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import * as ExpoLinking from "expo-linking";
+import { useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import React, { useEffect, useState } from "react";
 import {
@@ -44,7 +45,8 @@ function UserAvatar({ photo, name, size = 64 }: { photo?: string | null; name?: 
 }
 
 // ── Community Card ──
-function CommunityCard({ item }: { item: any }) {
+function CommunityCard({ item, currentUser }: { item: any, currentUser: any }) {
+  const router = useRouter();
   const donationLabel = item.donation_type === "Money" ? "Made a Donation" : item.donation_type === "Equipment" ? "Donated Equipment" : "Sponsored Scholarship";
   const donationIcon = item.donation_type === "Money" ? "💰" : item.donation_type === "Equipment" ? "🖥️" : "🎓";
 
@@ -92,10 +94,16 @@ function CommunityCard({ item }: { item: any }) {
         <Text style={cStyles.donationDate}>{item.created_at?.split("T")[0]}</Text>
       </View>
 
-      <TouchableOpacity style={cStyles.viewBtn} activeOpacity={0.88}>
-        <Ionicons name="person-outline" size={16} color="#fff" />
-        <Text style={cStyles.viewBtnText}>View Profile</Text>
-      </TouchableOpacity>
+      {(!currentUser || item.alumni_id !== currentUser.id) && (
+        <TouchableOpacity 
+          style={cStyles.viewBtn} 
+          activeOpacity={0.88}
+          onPress={() => router.push({ pathname: "/alumniprofile", params: { id: item.alumni_id } })}
+        >
+          <Ionicons name="person-outline" size={16} color="#fff" />
+          <Text style={cStyles.viewBtnText}>View Profile</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -570,7 +578,7 @@ export default function ContributionsScreen() {
                   <View style={cStyles.grid}>
                     {communityData.map(item => (
                       <View key={item.id} style={cStyles.gridItem}>
-                        <CommunityCard item={item} />
+                        <CommunityCard item={item} currentUser={user} />
                       </View>
                     ))}
                   </View>

@@ -1,5 +1,21 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import axios from "axios";
+
+// Configure Axios global interceptor
+axios.interceptors.request.use(async (config) => {
+  try {
+    const token = await AsyncStorage.getItem("token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  } catch (error) {
+    console.error("Error fetching token:", error);
+  }
+  return config;
+}, (error) => {
+  return Promise.reject(error);
+});
 
 export interface User {
   id?: number;

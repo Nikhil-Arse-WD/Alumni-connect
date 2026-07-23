@@ -1,5 +1,5 @@
-
 import { Feather, Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -64,8 +64,17 @@ function useMembers() {
   const [filter, setFilter]           = useState("All");
   const [selectedMember, setSelected] = useState<any>(null);
   const [detailModal, setDetailModal] = useState(false);
+  const [role, setRole]               = useState("admin");
 
-  useEffect(() => { fetchMembers(); }, []);
+  useEffect(() => { 
+    fetchMembers(); 
+    AsyncStorage.getItem("admin_user").then(val => {
+      if (val) {
+        const parsed = JSON.parse(val);
+        if (parsed.role) setRole(parsed.role);
+      }
+    });
+  }, []);
 
   const fetchMembers = async () => {
     try {
@@ -121,14 +130,14 @@ function useMembers() {
     filter, setFilter, counts,
     selectedMember, setSelected,
     detailModal, setDetailModal,
-    handleApprove, handleDelete,
+    handleApprove, handleDelete, role,
   };
 }
 
 // ═══════════════════════════════════════════════════════════════════
 // DETAIL MODAL (shared)
 // ═══════════════════════════════════════════════════════════════════
-function DetailModal({ member, visible, onClose, onApprove, onDelete }: any) {
+function DetailModal({ member, visible, onClose, onApprove, onDelete, role }: any) {
   if (!member) return null;
   const st = STATUS[member.approved as 0|1|2];
   return (
@@ -193,10 +202,12 @@ function DetailModal({ member, visible, onClose, onApprove, onDelete }: any) {
               <Text style={s.rejectTxt}>Revoke Approval</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity style={s.deleteBtn} onPress={() => { onClose(); onDelete(member.id); }}>
-            <Ionicons name="trash-outline" size={18} color={C.red} />
-            <Text style={{ color: C.red, fontWeight: "700" }}>Delete Member</Text>
-          </TouchableOpacity>
+          {role === 'super_admin' && (
+            <TouchableOpacity style={s.deleteBtn} onPress={() => { onClose(); onDelete(member.id); }}>
+              <Ionicons name="trash-outline" size={18} color={C.red} />
+              <Text style={{ color: C.red, fontWeight: "700" }}>Delete Member</Text>
+            </TouchableOpacity>
+          )}
         </ScrollView>
       </SafeAreaView>
     </Modal>
@@ -214,7 +225,7 @@ function MobileLayout() {
   const {
     filtered, search, setSearch, filter, setFilter, counts,
     selectedMember, setSelected, detailModal, setDetailModal,
-    handleApprove, handleDelete,
+    handleApprove, handleDelete, role,
   } = useMembers();
 
   const TABS = ["All","Pending","Approved","Rejected"] as const;
@@ -344,6 +355,7 @@ function MobileLayout() {
         member={selectedMember} visible={detailModal}
         onClose={() => setDetailModal(false)}
         onApprove={handleApprove} onDelete={handleDelete}
+        role={role}
       />
       <Sidebar drawerOpen={drawerOpen} translateX={translateX} closeDrawer={closeDrawer} handleMenu={handleMenu} />
     </SafeAreaView>
@@ -362,7 +374,7 @@ function WebLayout() {
   const {
     filtered, search, setSearch, filter, setFilter, counts,
     selectedMember, setSelected, detailModal, setDetailModal,
-    handleApprove, handleDelete,
+    handleApprove, handleDelete, role,
   } = useMembers();
 
   const TABS = ["All","Pending","Approved","Rejected"] as const;
@@ -577,6 +589,7 @@ function WebLayout() {
         member={selectedMember} visible={detailModal}
         onClose={() => setDetailModal(false)}
         onApprove={handleApprove} onDelete={handleDelete}
+        role={role}
       />
     </SafeAreaView>
   );

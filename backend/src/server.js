@@ -3,6 +3,7 @@ const express = require("express");
 const cors = require("cors");
 const multer = require("multer");
 const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
 const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
@@ -54,10 +55,41 @@ if (!fs.existsSync(path.join(UPLOADS_DIR, "banners"))) fs.mkdirSync(path.join(UP
 
 app.use("/uploads", express.static(UPLOADS_DIR));
 
-// const rateLimit = require("express-rate-limit");
+// ── JWT MIDDLEWARE ──
+const verifyToken = (req, res, next) => {
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
+  
+  if (!token) {
+    return res.status(401).json({ success: false, message: "Access denied. No token provided." });
+  }
 
-// // 1. General limiter: Increased to 1500 requests per 15 mins
-// // (This safely allows your 5-second polling + normal app navigation)
+  jwt.verify(token, process.env.JWT_SECRET || "fallback_secret_key", (err, decoded) => {
+    if (err) {
+      return res.status(403).json({ success: false, message: "Invalid or expired token." });
+    }
+    req.user = decoded; // { id, role }
+    next();
+  });
+};
+
+const verifyAdmin = (req, res, next) => {
+  verifyToken(req, res, () => {
+    if (req.user && (req.user.role === "admin" || req.user.role === "super_admin")) {
+      next();
+    } else {
+      res.status(403).json({ success: false, message: "Access denied. Admin privileges required." });
+    }
+  });
+};
+
+// Protect all /admin routes except /admin/login
+app.use("/admin", (req, res, next) => {
+  if (req.path === "/login") return next();
+  verifyAdmin(req, res, next);
+});
+
+// const rateLimit = require("express-rate-limit");
 // const generalLimiter = rateLimit({
 //   windowMs: 15 * 60 * 1000, 
 //   max: 15000, // <-- INCREASED FROM 100 TO 1500
@@ -302,6 +334,13 @@ app.post("/login", (req, res) => {
 try { isMatch = await bcrypt.compare(String(password), String(user.password)); } catch (e) { isMatch = false; }
     if (!isMatch) return res.status(401).json({ success: false, message: "Invalid credentials" });
     
+    // Generate JWT
+    const token = jwt.sign(
+      { id: user.id, role: user.role || "user" },
+      process.env.JWT_SECRET || "fallback_secret_key",
+      { expiresIn: "7d" }
+    );
+
     res.json({
       success: true, message: "Login Successful ✅",
       user: {
@@ -312,7 +351,7 @@ try { isMatch = await bcrypt.compare(String(password), String(user.password)); }
         role: user.role || "user",
         is_password_changed: user.is_password_changed,
       },
-      token: "123",
+      token: token,
     });
   });
 });
@@ -748,15 +787,26 @@ app.delete("/jobs/:id", (req, res) => {
 // =====================================
 app.post("/admin/login", (req, res) => {
   const { email, password } = req.body;
-  db.query("SELECT * FROM admins WHERE email = ?", [email], (err, result) => {
+  db.query("SELECT * FROM admins WHERE email = ?", [email], async (err, result) => {
     if (err) return res.status(500).json({ success: false, message: "DB Error" });
     if (!result || result.length === 0) return res.status(401).json({ success: false, message: "Invalid email" });
     const admin = result[0];
-    if (password !== admin.password) return res.status(401).json({ success: false, message: "Invalid password" });
+    
+    let isMatch = false;
+    try { isMatch = await bcrypt.compare(String(password), String(admin.password)); } catch (e) { isMatch = false; }
+    if (!isMatch) return res.status(401).json({ success: false, message: "Invalid password" });
+    
+    // Generate JWT
+    const token = jwt.sign(
+      { id: admin.id, role: admin.role || "admin" },
+      process.env.JWT_SECRET || "fallback_secret_key",
+      { expiresIn: "7d" }
+    );
+
     return res.json({
       success: true,
       message: "Login success",
-      token: "dummy-admin-token",
+      token: token,
       admin: {
         id: admin.id,
         name: admin.name,
@@ -1761,7 +1811,7 @@ app.post("/pay/success", (req, res) => {
         }
       });
     } else if (udf1 === "DON") {
-      db.query("UPDATE donations SET payment_status = 'Paid' WHERE id = ?", [udf2]);
+      db.query("UPDATE donations SET payment_status = 'Paid', status = 'Approved' WHERE id = ?", [udf2]);
     } else if (udf1 === "BAN") {
       db.query("UPDATE banner_requests SET payment_status = 'Paid', status = 'Approved' WHERE id = ?", [udf2]);
     }
