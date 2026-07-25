@@ -367,6 +367,9 @@ export default function RegisterScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F8FAFC" }}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <LinearGradient colors={["#312EBA", "#5B21B6", "#EC1D8F"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.hero}>
+          <TouchableOpacity onPress={() => router.push("/loginscreen")} style={{ position: "absolute", top: 16, left: 16, zIndex: 10, padding: 8, backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 20 }}>
+            <Ionicons name="arrow-back" size={24} color="#FFF" />
+          </TouchableOpacity>
           <Text style={styles.heroTitle}>Alumni Registration</Text>
           <Text style={styles.heroSub}>SVIMAA · Complete your profile</Text>
         </LinearGradient>
@@ -404,7 +407,13 @@ export default function RegisterScreen() {
             </Row2>
 
             <Row2>
-              {isWeb ? <WebDatePicker value={form.dob} onChange={v => set("dob", v)} /> : <MobileDateField label="Date of Birth" value={form.dob} onChange={v => set("dob", v)} />}
+              {isWeb ? (
+                <Field label="Date of Birth">
+                  <WebDatePicker value={form.dob} onChange={v => set("dob", v)} />
+                </Field>
+              ) : (
+                <MobileDateField label="Date of Birth" value={form.dob} onChange={v => set("dob", v)} />
+              )}
               
               {isWeb ? (
                 <Field label="Batch Year">
@@ -482,6 +491,13 @@ export default function RegisterScreen() {
                 )}
               </LinearGradient>
             </TouchableOpacity>
+
+            <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 16 }}>
+              <Text style={{ color: "#64748B", fontSize: 15 }}>Already registered? </Text>
+              <TouchableOpacity onPress={() => router.push("/loginscreen")} activeOpacity={0.7}>
+                <Text style={{ color: "#4F46E5", fontSize: 15, fontWeight: "700" }}>Sign In</Text>
+              </TouchableOpacity>
+            </View>
           </View>
           <View style={{ height: 60 }} />
         </View>

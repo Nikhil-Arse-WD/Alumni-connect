@@ -23,7 +23,7 @@ const userSockets = new Map();
 
 io.on("connection", (socket) => {
   console.log("New client connected:", socket.id);
-  
+
   socket.on("register_user", (alumni_id) => {
     userSockets.set(alumni_id, socket.id);
     console.log(`User ${alumni_id} registered with socket ${socket.id}`);
@@ -59,7 +59,7 @@ app.use("/uploads", express.static(UPLOADS_DIR));
 const verifyToken = (req, res, next) => {
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1];
-  
+
   if (!token) {
     return res.status(401).json({ success: false, message: "Access denied. No token provided." });
   }
@@ -172,9 +172,9 @@ const sendNotification = (alumni_id, title, message, type = "general") => {
   db.query(
     `INSERT INTO notifications (alumni_id, title, message, type) VALUES (?, ?, ?, ?)`,
     [alumni_id, title, message, type],
-    (err) => { 
+    (err) => {
       if (err) {
-        console.log("Notification Error:", err); 
+        console.log("Notification Error:", err);
         return;
       }
       // Instantly push to user if they are connected
@@ -198,32 +198,123 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// ── REUSABLE EMAIL FUNCTION ──
+// ── REUSABLE MODERN EMAIL FUNCTION WITH LOGO ──
 const sendWelcomeEmail = async (userEmail, fullName, tempPassword) => {
+  const portalUrl = "https://svimaa.svimi.org/";
+
   const mailOptions = {
-    from: `"SVIMAA" <${process.env.EMAIL_USER}>`,
+    from: `"SVIMAA Alumni Connect" <${process.env.EMAIL_USER}>`,
     to: userEmail,
-    subject: "Welcome to SVIMAA  Alumni Connect! 🎓",
+    subject: "Welcome to SVIMAA, Your Alumni Connect App! 🎓",
     html: `
-      <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #E2E8F0; border-radius: 10px;">
-        <h2 style="color: #4F46E5;">Welcome to the SVIMAA Family, ${fullName}!</h2>
-        <p style="color: #475569; font-size: 16px;">
-          Thank you for registering with the Shri Vaishnav Institute of Management Alumni Association (SVIMAA). We are thrilled to have you!
-        </p>
-        <div style="background-color: #F8FAFC; padding: 15px; border-radius: 8px; margin: 20px 0;">
-          <h3 style="margin-top: 0; color: #0F172A;">Your Login Credentials:</h3>
-          <p style="margin: 5px 0;"><strong>Email:</strong> ${userEmail}</p>
-          <p style="margin: 5px 0;"><strong>Temporary Password:</strong> ${tempPassword}</p>
-        </div>
-        <p style="color: #DC2626; font-weight: bold; font-size: 14px;">
-          ⚠️ For your security, you will be required to change this temporary password immediately upon your first login.
-        </p>
-        <p style="color: #475569; font-size: 16px; margin-top: 30px;">
-          Best Regards,<br/>
-          <strong>SVIMAA Admin Team</strong>
-        </p>
-      </div>
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Welcome to SVIMAA</title>
+      </head>
+      <body style="margin: 0; padding: 0; background-color: #F8FAFC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #F8FAFC; padding: 30px 10px;">
+          <tr>
+            <td align="center">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 580px; background-color: #FFFFFF; border-radius: 16px; border: 1px solid #E2E8F0; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);">
+                
+                <!-- HEADER WITH LOGO ICON -->
+                <tr>
+                  <td style="background-color: #4F46E5; padding: 40px 24px; text-align: center;">
+                    <div style="margin-bottom: 20px;">
+                      <img src="cid:svimaalogo" alt="SVIMAA Icon" width="80" height="80" style="border-radius: 16px; background-color: #FFFFFF; padding: 12px; display: inline-block; vertical-align: middle; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);" />
+                    </div>
+                    <h1 style="color: #FFFFFF; font-size: 26px; font-weight: 800; margin: 0 0 8px 0; font-family: sans-serif;">Welcome to SVIMAA!</h1>
+                    <p style="color: rgba(255,255,255,0.9); font-size: 15px; margin: 0; font-family: sans-serif; font-weight: 300;">Shri Vaishnav Institute of Management Alumni Association</p>
+                  </td>
+                </tr>
+
+                <!-- CONTENT BODY -->
+                <tr>
+                  <td style="padding: 32px 28px;">
+                    <p style="color: #0F172A; font-size: 16px; font-weight: 600; margin: 0 0 12px 0;">
+                      Hello ${fullName},
+                    </p>
+                    <p style="color: #475569; font-size: 15px; line-height: 1.6; margin: 0 0 24px 0;">
+                      We are thrilled to welcome you to the official SVIMAA network. Connect with fellow alumni, discover career opportunities, and stay updated with campus news!
+                    </p>
+
+                    <!-- CREDENTIALS CARD -->
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #F1F5F9; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 20px;">
+                      <tr>
+                        <td style="padding: 20px;">
+                          <p style="margin: 0 0 12px 0; color: #334155; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">
+                            Your Login Credentials
+                          </p>
+                          <p style="margin: 0 0 8px 0; color: #0F172A; font-size: 14px;">
+                            <strong style="color: #64748B;">Email:</strong> ${userEmail}
+                          </p>
+                          <p style="margin: 0; color: #0F172A; font-size: 14px;">
+                            <strong style="color: #64748B;">Temporary Password:</strong> 
+                            <span style="font-family: monospace; font-size: 15px; font-weight: 700; background: #E2E8F0; padding: 2px 8px; border-radius: 4px; color: #312EBA;">${tempPassword}</span>
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <!-- SECURITY ALERT BLOCK -->
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #FEF2F2; border-radius: 10px; border-left: 4px solid #DC2626; margin-bottom: 28px;">
+                      <tr>
+                        <td style="padding: 14px 16px;">
+                          <p style="margin: 0; color: #991B1B; font-size: 13px; line-height: 1.5; font-weight: 600;">
+                            ⚠️ <strong>Security Notice:</strong> You will be required to change this temporary password immediately upon your first login.
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <!-- BUTTON CTA -->
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 28px;">
+                      <tr>
+                        <td align="center">
+                          <a href="${portalUrl}" target="_blank" style="background-color: #4F46E5; color: #FFFFFF; font-size: 15px; font-weight: 700; text-decoration: none; padding: 14px 28px; border-radius: 10px; display: inline-block; box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);">
+                            Log In to Alumni Portal →
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <p style="color: #64748B; font-size: 14px; line-height: 1.5; margin: 0;">
+                      Best regards,<br>
+                      <strong style="color: #0F172A;">SVIMAA Admin Team</strong>
+                    </p>
+                  </td>
+                </tr>
+
+                <!-- FOOTER -->
+                <tr>
+                  <td style="background-color: #F8FAFC; padding: 20px 24px; text-align: center; border-top: 1px solid #E2E8F0;">
+                    <p style="color: #94A3B8; font-size: 12px; margin: 0 0 6px 0;">
+                      Shri Vaishnav Institute of Management Alumni Association
+                    </p>
+                    <p style="color: #CBD5E1; font-size: 11px; margin: 0;">
+                      If you did not request this account, please contact support immediately.
+                    </p>
+                  </td>
+                </tr>
+
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
     `,
+    attachments: [
+      {
+        filename: 'logo_1.png',
+        path: path.join(__dirname, '../assets/image/logo_1.png'),
+        cid: 'svimaalogo',
+        contentDisposition: 'inline'
+      }
+    ]
   };
 
   try {
@@ -269,8 +360,8 @@ app.post("/register", upload.single("profile_photo"), async (req, res) => {
             industry=?, married=?, spouse_name=?, anniversary_date=?, address=?, city=?, country=?
           WHERE email=?
         `;
-        
-        const updateParams = profile_photo 
+
+        const updateParams = profile_photo
           ? [full_name, mobile, gender, dob, batch_year, programme || null, profile_photo, employment_type || null, organisation || null, designation || null, years_of_experience || null, industry || null, married || "NO", spouse_name || null, anniversary_date || null, address || null, city || null, country || null, email]
           : [full_name, mobile, gender, dob, batch_year, programme || null, employment_type || null, organisation || null, designation || null, years_of_experience || null, industry || null, married || "NO", spouse_name || null, anniversary_date || null, address || null, city || null, country || null, email];
 
@@ -318,22 +409,22 @@ app.post("/login", (req, res) => {
   db.query("SELECT * FROM alumni_members WHERE email = ?", [email], async (err, result) => {
     if (err) return res.status(500).json({ success: false, message: "Server Error" });
     if (result.length === 0) return res.status(401).json({ success: false, message: "Email not found" });
-    
+
     const user = result[0];
 
     // ---> RESTRICT UNPAID LOGINS <---
     if (user.payment_status !== "YES") {
-      return res.status(402).json({ 
-        success: false, 
-        message: "Membership payment pending. Please complete your registration payment to activate your account." 
+      return res.status(402).json({
+        success: false,
+        message: "Membership payment pending. Please complete your registration payment to activate your account."
       });
     }
 
     let isMatch = false;
-// Wrapping in String() guarantees bcrypt won't crash if the password is numbers only
-try { isMatch = await bcrypt.compare(String(password), String(user.password)); } catch (e) { isMatch = false; }
+    // Wrapping in String() guarantees bcrypt won't crash if the password is numbers only
+    try { isMatch = await bcrypt.compare(String(password), String(user.password)); } catch (e) { isMatch = false; }
     if (!isMatch) return res.status(401).json({ success: false, message: "Invalid credentials" });
-    
+
     // Generate JWT
     const token = jwt.sign(
       { id: user.id, role: user.role || "user" },
@@ -427,8 +518,8 @@ app.put("/member/update/:email", upload.single("profile_photo"), (req, res) => {
   db.query("SELECT profile_photo FROM alumni_members WHERE email = ?", [req.params.email], (err, rows) => {
     if (err) return res.status(500).json({ success: false });
 
-    const oldPhoto   = rows[0]?.profile_photo || null;
-    const newPhoto   = req.file ? req.file.filename : oldPhoto;
+    const oldPhoto = rows[0]?.profile_photo || null;
+    const newPhoto = req.file ? req.file.filename : oldPhoto;
 
     db.query(
       `UPDATE alumni_members SET
@@ -464,12 +555,12 @@ app.get("/alumni", (req, res) => {
     FROM alumni_members WHERE approved = 1
   `;
   const values = [];
-  if (programme)    { sql += " AND programme = ?";    values.push(programme); }
-  if (batch_year)   { sql += " AND batch_year = ?";   values.push(batch_year); }
-  if (city)         { sql += " AND city = ?";         values.push(city); }
-  if (industry)     { sql += " AND industry = ?";     values.push(industry); }
+  if (programme) { sql += " AND programme = ?"; values.push(programme); }
+  if (batch_year) { sql += " AND batch_year = ?"; values.push(batch_year); }
+  if (city) { sql += " AND city = ?"; values.push(city); }
+  if (industry) { sql += " AND industry = ?"; values.push(industry); }
   if (organisation) { sql += " AND organisation = ?"; values.push(organisation); }
-  if (search)       { sql += " AND full_name LIKE ?"; values.push(`%${search}%`); }
+  if (search) { sql += " AND full_name LIKE ?"; values.push(`%${search}%`); }
   db.query(sql, values, (err, result) => {
     if (err) return res.status(500).json({ success: false });
     res.json({ success: true, data: result });
@@ -529,10 +620,10 @@ app.get("/forum/posts", (req, res) => {
       alumni_members.programme, 
       alumni_members.batch_year,
       ${escapedId
-        ? `(SELECT COUNT(*) FROM forum_likes fl WHERE fl.post_id = forum_posts.id AND fl.user_id = ${escapedId}) AS liked_by_user,
+      ? `(SELECT COUNT(*) FROM forum_likes fl WHERE fl.post_id = forum_posts.id AND fl.user_id = ${escapedId}) AS liked_by_user,
            (SELECT COUNT(*) FROM forum_reports fr WHERE fr.post_id = forum_posts.id AND fr.reported_by = ${escapedId}) AS reported_by_user`
-        : `0 AS liked_by_user, 0 AS reported_by_user`
-      }
+      : `0 AS liked_by_user, 0 AS reported_by_user`
+    }
     FROM forum_posts
     JOIN alumni_members ON forum_posts.user_id = alumni_members.id
     WHERE forum_posts.status = 'ACTIVE'
@@ -608,7 +699,7 @@ app.get("/forum/count/:userId", (req, res) => {
         db.query(
           `INSERT INTO forum_user_seen (user_id, seen_at) VALUES (?, '2000-01-01 00:00:00')`,
           [userId],
-          () => {}
+          () => { }
         );
 
         db.query(
@@ -716,7 +807,7 @@ app.post("/jobs/create", (req, res) => {
   db.query(
     `INSERT INTO jobs (title, company, location, experience_range, function_name, skills, job_description, apply_url, apply_email, expires_on, posted_by_user_id)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [title, company, location, experience_range||null, function_name||null, skills||null, job_description, apply_url||null, apply_email||null, expires_on||"2026-12-31", posted_by_user_id],
+    [title, company, location, experience_range || null, function_name || null, skills || null, job_description, apply_url || null, apply_email || null, expires_on || "2026-12-31", posted_by_user_id],
     (err) => {
       if (err) { console.log("CREATE JOB ERROR:", err); return res.status(500).json({ success: false }); }
       res.json({ success: true, message: "Job posted successfully" });
@@ -725,15 +816,15 @@ app.post("/jobs/create", (req, res) => {
 });
 
 app.get("/jobs", (req, res) => {
-  const { search="", location="", experience="", function_name="" } = req.query;
+  const { search = "", location = "", experience = "", function_name = "" } = req.query;
   let sql = `
     SELECT jobs.*, alumni_members.full_name AS posted_by_name, alumni_members.profile_photo AS posted_by_photo
     FROM jobs LEFT JOIN alumni_members ON jobs.posted_by_user_id = alumni_members.id WHERE 1=1
   `;
   const values = [];
-  if (search)        { sql += " AND (jobs.title LIKE ? OR jobs.company LIKE ? OR jobs.skills LIKE ?)"; values.push(`%${search}%`,`%${search}%`,`%${search}%`); }
-  if (location)      { sql += " AND jobs.location LIKE ?"; values.push(`%${location}%`); }
-  if (experience)    { sql += " AND jobs.experience_range = ?"; values.push(experience); }
+  if (search) { sql += " AND (jobs.title LIKE ? OR jobs.company LIKE ? OR jobs.skills LIKE ?)"; values.push(`%${search}%`, `%${search}%`, `%${search}%`); }
+  if (location) { sql += " AND jobs.location LIKE ?"; values.push(`%${location}%`); }
+  if (experience) { sql += " AND jobs.experience_range = ?"; values.push(experience); }
   if (function_name) { sql += " AND jobs.function_name = ?"; values.push(function_name); }
   sql += " ORDER BY jobs.is_featured DESC, jobs.id DESC";
   db.query(sql, values, (err, result) => {
@@ -746,7 +837,7 @@ app.put("/jobs/:id", (req, res) => {
   const { title, company, location, experience_range, function_name, skills, job_description, apply_url, apply_email, expires_on } = req.body;
   db.query(
     `UPDATE jobs SET title=?, company=?, location=?, experience_range=?, function_name=?, skills=?, job_description=?, apply_url=?, apply_email=?, expires_on=? WHERE id=?`,
-    [title, company, location, experience_range||null, function_name||null, skills||null, job_description, apply_url||null, apply_email||null, expires_on||null, req.params.id],
+    [title, company, location, experience_range || null, function_name || null, skills || null, job_description, apply_url || null, apply_email || null, expires_on || null, req.params.id],
     (err) => {
       if (err) return res.status(500).json({ success: false });
       res.json({ success: true, message: "Job updated successfully" });
@@ -791,11 +882,11 @@ app.post("/admin/login", (req, res) => {
     if (err) return res.status(500).json({ success: false, message: "DB Error" });
     if (!result || result.length === 0) return res.status(401).json({ success: false, message: "Invalid email" });
     const admin = result[0];
-    
+
     let isMatch = false;
     try { isMatch = await bcrypt.compare(String(password), String(admin.password)); } catch (e) { isMatch = false; }
     if (!isMatch) return res.status(401).json({ success: false, message: "Invalid password" });
-    
+
     // Generate JWT
     const token = jwt.sign(
       { id: admin.id, role: admin.role || "admin" },
@@ -818,11 +909,11 @@ app.post("/admin/login", (req, res) => {
 });
 
 app.post("/admin/create-event", uploadEvent.single("cover_photo"), (req, res) => {
-  const { title, description, venue, event_date, event_time, capacity,status } = req.body;
+  const { title, description, venue, event_date, event_time, capacity, status } = req.body;
   const cover_photo = req.file ? `/uploads/events/${req.file.filename}` : null;
   db.query(
     "INSERT INTO events (title, description, venue, event_date, event_time, capacity, cover_photo,status) VALUES (?, ?, ?, ?, ?, ?, ?,?)",
-    [title, description, venue, event_date, event_time, capacity, cover_photo,status],
+    [title, description, venue, event_date, event_time, capacity, cover_photo, status],
     (err) => {
       if (err) return res.json({ success: false, message: "Database Error" });
       res.json({ success: true, message: "Event Created Successfully", token: "321" });
@@ -952,7 +1043,7 @@ app.post("/contributions/lecture", (req, res) => {
   if (!alumni_id || !topic) return res.status(400).json({ success: false, message: "Required fields missing" });
   db.query(
     `INSERT INTO guest_lectures (alumni_id, topic, description, available_from, available_to, target_batches, mode) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [alumni_id, topic, description||null, available_from||null, available_to||null, target_batches||null, mode||"Both"],
+    [alumni_id, topic, description || null, available_from || null, available_to || null, target_batches || null, mode || "Both"],
     (err) => {
       if (err) return res.status(500).json({ success: false });
       res.json({ success: true, message: "Lecture submitted for review ✅" });
@@ -972,12 +1063,12 @@ app.post("/contributions/mentor", (req, res) => {
   if (!alumni_id || !expertise) return res.status(400).json({ success: false, message: "Required fields missing" });
   db.query(`SELECT id FROM mentorships WHERE alumni_id = ?`, [alumni_id], (err, existing) => {
     if (existing && existing.length > 0) {
-      db.query(`UPDATE mentorships SET expertise=?, max_mentees=?, is_available=1, status='Pending' WHERE alumni_id=?`, [expertise, max_mentees||3, alumni_id], (err2) => {
+      db.query(`UPDATE mentorships SET expertise=?, max_mentees=?, is_available=1, status='Pending' WHERE alumni_id=?`, [expertise, max_mentees || 3, alumni_id], (err2) => {
         if (err2) return res.status(500).json({ success: false });
         return res.json({ success: true, message: "Mentorship updated ✅" });
       });
     } else {
-      db.query(`INSERT INTO mentorships (alumni_id, expertise, max_mentees) VALUES (?, ?, ?)`, [alumni_id, expertise, max_mentees||3], (err2) => {
+      db.query(`INSERT INTO mentorships (alumni_id, expertise, max_mentees) VALUES (?, ?, ?)`, [alumni_id, expertise, max_mentees || 3], (err2) => {
         if (err2) return res.status(500).json({ success: false });
         res.json({ success: true, message: "Mentorship submitted for review ✅" });
       });
@@ -1001,7 +1092,7 @@ app.get("/mentors", (req, res) => {
 
 app.post("/mentorship/request", (req, res) => {
   const { mentor_id, requester_id, message } = req.body;
-  db.query(`INSERT INTO mentorship_requests (mentor_id, requester_id, message) VALUES (?, ?, ?)`, [mentor_id, requester_id, message||null], (err) => {
+  db.query(`INSERT INTO mentorship_requests (mentor_id, requester_id, message) VALUES (?, ?, ?)`, [mentor_id, requester_id, message || null], (err) => {
     if (err) return res.status(500).json({ success: false });
     res.json({ success: true, message: "Request sent ✅" });
   });
@@ -1010,18 +1101,18 @@ app.post("/mentorship/request", (req, res) => {
 app.post("/contributions/donate", (req, res) => {
   const { alumni_id, donation_type, amount, equipment_description, scholarship_description, message } = req.body;
   if (!alumni_id || !donation_type) return res.status(400).json({ success: false, message: "Required fields missing" });
-  
+
   const receipt_number = donation_type === "Money" ? "DON-" + Date.now() + "-" + Math.floor(Math.random() * 9000 + 1000) : null;
-  
+
   db.query(
     `INSERT INTO donations (alumni_id, donation_type, amount, equipment_description, scholarship_description, message, receipt_number, payment_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [alumni_id, donation_type, amount||null, equipment_description||null, scholarship_description||null, message||null, receipt_number, donation_type==="Money"?"Pending":"Paid"],
+    [alumni_id, donation_type, amount || null, equipment_description || null, scholarship_description || null, message || null, receipt_number, donation_type === "Money" ? "Pending" : "Paid"],
     (err, result) => { // <--- Notice 'result' is added here!
       if (err) return res.status(500).json({ success: false });
-      
-      res.json({ 
-        success: true, 
-        message: "Donation submitted ✅", 
+
+      res.json({
+        success: true,
+        message: "Donation submitted ✅",
         receipt_number,
         donation_id: result.insertId // <--- Easebuzz needs this ID!
       });
@@ -1038,14 +1129,14 @@ app.get("/contributions/donate/:alumni_id", (req, res) => {
 
 app.get("/contributions/all/:alumni_id", (req, res) => {
   const id = req.params.alumni_id;
-  const lQ = new Promise((resolve, reject) => db.query(`SELECT 'lecture' as type, id, topic as title, status, created_at FROM guest_lectures WHERE alumni_id = ? ORDER BY id DESC`, [id], (e,r) => e?reject(e):resolve(r)));
-  const mQ = new Promise((resolve, reject) => db.query(`SELECT 'mentor' as type, id, expertise as title, status, created_at FROM mentorships WHERE alumni_id = ? ORDER BY id DESC`, [id], (e,r) => e?reject(e):resolve(r)));
+  const lQ = new Promise((resolve, reject) => db.query(`SELECT 'lecture' as type, id, topic as title, status, created_at FROM guest_lectures WHERE alumni_id = ? ORDER BY id DESC`, [id], (e, r) => e ? reject(e) : resolve(r)));
+  const mQ = new Promise((resolve, reject) => db.query(`SELECT 'mentor' as type, id, expertise as title, status, created_at FROM mentorships WHERE alumni_id = ? ORDER BY id DESC`, [id], (e, r) => e ? reject(e) : resolve(r)));
   const dQ = new Promise((resolve, reject) => db.query(
     `SELECT 'donation' as type, id, donation_type as title, status, created_at, amount, receipt_number 
      FROM donations 
      WHERE alumni_id = ? AND (donation_type != 'Money' OR payment_status = 'Paid') 
-     ORDER BY id DESC`, 
-     [id], (e,r) => e?reject(e):resolve(r)
+     ORDER BY id DESC`,
+    [id], (e, r) => e ? reject(e) : resolve(r)
   ));
   Promise.all([lQ, mQ, dQ])
     .then(([lectures, mentors, donations]) => res.json({ success: true, lectures, mentors, donations }))
@@ -1066,10 +1157,10 @@ app.put("/admin/contribution/:type/:id", (req, res) => {
 });
 
 app.get("/admin/contributions/pending", (req, res) => {
-  const lQ = new Promise((resolve, reject) => db.query(`SELECT gl.*, a.full_name, a.profile_photo, 'lecture' as type FROM guest_lectures gl JOIN alumni_members a ON gl.alumni_id = a.id WHERE gl.status = 'Pending' ORDER BY gl.id DESC`, (e,r) => e?reject(e):resolve(r)));
-  const mQ = new Promise((resolve, reject) => db.query(`SELECT m.*, a.full_name, a.profile_photo, 'mentor' as type FROM mentorships m JOIN alumni_members a ON m.alumni_id = a.id WHERE m.status = 'Pending' ORDER BY m.id DESC`, (e,r) => e?reject(e):resolve(r)));
-  const dQ = new Promise((resolve, reject) => db.query(`SELECT d.*, a.full_name, a.profile_photo, 'donation' as type FROM donations d JOIN alumni_members a ON d.alumni_id = a.id WHERE d.status = 'Pending' ORDER BY d.id DESC`, (e,r) => e?reject(e):resolve(r)));
-  Promise.all([lQ, mQ, dQ]).then(([lectures, mentors, donations]) => res.json({ success: true, lectures, mentors, donations, total: lectures.length+mentors.length+donations.length })).catch(() => res.status(500).json({ success: false }));
+  const lQ = new Promise((resolve, reject) => db.query(`SELECT gl.*, a.full_name, a.profile_photo, 'lecture' as type FROM guest_lectures gl JOIN alumni_members a ON gl.alumni_id = a.id WHERE gl.status = 'Pending' ORDER BY gl.id DESC`, (e, r) => e ? reject(e) : resolve(r)));
+  const mQ = new Promise((resolve, reject) => db.query(`SELECT m.*, a.full_name, a.profile_photo, 'mentor' as type FROM mentorships m JOIN alumni_members a ON m.alumni_id = a.id WHERE m.status = 'Pending' ORDER BY m.id DESC`, (e, r) => e ? reject(e) : resolve(r)));
+  const dQ = new Promise((resolve, reject) => db.query(`SELECT d.*, a.full_name, a.profile_photo, 'donation' as type FROM donations d JOIN alumni_members a ON d.alumni_id = a.id WHERE d.status = 'Pending' ORDER BY d.id DESC`, (e, r) => e ? reject(e) : resolve(r)));
+  Promise.all([lQ, mQ, dQ]).then(([lectures, mentors, donations]) => res.json({ success: true, lectures, mentors, donations, total: lectures.length + mentors.length + donations.length })).catch(() => res.status(500).json({ success: false }));
 });
 
 app.get("/admin/contributions/lectures", (req, res) => {
@@ -1109,11 +1200,11 @@ app.put("/admin/mentorship/match/:id", (req, res) => {
 
 app.get("/admin/stats", (req, res) => {
   const queries = {
-    total_members:   `SELECT COUNT(*) as c FROM alumni_members`,
+    total_members: `SELECT COUNT(*) as c FROM alumni_members`,
     pending_members: `SELECT COUNT(*) as c FROM alumni_members WHERE approved = 0`,
-    total_events:    `SELECT COUNT(*) as c FROM events`,
-    active_jobs:     `SELECT COUNT(*) as c FROM jobs WHERE is_closed = 0`,
-    total_posts:     `SELECT COUNT(*) as c FROM forum_posts`,
+    total_events: `SELECT COUNT(*) as c FROM events`,
+    active_jobs: `SELECT COUNT(*) as c FROM jobs WHERE is_closed = 0`,
+    total_posts: `SELECT COUNT(*) as c FROM forum_posts`,
     total_donations: `SELECT SUM(amount) as c FROM donations WHERE status = 'Approved'`,
   };
   const promises = Object.entries(queries).map(([key, sql]) =>
@@ -1434,13 +1525,13 @@ app.post("/banner-request", (req, res) => {
     const {
       full_name, email, mobile, organisation_name, banner_title,
       banner_description, website_link, preferred_duration,
-      preferred_start_date, additional_notes, amount_to_pay 
+      preferred_start_date, additional_notes, amount_to_pay
     } = req.body;
-    
+
     if (!full_name || !email || !mobile || !banner_title || !banner_description) {
       return res.status(400).json({ success: false, message: "Required fields missing" });
     }
-    
+
     const banner_image = req.file ? `/uploads/banners/${req.file.filename}` : null;
 
     // --- THE AUTO-APPROVAL LOGIC ---
@@ -1450,13 +1541,13 @@ app.post("/banner-request", (req, res) => {
     const initialStatus = isPaid ? 'Payment Requested' : 'Approved';
     const initialPaymentStatus = isPaid ? 'Pending' : 'Not Required';
     const amountRequested = isPaid ? amount_to_pay : 0;
-    
+
     let weeks = 1;
     if (preferred_duration) {
       const match = preferred_duration.match(/(\d+)/);
       if (match) weeks = parseInt(match[1], 10);
     }
-    
+
     db.query(
       `INSERT INTO banner_requests
         (full_name, email, mobile, organisation_name, banner_title, banner_description,
@@ -1469,28 +1560,28 @@ app.post("/banner-request", (req, res) => {
       ],
       (errDB, result) => {
         if (errDB) return res.status(500).json({ success: false, message: "Database Error", error: errDB });
-    
+
         // Send appropriate notification based on whether payment is required
         db.query("SELECT id FROM alumni_members WHERE email = ?", [email], (e2, rows) => {
           if (!e2 && rows.length > 0) {
-            const notifMsg = isPaid 
+            const notifMsg = isPaid
               ? "Your banner request is saved. Please complete the payment to make it live."
               : "Your banner has been automatically approved and is now live on the homepage!";
             sendNotification(rows[0].id, "📢 Banner Status Update", notifMsg, "general");
           }
         });
-    
-        res.json({ 
-          success: true, 
-          message: isPaid ? "Banner saved, awaiting payment" : "Banner submitted and instantly approved ✅", 
+
+        res.json({
+          success: true,
+          message: isPaid ? "Banner saved, awaiting payment" : "Banner submitted and instantly approved ✅",
           id: result.insertId,
-          status: initialStatus 
+          status: initialStatus
         });
       }
     );
   });
 });
- 
+
 // ── ALUMNI: apni request(s) ka status/payment dekhna ──
 app.get("/banner-request/mine/:email", (req, res) => {
   db.query(
@@ -1502,7 +1593,7 @@ app.get("/banner-request/mine/:email", (req, res) => {
     }
   );
 });
- 
+
 // ── PUBLIC / HOME PAGE: sirf approved banners ──
 app.get("/banners/active", (req, res) => {
   db.query(
@@ -1528,14 +1619,14 @@ app.get("/admin/banner-requests", (req, res) => {
     res.json({ success: true, data: result });
   });
 });
- 
+
 // ── ADMIN: approve karne se pehle payment maango ──
 app.put("/admin/banner-request/request-payment/:id", (req, res) => {
   const { amount, payment_note } = req.body;
   if (!amount || Number(amount) <= 0) {
     return res.status(400).json({ success: false, message: "Valid amount is required" });
   }
- 
+
   db.query(
     `UPDATE banner_requests
      SET status = 'Payment Requested', amount_requested = ?, payment_note = ?, payment_status = 'Pending'
@@ -1543,7 +1634,7 @@ app.put("/admin/banner-request/request-payment/:id", (req, res) => {
     [amount, payment_note || null, req.params.id],
     (err) => {
       if (err) return res.status(500).json({ success: false });
- 
+
       db.query("SELECT email FROM banner_requests WHERE id = ?", [req.params.id], (e2, rows) => {
         if (!e2 && rows.length > 0) {
           db.query("SELECT id FROM alumni_members WHERE email = ?", [rows[0].email], (e3, urows) => {
@@ -1558,12 +1649,12 @@ app.put("/admin/banner-request/request-payment/:id", (req, res) => {
           });
         }
       });
- 
+
       res.json({ success: true, message: "Payment request sent to alumni ✅" });
     }
   );
 });
- 
+
 // ── ADMIN: payment mil gaya, ab banner approve karo ──
 app.put("/admin/banner-request/approve/:id", (req, res) => {
   db.query(
@@ -1601,7 +1692,7 @@ app.put("/admin/banner-request/approve/:id", (req, res) => {
     }
   );
 });
- 
+
 // ── ADMIN: reject karo ──
 app.put("/admin/banner-request/reject/:id", (req, res) => {
   const { admin_remarks } = req.body;
@@ -1610,7 +1701,7 @@ app.put("/admin/banner-request/reject/:id", (req, res) => {
     [admin_remarks || null, req.params.id],
     (err) => {
       if (err) return res.status(500).json({ success: false });
- 
+
       db.query("SELECT email FROM banner_requests WHERE id = ?", [req.params.id], (e2, rows) => {
         if (!e2 && rows.length > 0) {
           db.query("SELECT id FROM alumni_members WHERE email = ?", [rows[0].email], (e3, urows) => {
@@ -1625,12 +1716,12 @@ app.put("/admin/banner-request/reject/:id", (req, res) => {
           });
         }
       });
- 
+
       res.json({ success: true, message: "Banner Rejected" });
     }
   );
 });
- 
+
 // ── ADMIN: request delete karo ──
 app.delete("/admin/banner-request/:id", (req, res) => {
   db.query(`DELETE FROM banner_requests WHERE id = ?`, [req.params.id], (err) => {
@@ -1721,17 +1812,17 @@ app.post("/pay/initiate", async (req, res) => {
   }
 
   // ── 1. FIX SURL/FURL LOCALHOST REJECTION ──
-  let serverIp = process.env.SERVER_URL; 
+  let serverIp = process.env.SERVER_URL;
   serverIp = serverIp.replace(/\/+$/, ""); // Removes any accidental trailing slashes
   serverIp = serverIp.replace("localhost", "127.0.0.1"); // Easebuzz rejects 'localhost', so we disguise it!
   if (!serverIp.startsWith("http")) serverIp = `http://${serverIp}`;
 
   const txnid = `${payment_type}_${Date.now()}`;
   const amountStr = parseFloat(amount).toFixed(2);
-  
-  const udf1 = payment_type || ""; 
-  const udf2 = reference_id || ""; 
-  
+
+  const udf1 = payment_type || "";
+  const udf2 = reference_id || "";
+
   // ── THE FIX: HEX ENCODE THE URL SO EASEBUZZ FIREWALL ACCEPTS IT ──
   const udf3 = return_url ? Buffer.from(return_url).toString("hex") : "";
 
@@ -1759,20 +1850,20 @@ app.post("/pay/initiate", async (req, res) => {
       form.append("firstname", firstname);
       form.append("email", email);
       form.append("phone", phone);
-      form.append("surl", `${serverIp}/pay/success`); 
-      form.append("furl", `${serverIp}/pay/failed`);  
+      form.append("surl", `${serverIp}/pay/success`);
+      form.append("furl", `${serverIp}/pay/failed`);
       form.append("udf1", udf1);
       form.append("udf2", udf2);
       form.append("udf3", udf3);
       form.append("hash", hash);
-      
+
       try {
         const response = await fetch(`${baseUrl}/payment/initiateLink`, {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json" },
           body: form.toString(),
         });
-        
+
         const data = await response.json();
 
         if (data.status === 1) {
