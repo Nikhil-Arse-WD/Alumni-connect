@@ -22,38 +22,7 @@ if (!fs.existsSync(path.join(uploadsDir, "banners"))) fs.mkdirSync(path.join(upl
 
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// const rateLimit = require("express-rate-limit");
-
-// // 1. General limiter: Increased to 1500 requests per 15 mins
-// // (This safely allows your 5-second polling + normal app navigation)
-// const generalLimiter = rateLimit({
-//   windowMs: 15 * 60 * 1000, 
-//   max: 15000, // <-- INCREASED FROM 100 TO 1500
-//   handler: (req, res) => {
-//     // FORCE JSON RESPONSE
-//     res.status(429).json({ success: false, message: "Too many requests from this IP, please try again after 15 minutes" });
-//   }
-// });
-
-// // 2. Strict limiter specifically for Login and Payment routes to prevent brute-forcing
-// const strictLimiter = rateLimit({
-//   windowMs: 15 * 60 * 1000, 
-//   max: 10, // Only 10 attempts allowed
-//   handler: (req, res) => {
-//     // FORCE JSON RESPONSE
-//     res.status(429).json({ success: false, message: "Too many attempts, please try again later." });
-//   }
-// });
-
-// // Apply general limiter to all routes
-// app.use(generalLimiter);
-
-// // Apply strict limiter ONLY to sensitive routes
-// // Note: These routes will hit BOTH limiters, but the strict one (10 max) will trigger first.
-// app.use("/login", strictLimiter);
-// app.use("/admin/login", strictLimiter);
-// app.use("/pay/initiate", strictLimiter);
-// ── 1. PROFILE PHOTOS STORAGE (FIXED WITH ABSOLUTE DIRECTORY) ──  
+// ── 1. PROFILE PHOTOS STORAGE ──  
 const getStorage = (folder) => multer.diskStorage({
   destination: (req, file, cb) => {
     const dir = path.join(__dirname, "uploads", folder);
@@ -66,7 +35,7 @@ const getStorage = (folder) => multer.diskStorage({
 });
 const upload = multer({ storage: getStorage("") });
 
-// ── 2. EVENT COVER PHOTOS STORAGE (UPDATED) ──
+// ── 2. EVENT COVER PHOTOS STORAGE ──
 const eventStorage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "uploads/events"),
   filename: (req, file, cb) => {
@@ -76,7 +45,7 @@ const eventStorage = multer.diskStorage({
 });
 const uploadEvent = multer({ storage: eventStorage });
 
-// ── 3. EVENT GALLERY STORAGE (ALREADY GOOD - KEPT CLEAN) ──
+// ── 3. EVENT GALLERY STORAGE ──
 const galleryStorage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "uploads/event-gallery"),
   filename: (req, file, cb) => {
@@ -86,10 +55,9 @@ const galleryStorage = multer.diskStorage({
 });
 const uploadGallery = multer({ storage: galleryStorage });
 
-// ── 4. BANNER AD STORAGE (UPDATED FOR ABSOLUTE PATH) ──
+// ── 4. BANNER AD STORAGE ──
 const bannerStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    // This forces the file into the exact uploads/banners folder next to init.js
     cb(null, path.join(__dirname, "uploads/banners")); 
   },
   filename: (req, file, cb) => {
@@ -120,7 +88,7 @@ const sendNotification = (alumni_id, title, message, type = "general") => {
 };
 
 // =====================================
-// MYSQL CONNECTION for multiple user base 
+// MYSQL CONNECTION POOL
 // =====================================
 const db = mysql.createPool({
   host: process.env.DB_HOST,
@@ -128,7 +96,7 @@ const db = mysql.createPool({
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   waitForConnections: true,
-  connectionLimit: 10, // Adjust based on your server capacity
+  connectionLimit: 10,
   queueLimit: 0
 });
 
@@ -137,7 +105,6 @@ db.getConnection((err, connection) => {
     console.error("DB Pool Connection Error:", err); 
     return; 
   }
-  // Release the connection back to the pool immediately after a successful test
   if (connection) connection.release();
   console.log("MySQL Pool Connected ✅");
 });
@@ -153,31 +120,123 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// ── REUSABLE EMAIL FUNCTION ──
+// ── REUSABLE MODERN EMAIL FUNCTION WITH LOGO ──
 const sendWelcomeEmail = async (userEmail, fullName, tempPassword) => {
+  const portalUrl ="https://svimaa.svimi.org/";
+  const logoPath = path.join(__dirname,"..","assets", "images", "logo.png"); // Path to logo in uploads/
+
   const mailOptions = {
-    from: `"SVIMAA" <${process.env.EMAIL_USER}>`,
+    from: `"SVIMAA Alumni Connect" <${process.env.EMAIL_USER}>`,
     to: userEmail,
-    subject: "Welcome to SVIMAA  Alumni Connect! 🎓",
+    subject: "Welcome to SVIMAA, Your Alumni Connect App!🎓",
+    attachments: [
+      {
+        filename: "logo.png",
+        path: logoPath,
+        cid: "svimaaLogo", // Content ID referenced in the HTML <img src="cid:svimaaLogo" />
+      },
+      ],
     html: `
-      <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #E2E8F0; border-radius: 10px;">
-        <h2 style="color: #4F46E5;">Welcome to the SVIMAA Family, ${fullName}!</h2>
-        <p style="color: #475569; font-size: 16px;">
-          Thank you for registering with the Shri Vaishnav Institute of Management Alumni Association (SVIMAA). We are thrilled to have you!
-        </p>
-        <div style="background-color: #F8FAFC; padding: 15px; border-radius: 8px; margin: 20px 0;">
-          <h3 style="margin-top: 0; color: #0F172A;">Your Login Credentials:</h3>
-          <p style="margin: 5px 0;"><strong>Email:</strong> ${userEmail}</p>
-          <p style="margin: 5px 0;"><strong>Temporary Password:</strong> ${tempPassword}</p>
-        </div>
-        <p style="color: #DC2626; font-weight: bold; font-size: 14px;">
-          ⚠️ For your security, you will be required to change this temporary password immediately upon your first login.
-        </p>
-        <p style="color: #475569; font-size: 16px; margin-top: 30px;">
-          Best Regards,<br/>
-          <strong>SVIMAA Admin Team</strong>
-        </p>
-      </div>
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Welcome to SVIMAA</title>
+      </head>
+      <body style="margin: 0; padding: 0; background-color: #F8FAFC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #F8FAFC; padding: 30px 10px;">
+          <tr>
+            <td align="center">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 580px; background-color: #FFFFFF; border-radius: 16px; border: 1px solid #E2E8F0; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);">
+                
+               
+      <!-- HEADER WITH LOGO ICON -->
+                <tr>
+                  <td style="background: linear-gradient(135deg, #312EBA 0%, #5B21B6 100%); padding: 32px 24px; text-align: center;">
+                    <div style="margin-bottom: 16px;">
+                      <img src="cid:svimaaLogo" alt="SVIMAA Icon" width="64" height="64" style="border-radius: 12px; background-color: rgba(255,255,255,0.2); padding: 8px; display: inline-block; vertical-align: middle;" />
+                    </div>
+                    <h1 style="color: #FFFFFF; font-size: 24px; font-weight: 800; margin: 0 0 6px 0;">Welcome to SVIMAA!</h1>
+                    <p style="color: rgba(255,255,255,0.85); font-size: 14px; margin: 0;">Shri Vaishnav Institute of Management Alumni Association</p>
+                  </td>
+                </tr>
+
+                <!-- CONTENT BODY -->
+                <tr>
+                  <td style="padding: 32px 28px;">
+                    <p style="color: #0F172A; font-size: 16px; font-weight: 600; margin: 0 0 12px 0;">
+                      Hello ${fullName},
+                    </p>
+                    <p style="color: #475569; font-size: 15px; line-height: 1.6; margin: 0 0 24px 0;">
+                      We are thrilled to welcome you to the official SVIMAA network. Connect with fellow alumni, discover career opportunities, and stay updated with campus news!
+                    </p>
+
+                    <!-- CREDENTIALS CARD -->
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #F1F5F9; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 20px;">
+                      <tr>
+                        <td style="padding: 20px;">
+                          <p style="margin: 0 0 12px 0; color: #334155; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">
+                            Your Login Credentials
+                          </p>
+                          <p style="margin: 0 0 8px 0; color: #0F172A; font-size: 14px;">
+                            <strong style="color: #64748B;">Email:</strong> ${userEmail}
+                          </p>
+                          <p style="margin: 0; color: #0F172A; font-size: 14px;">
+                            <strong style="color: #64748B;">Temporary Password:</strong> 
+                            <span style="font-family: monospace; font-size: 15px; font-weight: 700; background: #E2E8F0; padding: 2px 8px; border-radius: 4px; color: #312EBA;">${tempPassword}</span>
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <!-- SECURITY ALERT BLOCK -->
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #FEF2F2; border-radius: 10px; border-left: 4px solid #DC2626; margin-bottom: 28px;">
+                      <tr>
+                        <td style="padding: 14px 16px;">
+                          <p style="margin: 0; color: #991B1B; font-size: 13px; line-height: 1.5; font-weight: 600;">
+                            ⚠️ <strong>Security Notice:</strong> You will be required to change this temporary password immediately upon your first login.
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <!-- BUTTON CTA -->
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 28px;">
+                      <tr>
+                        <td align="center">
+                          <a href="${portalUrl}" target="_blank" style="background-color: #4F46E5; color: #FFFFFF; font-size: 15px; font-weight: 700; text-decoration: none; padding: 14px 28px; border-radius: 10px; display: inline-block; box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);">
+                            Log In to Alumni Portal →
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <p style="color: #64748B; font-size: 14px; line-height: 1.5; margin: 0;">
+                      Best regards,<br>
+                      <strong style="color: #0F172A;">SVIMAA Admin Team</strong>
+                    </p>
+                  </td>
+                </tr>
+
+                <!-- FOOTER -->
+                <tr>
+                  <td style="background-color: #F8FAFC; padding: 20px 24px; text-align: center; border-top: 1px solid #E2E8F0;">
+                    <p style="color: #94A3B8; font-size: 12px; margin: 0 0 6px 0;">
+                      Shri Vaishnav Institute of Management Alumni Association
+                    </p>
+                    <p style="color: #CBD5E1; font-size: 11px; margin: 0;">
+                      If you did not request this account, please contact support immediately.
+                    </p>
+                  </td>
+                </tr>
+
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
     `,
   };
 
@@ -192,7 +251,7 @@ const sendWelcomeEmail = async (userEmail, fullName, tempPassword) => {
 app.get("/", (req, res) => res.send("API Running ✅"));
 
 // =====================================
-// REGISTER (With Retry Logic & Strict Mode)
+// REGISTER
 // =====================================
 app.post("/register", upload.single("profile_photo"), async (req, res) => {
   try {
@@ -233,7 +292,7 @@ app.post("/register", upload.single("profile_photo"), async (req, res) => {
           if (updateErr) return res.status(500).json({ success: false, message: "Failed to update existing record" });
           return res.json({ success: true, message: "Record updated, ready for payment ✅", member_id: user.member_id, receipt_number: user.receipt_number });
         });
-        return; // Exits the function so it doesn't try to insert a new user below
+        return;
       }
 
       // New User Logic
@@ -276,7 +335,6 @@ app.post("/login", (req, res) => {
     
     const user = result[0];
 
-    // ---> RESTRICT UNPAID LOGINS <---
     if (user.payment_status !== "YES") {
       return res.status(402).json({ 
         success: false, 
@@ -285,8 +343,7 @@ app.post("/login", (req, res) => {
     }
 
     let isMatch = false;
-// Wrapping in String() guarantees bcrypt won't crash if the password is numbers only
-try { isMatch = await bcrypt.compare(String(password), String(user.password)); } catch (e) { isMatch = false; }
+    try { isMatch = await bcrypt.compare(String(password), String(user.password)); } catch (e) { isMatch = false; }
     if (!isMatch) return res.status(401).json({ success: false, message: "Invalid credentials" });
     
     res.json({
@@ -565,7 +622,6 @@ app.get("/forum/count/:userId", (req, res) => {
           [userId],
           (err2, r) => {
             if (err2) return res.json({ success: true, count: 0 });
-            console.log(`[forum/count] userId=${userId} firstTime count=${r[0].count}`);
             return res.json({ success: true, count: r[0].count });
           }
         );
@@ -573,7 +629,6 @@ app.get("/forum/count/:userId", (req, res) => {
       }
 
       const seenAt = result[0].seen_at;
-      //console.log(`[forum/count] userId=${userId} seenAt=${seenAt}`);
 
       db.query(
         `SELECT COUNT(*) AS count FROM forum_posts
@@ -583,7 +638,6 @@ app.get("/forum/count/:userId", (req, res) => {
         [userId, seenAt],
         (err2, r) => {
           if (err2) return res.json({ success: true, count: 0 });
-          //console.log(`[forum/count] count=${r[0].count}`);
           res.json({ success: true, count: r[0].count });
         }
       );
@@ -953,14 +1007,14 @@ app.post("/contributions/donate", (req, res) => {
   db.query(
     `INSERT INTO donations (alumni_id, donation_type, amount, equipment_description, scholarship_description, message, receipt_number, payment_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [alumni_id, donation_type, amount||null, equipment_description||null, scholarship_description||null, message||null, receipt_number, donation_type==="Money"?"Pending":"Paid"],
-    (err, result) => { // <--- Notice 'result' is added here!
+    (err, result) => {
       if (err) return res.status(500).json({ success: false });
       
       res.json({ 
         success: true, 
         message: "Donation submitted ✅", 
         receipt_number,
-        donation_id: result.insertId // <--- Easebuzz needs this ID!
+        donation_id: result.insertId
       });
     }
   );
@@ -1090,7 +1144,6 @@ app.delete("/admin/member/:id", (req, res) => {
 });
 
 app.post("/admin/notifications/bulk", (req, res) => {
-
   const { title, message, target, batch_year } = req.body;
 
   let sql = `SELECT id FROM alumni_members WHERE 1=1`;
@@ -1106,7 +1159,6 @@ app.post("/admin/notifications/bulk", (req, res) => {
   }
 
   db.query(sql, values, (err, members) => {
-
     if (err) {
       console.log(err);
       return res.status(500).json({ success: false });
@@ -1138,9 +1190,7 @@ app.post("/admin/notifications/bulk", (req, res) => {
       success: true,
       sent_count: members.length
     });
-
   });
-
 });
 
 app.get("/admin/notifications/history", (req, res) => {
@@ -1205,8 +1255,6 @@ app.get("/contributions/community", (req, res) => {
     JOIN alumni_members a ON d.alumni_id = a.id
 
     WHERE d.status = 'Approved'
-    
-
     ORDER BY d.created_at DESC
   `;
 
@@ -1226,7 +1274,6 @@ app.get("/contributions/community", (req, res) => {
 // ADMIN MANAGEMENT ROUTES
 // =====================================
 
-// GET all admins
 app.get("/admin/admins", (req, res) => {
   db.query(
     `SELECT id, name, email, phone, role, last_login, created_at
@@ -1238,7 +1285,6 @@ app.get("/admin/admins", (req, res) => {
   );
 });
 
-// POST create admin
 app.post("/admin/admins", async (req, res) => {
   const { name, email, password, phone, role } = req.body;
   if (!name || !email || !password)
@@ -1264,7 +1310,6 @@ app.post("/admin/admins", async (req, res) => {
   }
 });
 
-// PUT update admin
 app.put("/admin/admins/:id", async (req, res) => {
   const { name, email, password, phone, role } = req.body;
   try {
@@ -1293,7 +1338,6 @@ app.put("/admin/admins/:id", async (req, res) => {
   }
 });
 
-// DELETE admin
 app.delete("/admin/admins/:id", (req, res) => {
   db.query(`DELETE FROM admins WHERE id = ?`, [req.params.id], (err) => {
     if (err) return res.status(500).json({ success: false });
@@ -1321,7 +1365,6 @@ app.post("/admin/delete-request", (req, res) => {
   );
 });
 
-
 app.get("/admin/delete-requests", (req, res) => {
   db.query(
     `SELECT r.*, a.name, a.email, a.role 
@@ -1336,9 +1379,8 @@ app.get("/admin/delete-requests", (req, res) => {
   );
 });
 
-
 app.put("/admin/delete-request/:id", (req, res) => {
-  const { status, requester_id } = req.body; // status: 'Approved' or 'Rejected'
+  const { status, requester_id } = req.body;
   db.query(
     `UPDATE admin_delete_requests SET status = ? WHERE id = ?`,
     [status, req.params.id],
@@ -1360,9 +1402,7 @@ app.put("/admin/delete-request/:id", (req, res) => {
 // BANNER ROUTES
 // =====================================
 
-// ── ALUMNI: naya banner request submit karo (AUTO-APPROVAL UPDATED) ──
 app.post("/banner-request", (req, res) => {
-  // Wrap multer to handle file size errors gracefully
   uploadBanner.single("banner_image")(req, res, function (err) {
     if (err) {
       return res.status(400).json({ success: false, message: err.message });
@@ -1380,9 +1420,6 @@ app.post("/banner-request", (req, res) => {
     
     const banner_image = req.file ? `/uploads/banners/${req.file.filename}` : null;
 
-    // --- THE AUTO-APPROVAL LOGIC ---
-    // If the frontend sends an amount > 0, route to payment.
-    // If it's free, instantly approve it for the homepage.
     const isPaid = amount_to_pay && Number(amount_to_pay) > 0;
     const initialStatus = isPaid ? 'Payment Requested' : 'Approved';
     const initialPaymentStatus = isPaid ? 'Pending' : 'Not Required';
@@ -1401,7 +1438,6 @@ app.post("/banner-request", (req, res) => {
       (errDB, result) => {
         if (errDB) return res.status(500).json({ success: false, message: "Database Error", error: errDB });
     
-        // Send appropriate notification based on whether payment is required
         db.query("SELECT id FROM alumni_members WHERE email = ?", [email], (e2, rows) => {
           if (!e2 && rows.length > 0) {
             const notifMsg = isPaid 
@@ -1422,7 +1458,6 @@ app.post("/banner-request", (req, res) => {
   });
 });
  
-// ── ALUMNI: apni request(s) ka status/payment dekhna ──
 app.get("/banner-request/mine/:email", (req, res) => {
   db.query(
     `SELECT * FROM banner_requests WHERE email = ? ORDER BY id DESC`,
@@ -1434,7 +1469,6 @@ app.get("/banner-request/mine/:email", (req, res) => {
   );
 });
  
-// ── PUBLIC / HOME PAGE: sirf approved banners ──
 app.get("/banners/active", (req, res) => {
   db.query(
     `SELECT id, banner_title, banner_description, website_link, banner_image,
@@ -1452,7 +1486,6 @@ app.get("/banners/active", (req, res) => {
   );
 });
 
-// ── ADMIN: saare banner requests list karo ──
 app.get("/admin/banner-requests", (req, res) => {
   db.query(`SELECT * FROM banner_requests ORDER BY id DESC`, (err, result) => {
     if (err) return res.status(500).json({ success: false });
@@ -1460,7 +1493,6 @@ app.get("/admin/banner-requests", (req, res) => {
   });
 });
  
-// ── ADMIN: approve karne se pehle payment maango ──
 app.put("/admin/banner-request/request-payment/:id", (req, res) => {
   const { amount, payment_note } = req.body;
   if (!amount || Number(amount) <= 0) {
@@ -1495,7 +1527,6 @@ app.put("/admin/banner-request/request-payment/:id", (req, res) => {
   );
 });
  
-// ── ADMIN: payment mil gaya, ab banner approve karo ──
 app.put("/admin/banner-request/approve/:id", (req, res) => {
   db.query(
     `UPDATE banner_requests SET status = 'Approved', payment_status = 'Paid' WHERE id = ?`,
@@ -1523,7 +1554,6 @@ app.put("/admin/banner-request/approve/:id", (req, res) => {
   );
 });
  
-// ── ADMIN: reject karo ──
 app.put("/admin/banner-request/reject/:id", (req, res) => {
   const { admin_remarks } = req.body;
   db.query(
@@ -1552,7 +1582,6 @@ app.put("/admin/banner-request/reject/:id", (req, res) => {
   );
 });
  
-// ── ADMIN: request delete karo ──
 app.delete("/admin/banner-request/:id", (req, res) => {
   db.query(`DELETE FROM banner_requests WHERE id = ?`, [req.params.id], (err) => {
     if (err) return res.status(500).json({ success: false });
@@ -1623,6 +1652,7 @@ app.get("/birthdays/today", (req, res) => {
       });
     });
 });
+
 // ======================================================
 // UNIFIED EASEBUZZ PAYMENT GATEWAY PIPELINE
 // ======================================================
@@ -1635,16 +1665,14 @@ app.post("/pay/initiate", async (req, res) => {
   const env = process.env.EASEBUZZ_ENV || "test";
   const baseUrl = env === "prod" ? "https://pay.easebuzz.in" : "https://testpay.easebuzz.in";
 
-  // ── 0. SAFETY CHECK ──
   if (!key || !salt) {
     console.error("CRITICAL ERROR: Easebuzz Key or Salt is missing from your .env file!");
     return res.status(500).json({ success: false, message: "Payment Gateway configuration error on server." });
   }
 
-  // ── 1. FIX SURL/FURL LOCALHOST REJECTION ──
   let serverIp = process.env.SERVER_URL; 
-  serverIp = serverIp.replace(/\/+$/, ""); // Removes any accidental trailing slashes
-  serverIp = serverIp.replace("localhost", "127.0.0.1"); // Easebuzz rejects 'localhost', so we disguise it!
+  serverIp = serverIp.replace(/\/+$/, "");
+  serverIp = serverIp.replace("localhost", "127.0.0.1");
   if (!serverIp.startsWith("http")) serverIp = `http://${serverIp}`;
 
   const txnid = `${payment_type}_${Date.now()}`;
@@ -1652,16 +1680,11 @@ app.post("/pay/initiate", async (req, res) => {
   
   const udf1 = payment_type || ""; 
   const udf2 = reference_id || ""; 
-  
-  // ── THE FIX: HEX ENCODE THE URL SO EASEBUZZ FIREWALL ACCEPTS IT ──
   const udf3 = return_url ? Buffer.from(return_url).toString("hex") : "";
 
-  // ── 2. THE CORRECTED HASH (EXACTLY 8 PIPES AFTER UDF3) ──
-  // Sequence: key|txnid|amount|productinfo|firstname|email|udf1|udf2|udf3|udf4|udf5|udf6|udf7|udf8|udf9|udf10|salt
   const hashString = `${key}|${txnid}|${amountStr}|${productinfo}|${firstname}|${email}|${udf1}|${udf2}|${udf3}||||||||${salt}`;
   const hash = crypto.createHash("sha512").update(hashString).digest("hex");
 
-  // ── 3. LEDGER INSERT ──
   db.query(
     `INSERT INTO transactions (txnid, payment_type, reference_id, amount, status) VALUES (?, ?, ?, ?, 'Pending')`,
     [txnid, payment_type, reference_id, amountStr],
@@ -1671,7 +1694,6 @@ app.post("/pay/initiate", async (req, res) => {
         return res.status(500).json({ success: false, message: "Database Error" });
       }
 
-      // ── 4. BUILD EASEBUZZ FORM ──
       const form = new URLSearchParams();
       form.append("key", key);
       form.append("txnid", txnid);
@@ -1699,7 +1721,7 @@ app.post("/pay/initiate", async (req, res) => {
         if (data.status === 1) {
           res.json({ success: true, txnid, checkout_url: `${baseUrl}/pay/${data.data}` });
         } else {
-          console.error("Easebuzz Rejection Data:", data); // Logs the exact reason to your terminal if it fails again
+          console.error("Easebuzz Rejection Data:", data);
           db.query(`UPDATE transactions SET status = 'Failed', error_message = ? WHERE txnid = ?`, [data.data, txnid]);
           res.status(400).json({ success: false, message: data.data || "Gateway connection failed" });
         }
@@ -1709,7 +1731,9 @@ app.post("/pay/initiate", async (req, res) => {
       }
     }
   );
-});// ── WEBHOOK: PAYMENT SUCCESS ──
+});
+
+// ── WEBHOOK: PAYMENT SUCCESS ──
 app.post("/pay/success", (req, res) => {
   const { status, txnid, easepayid, amount, productinfo, firstname, email, udf1, udf2, udf3, udf4, udf5, udf6, udf7, udf8, udf9, udf10, hash, key } = req.body;
   const salt = process.env.EASEBUZZ_SALT;
@@ -1741,11 +1765,9 @@ app.post("/pay/success", (req, res) => {
       <html><body style="display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;background:#F8FAFC;font-family:sans-serif;text-align:center;">
         <script>
           if (window.opener) {
-            // WEB POPUP MODE: Send hidden success message to the main app and auto-close!
             window.opener.postMessage({ type: 'PAYMENT_RETURN', status: 'success' }, "*");
             window.close();
           } else {
-            // MOBILE MODE: Attach status to the deep link and trigger it
             if ("${decodedUrl}") { 
               const separator = "${decodedUrl}".includes("?") ? "&" : "?";
               window.location.href = "${decodedUrl}" + separator + "status=success"; 
@@ -1792,8 +1814,9 @@ app.post("/pay/failed", (req, res) => {
     </body></html>
   `);
 });
+
 // =====================================
-// SERVER
+// SERVER LISTEN
 // =====================================
 const PORT = process.env.PORT || 2000;
 app.listen(PORT, "0.0.0.0", () => {
