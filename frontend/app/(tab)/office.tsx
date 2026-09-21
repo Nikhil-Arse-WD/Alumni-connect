@@ -20,7 +20,7 @@ const members = [
     role: "President",
     name: "Dr. George Thomas",
     desc: "Leading with vision and dedication",
-    img: require("../../assets/Alumni_Pics/director.jpg"),
+    img: require("../../assets/Alumni_Pics/Dr George Thomas.jpeg"),
   },
   {
     role: "Chairman",
@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#eef2f7",
-    marginBottom:60
+    marginBottom: 60
   },
 
   /* HERO */

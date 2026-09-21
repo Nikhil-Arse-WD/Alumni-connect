@@ -465,7 +465,7 @@ export default function ContactScreen() {
           professional community.
         </Text>
 
-        <TouchableOpacity style={styles.ctaBtn} onPress={()=> router.push("/")}>
+        <TouchableOpacity style={styles.ctaBtn} onPress={() => router.push("/")}>
           <Text style={styles.ctaBtnText}>
             Explore Community
           </Text>
@@ -483,6 +483,7 @@ export default function ContactScreen() {
       >
         <View style={styles.modalOverlay}>
           <ScrollView
+            style={{ flex: 1, width: "100%" }}
             contentContainerStyle={styles.modalScrollWrap}
             showsVerticalScrollIndicator={false}
           >
@@ -526,8 +527,8 @@ export default function ContactScreen() {
               </View>
 
               {/* BATCH + CONTACT ROW */}
-              <View style={styles.fieldRow}>
-                <View style={{ flex: 1, marginRight: 8 }}>
+              <View style={isWeb ? styles.fieldRowWeb : styles.fieldRowMobile}>
+                <View style={isWeb ? { flex: 1, marginRight: 8 } : { width: "100%" }}>
                   <Text style={styles.fieldLabel}>Batch Year</Text>
                   <View style={styles.inputWrap}>
                     <Ionicons name="school-outline" size={18} color="#94A3B8" />
@@ -543,7 +544,7 @@ export default function ContactScreen() {
                   </View>
                 </View>
 
-                <View style={{ flex: 1, marginLeft: 8 }}>
+                <View style={isWeb ? { flex: 1, marginLeft: 8 } : { width: "100%" }}>
                   <Text style={styles.fieldLabel}>Email / Phone</Text>
                   <View style={styles.inputWrap}>
                     <Ionicons name="at-outline" size={18} color="#94A3B8" />
@@ -651,7 +652,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F8FAFC",
-    marginBottom: Platform.OS === "web" ?0:50
+    marginBottom: Platform.OS === "web" ? 0 : 50
   },
 
   // HERO
@@ -973,8 +974,6 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(15,23,42,0.6)",
-    justifyContent: "center",
-    alignItems: "center",
   },
   modalScrollWrap: {
     flexGrow: 1,
@@ -986,9 +985,14 @@ const styles = StyleSheet.create({
   modalCard: {
     backgroundColor: "#fff",
     borderRadius: 26,
-    padding: 24,
+    padding: Platform.OS === "web" ? 32 : 20,
     width: "100%",
-    maxWidth: 460,
+    maxWidth: 500,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 10,
   },
   modalHeaderRow: {
     flexDirection: "row",
@@ -1030,8 +1034,12 @@ const styles = StyleSheet.create({
   required: {
     color: "#DC2626",
   },
-  fieldRow: {
+  fieldRowWeb: {
     flexDirection: "row",
+    marginTop: 4,
+  },
+  fieldRowMobile: {
+    flexDirection: "column",
     marginTop: 4,
   },
   inputWrap: {
@@ -1050,8 +1058,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 14,
     color: "#0F172A",
-    outlineStyle:"None",
-  }as any,
+    outlineStyle: "None",
+  } as any,
   textAreaWrap: {
     alignItems: "flex-start",
     paddingVertical: 4,

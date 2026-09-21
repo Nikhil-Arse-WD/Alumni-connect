@@ -177,12 +177,12 @@ export default function ChangePasswordScreen() {
   };
 
   return (
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === "ios" ? "padding" : "height"} 
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={{ flex: 1, backgroundColor: "#F8FAFC" }}
     >
-      <ScrollView 
-        bounces={false} 
+      <ScrollView
+        bounces={false}
         contentContainerStyle={{ flexGrow: 1 }}
         keyboardShouldPersistTaps="handled"
       >
@@ -288,8 +288,8 @@ export default function ChangePasswordScreen() {
 // ── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   hero: {
-    paddingTop: Platform.OS === "ios" ? 64 : 54, 
-    paddingBottom: 32, 
+    paddingTop: Platform.OS === "ios" ? 64 : 54,
+    paddingBottom: 32,
     paddingHorizontal: 24,
     alignItems: "center",
   },

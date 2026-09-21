@@ -5,7 +5,6 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
-import { useUser } from "../../context/UserContext";
 import {
   ActivityIndicator,
   Alert,
@@ -16,6 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useUser } from "../../context/UserContext";
 import Footer from "../components/Footer";
 
 // ─── Bind to Environment Variables ──────────────────────────────────────────────
@@ -128,7 +128,7 @@ export default function AlumniProfileScreen() {
         </LinearGradient>
 
         <View style={styles.webContainer}>
-          
+
           {/* ── FIXED: Action Buttons restored to your 2x2 mobile layout ── */}
           <View style={styles.actionRow}>
             <TouchableOpacity
@@ -227,12 +227,12 @@ export default function AlumniProfileScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#eef2f7" },
   webContainer: { width: "100%", maxWidth: 900, alignSelf: "center", paddingTop: 10 },
-  
+
   errorContainer: { flex: 1, backgroundColor: "#F8FAFC", justifyContent: "center", alignItems: "center", padding: 32, textAlign: "center" as any },
   errorTitle: { fontSize: 18, fontWeight: "800", color: "#0F172A", marginTop: 16, marginBottom: 8 },
   errorSub: { fontSize: 13.5, color: "#64748B", textAlign: "center", lineHeight: 20, maxWidth: 420 },
-  
-  loader:    { flex: 1, justifyContent: "center", alignItems: "center" },
+
+  loader: { flex: 1, justifyContent: "center", alignItems: "center" },
   topSection: { alignItems: "center", paddingTop: isWeb ? 50 : 80, paddingBottom: 45, borderBottomLeftRadius: 30, borderBottomRightRadius: 30, elevation: 5 },
   avatarLarge: { width: 120, height: 120, borderRadius: 60, backgroundColor: "#fff", justifyContent: "center", alignItems: "center", overflow: "hidden", marginBottom: 15, borderWidth: 4, borderColor: "#fff", shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 10 },
   largeImage: { width: "100%", height: "100%" },
@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
   bigName: { fontSize: 26, fontWeight: "bold", color: "#fff" },
   bigRole: { fontSize: 16, color: "#f1f1f1", marginTop: 5 },
   company: { fontSize: 14, color: "#e5e5e5", marginTop: 4 },
-  
+
   actionRow: {
     flexDirection: "row",
     flexWrap: isWeb ? "nowrap" : "wrap", // Web: inline, Mobile: grid
@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
 
     // Restores your mobile 2x2 layout
     ...(!isWeb && {
-      width: "46%", 
+      width: "46%",
       marginBottom: 0,
     }),
   },
@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 18, fontWeight: "800", color: "#0f172a", marginBottom: 18, letterSpacing: -0.3 },
   infoRow: { flexDirection: "row", alignItems: "center", marginBottom: 16 },
   infoText: { marginLeft: 14, fontSize: 15, color: "#334155", fontWeight: "600", flex: 1 },
-  
+
   logoutBtn: { backgroundColor: "#EF4444", marginBottom: 40, paddingVertical: 16, borderRadius: 18, marginHorizontal: 20, flexDirection: "row", justifyContent: "center", alignItems: "center", shadowColor: "#EF4444", shadowOpacity: 0.2, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
   logoutText: { color: "#fff", fontWeight: "800", fontSize: 16, marginLeft: 8 },
 });

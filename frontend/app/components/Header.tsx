@@ -9,11 +9,9 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import axios from "axios";
-import { io } from "socket.io-client";
 import { LinearGradient } from "expo-linear-gradient";
 import { usePathname, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useUser } from "../../context/UserContext";
 import {
   Alert, Image, Modal, Platform, StyleSheet,
   Text, TouchableOpacity, useWindowDimensions, View,
@@ -22,6 +20,8 @@ import Animated, {
   useAnimatedStyle, useSharedValue, withRepeat, withTiming,
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { io } from "socket.io-client";
+import { useUser } from "../../context/UserContext";
 
 const API = process.env.EXPO_PUBLIC_API_BASE;
 const socket = io(API);
@@ -48,11 +48,11 @@ function useResponsiveWidth(): number {
 }
 
 const TABS = [
-  { name: "Home",   icon: "home-outline",     route: "/" },
-  { name: "Alumni", icon: "people-outline",    route: "/alumnidirectory" },
-  { name: "Events", icon: "calendar-outline",  route: "/event_detail" },
-  { name: "Jobs",   icon: "briefcase-outline", route: "/job" },
-  { name: "More",   icon: "grid-outline",      route: "/#" },
+  { name: "Home", icon: "home-outline", route: "/" },
+  { name: "Alumni", icon: "people-outline", route: "/alumnidirectory" },
+  { name: "Events", icon: "calendar-outline", route: "/event_detail" },
+  { name: "Jobs", icon: "briefcase-outline", route: "/job" },
+  { name: "More", icon: "grid-outline", route: "/#" },
 ];
 
 const MORE_ITEMS = [
@@ -61,46 +61,46 @@ const MORE_ITEMS = [
 ];
 
 const INFO_ITEMS = [
-  { label: "About us",       sub: "Our mission and story",         icon: "information-circle-outline", route: "/about" },
-  { label: "Contact us",     sub: "Get in touch with the team",    icon: "mail-outline",               route: "/contact" },
-  { label: "Office Bearers", sub: "Get in touch with the team",    icon: "people",                     route: "/office" },
-  { label: "Developer",      sub: "Meet our developers",           icon: "people",                     route: "/develper" },
+  { label: "About us", sub: "Our mission and story", icon: "information-circle-outline", route: "/about" },
+  { label: "Contact us", sub: "Get in touch with the team", icon: "mail-outline", route: "/contact" },
+  { label: "Office Bearers", sub: "Get in touch with the team", icon: "people", route: "/office" },
+  { label: "Developer", sub: "Meet our developers", icon: "people", route: "/developer" },
 ];
 
 function Badge({ count }: { count: number }) {
   if (count <= 0) return null;
   return (
     <View style={styles.badge}>
-     <Text style={styles.badgeText}>{count > 99 ? "99+" : count}</Text>
+      <Text style={styles.badgeText}>{count > 99 ? "99+" : count}</Text>
     </View>
   );
 }
 
 export default function Header() {
-  const router   = useRouter();
+  const router = useRouter();
   const pathname = usePathname();
 
-  const width     = useResponsiveWidth();
+  const width = useResponsiveWidth();
   const isDesktop = width >= DESKTOP_BP;
-  const isNative  = Platform.OS !== "web";
+  const isNative = Platform.OS !== "web";
 
   const { user, loading } = useUser();
-  const [unreadNotifs,    setUnreadNotifs]    = useState(0);
-  const [unreadMsgs,      setUnreadMsgs]      = useState(0);
-  const [moreVisible,     setMoreVisible]     = useState(false);
+  const [unreadNotifs, setUnreadNotifs] = useState(0);
+  const [unreadMsgs, setUnreadMsgs] = useState(0);
+  const [moreVisible, setMoreVisible] = useState(false);
   // ── password change status derived from context ──────────────
   const passwordChanged = user ? (user.is_password_changed === 1) : null;
   // ─────────────────────────────────────────────────────────────
   const forumVisited = useRef(false);
 
-  const scale      = useSharedValue(1);
+  const scale = useSharedValue(1);
   const translateX = useSharedValue(-40);
-  const opacity    = useSharedValue(0);
+  const opacity = useSharedValue(0);
 
   useEffect(() => {
-    scale.value      = withRepeat(withTiming(1.08, { duration: 1200 }), -1, true);
-    translateX.value = withTiming(0,  { duration: 500 });
-    opacity.value    = withTiming(1,  { duration: 700 });
+    scale.value = withRepeat(withTiming(1.08, { duration: 1200 }), -1, true);
+    translateX.value = withTiming(0, { duration: 500 });
+    opacity.value = withTiming(1, { duration: 700 });
   }, []);
 
   const logoAnimStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
@@ -148,7 +148,7 @@ export default function Header() {
       if (!id) return;
       const res = await axios.get(`${API}/notifications/unread-count/${id}`);
       if (res.data.success) setUnreadNotifs(res.data.count ?? 0);
-    } catch {}
+    } catch { }
   };
 
   const fetchForumCount = async () => {
@@ -157,7 +157,7 @@ export default function Header() {
       if (!id) return;
       const res = await axios.get(`${API}/forum/count/${id}`);
       if (res.data.success) setUnreadMsgs(res.data.count ?? 0);
-    } catch {}
+    } catch { }
   };
 
   const handleProfilePress = async () => {
@@ -172,7 +172,7 @@ export default function Header() {
     try {
       const id = await getUserId();
       if (id) await axios.patch(`${API}/notifications/mark-read/${id}`);
-    } catch {}
+    } catch { }
     router.push("/notification");
   };
 
@@ -181,8 +181,8 @@ export default function Header() {
     forumVisited.current = true;
     try {
       const id = await getUserId();
-      if (id) axios.post(`${API}/forum/seen/${id}`).catch(() => {});
-    } catch {}
+      if (id) axios.post(`${API}/forum/seen/${id}`).catch(() => { });
+    } catch { }
     router.push("/form");
   };
 
@@ -207,11 +207,11 @@ export default function Header() {
     setTimeout(() => router.push(route as any), 200);
   };
 
-  const logoSize  = isDesktop ? 52 : 44;
-  const headerH   = isDesktop ? 72 : 68;
+  const logoSize = isDesktop ? 52 : 44;
+  const headerH = isDesktop ? 72 : 68;
   const titleSize = isDesktop ? Math.min(25, width * 0.018) : 18;
-  const tabSize   = isDesktop ? Math.min(14, width * 0.013) : 11;
-  const iconSize  = isDesktop ? 22 : 20;
+  const tabSize = isDesktop ? Math.min(14, width * 0.013) : 11;
+  const iconSize = isDesktop ? 22 : 20;
 
   // ══════════════════════════════════════════════════════════════
   // ── KEY GUARD: password nahi badla toh kuch nahi dikhao ──────
@@ -243,7 +243,7 @@ export default function Header() {
       >
         <TouchableOpacity
           activeOpacity={1}
-          onPress={() => {}}
+          onPress={() => { }}
           style={[styles.sheet, isDesktop ? styles.sheetDesktop : styles.sheetMobile]}
         >
           <View style={styles.handle} />
