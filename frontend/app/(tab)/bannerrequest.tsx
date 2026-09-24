@@ -205,9 +205,35 @@ export default function BannerRequestScreen() {
       const response = await axios.post(API_URL, fd);
 
       if (amountToPay > 0 && response.data.id) {
+        // Clear local state before pushing to next screen
+        setForm({
+          full_name:          "",
+          email:              "",
+          mobile:             "",
+          organisation_name:  "",
+          banner_title:       "",
+          banner_description: "",
+          website_link:       "",
+          additional_notes:   "",
+        });
+        setBannerImage(null);
+        setWeeks(1);
+
+        const currentName = form.full_name;
+        const currentEmail = form.email;
+        const currentMobile = form.mobile;
+        const currentTitle = form.banner_title;
+
         router.push({
           pathname: "/Paybanner" as any, 
-          params: { id: response.data.id, amount: amountToPay, title: form.banner_title }
+          params: { 
+            id: response.data.id, 
+            amount: amountToPay, 
+            title: currentTitle,
+            name: currentName,
+            email: currentEmail,
+            phone: currentMobile 
+          }
         });
       }
 

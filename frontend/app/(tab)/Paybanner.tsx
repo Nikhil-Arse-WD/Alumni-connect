@@ -19,10 +19,16 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE;
+const isWeb = Platform.OS === 'web';
+
+const showAlert = (title: string, msg: string) => {
+  if (isWeb) window.alert(`${title}\n${msg}`);
+  else Alert.alert(title, msg);
+};
 
 export default function PayBannerScreen() {
   const router = useRouter();
-  const { id, amount, title } = useLocalSearchParams<{ id: string; amount: string; title: string }>();
+  const { id, amount, title, name: pName, email: pEmail, phone: pPhone } = useLocalSearchParams<{ id: string; amount: string; title: string, name?: string, email?: string, phone?: string }>();
   const [loading, setLoading] = useState(false);
   const [verifying, setVerifying] = useState(false);
 
@@ -34,41 +40,53 @@ export default function PayBannerScreen() {
       if (res.data.status === 'Success') {
         const title = "Payment Successful";
         const msg = "Your banner is live!";
-        if (Platform.OS === "web") {
+        if (isWeb) {
           window.alert(`${title}\n${msg}`);
           router.replace("/mybanner" as any);
         } else {
-          Alert.alert(title, msg, [
-            { text: "OK", onPress: () => router.replace("/mybanner" as any) }
-          ]);
+          showAlert(title, msg);
+          router.replace("/mybanner" as any);
         }
       } else {
-        Alert.alert("Payment Status", "Payment is still " + res.data.status + ". Please wait a moment.");
+        showAlert("Payment Status", "Payment is still " + res.data.status + ". Please wait a moment.");
       }
     } catch (e) {
-      Alert.alert("Verification Error", "Could not verify payment status.");
+      showAlert("Verification Error", "Could not verify payment status.");
     } finally {
       setVerifying(false);
     }
   };
 
   const handlePayment = async () => {
+    console.log("Pay button clicked!");
     setLoading(true);
     try {
       const user = await AsyncStorage.getItem("user");
       const uData = user ? JSON.parse(user) : {};
 
-      const safeName = (uData.full_name || "Alumni").trim().replace(/[^a-zA-Z\s]/g, "").slice(0, 50);
-      const safePhone = uData.mobile ? uData.mobile.replace(/\D/g, "").slice(-10) : "9999999999";
+      let safeName = (pName || uData.full_name || "").trim();
+      let safePhone = (pPhone || uData.mobile || "").replace(/\D/g, "");
+      let safeEmail = (pEmail || uData.email || "").trim();
+      let safeTitle = title ? title.replace(/\|/g, "").trim().slice(0, 100) : "Banner Payment";
+
+      if (!safeName || !safeEmail || safePhone.length < 10) {
+        setLoading(false);
+        showAlert(
+          "Incomplete Profile", 
+          "Your profile is missing a valid name, email, or phone number. Please update your profile in settings before proceeding with the payment."
+        );
+        return;
+      }
 
       const returnUrl = Platform.OS === 'web' ? window.location.href : ExpoLinking.createURL("");
-
+      console.log("Initiating payment with API_BASE:", API_BASE);
+      
       const res = await axios.post(`${API_BASE}/pay/initiate`, {
         amount,
         firstname: safeName,
-        email: uData.email,
+        email: safeEmail,
         phone: safePhone,
-        productinfo: title,
+        productinfo: safeTitle,
         payment_type: "BAN",
         reference_id: id,
         return_url: returnUrl 
@@ -83,12 +101,17 @@ export default function PayBannerScreen() {
               if (data.status === 'success') {
                 verifyStatusWithServer(res.data.txnid);
               } else {
-                Alert.alert("Payment Failed", "Transaction was cancelled.");
+                showAlert("Payment Failed", "Transaction was cancelled.");
               }
             }
           };
           window.addEventListener("message", handleMessage);
-          window.open(res.data.checkout_url, "_blank", "width=600,height=700");
+          
+          const popup = window.open(res.data.checkout_url, "_blank", "width=600,height=700");
+          if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+            // Popup was blocked, fallback to redirecting the main window
+            window.location.href = res.data.checkout_url;
+          }
         } else {
           const browserResult = await WebBrowser.openAuthSessionAsync(res.data.checkout_url, returnUrl);
           
@@ -97,15 +120,20 @@ export default function PayBannerScreen() {
             if (parsed.queryParams?.status === 'success') {
               verifyStatusWithServer(res.data.txnid);
             } else {
-              Alert.alert("Payment Failed", "Transaction was cancelled or failed.");
+              showAlert("Payment Failed", "Transaction was cancelled or failed.");
             }
           } else {
-            Alert.alert("Payment Cancelled", "You closed the gateway before completing the payment.");
+            showAlert("Payment Cancelled", "You closed the gateway before completing the payment.");
           }
         }
+      } else {
+         console.error("Backend returned success: false", res.data);
+         showAlert("Error", res.data.message || "Failed to start payment.");
       }
-    } catch (err) {
-      Alert.alert("Error", "Could not initiate payment");
+    } catch (err: any) {
+      console.error("handlePayment error caught:", err);
+      const msg = err?.response?.data?.message || err.message || "Could not initiate payment";
+      showAlert("Error", msg);
     } finally {
       setLoading(false);
     }

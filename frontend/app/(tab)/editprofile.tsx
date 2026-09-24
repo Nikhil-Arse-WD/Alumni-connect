@@ -52,7 +52,10 @@ const showAlert = (title: string, msg: string) =>
   isWeb ? window.alert(`${title}\n${msg}`) : Alert.alert(title, msg);
 
 const isValidName = (name: string) => /^[A-Za-z\s\.]{2,50}$/.test(name.trim());
-const isValidMobile = (m: string) => /^[6-9]\d{9}$/.test(m.replace(/[\s\-\+]/g, ""));
+const isValidMobile = (m: string) => {
+  const digits = m.replace(/[\s\-\+]/g, "");
+  return digits.length >= 7 && digits.length <= 15;
+};
 
 // Helper function to format ISO dates cleanly into DD/MM/YYYY for presentation display fields
 const formatDisplayDate = (dateStr: string) => {
@@ -382,7 +385,7 @@ export default function EditProfileScreen() {
     }
 
     if (form.mobile && !isValidMobile(form.mobile)) {
-      newErrors.mobile = "Please enter a valid 10-digit Indian mobile number.";
+      newErrors.mobile = "Please enter a valid mobile number.";
       valid = false;
     }
 

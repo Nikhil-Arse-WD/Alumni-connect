@@ -262,7 +262,8 @@ export default function RegisterScreen() {
     else if (!isValidEmail(form.email)) e.email = "Enter a valid email (e.g. rahul@gmail.com)";
 
     if (!form.mobile.trim()) e.mobile = "Mobile number is required";
-    else if (!isValidMobile(form.mobile)) e.mobile = "Enter a valid 10-digit Indian mobile number";
+    else if (form.country_code === "+91" && !isValidMobile(form.mobile)) e.mobile = "Enter a valid 10-digit Indian mobile number";
+    else if (form.country_code !== "+91" && form.mobile.replace(/[\s\-\+]/g, "").length < 7) e.mobile = "Enter a valid mobile number";
 
     if (!form.industry.trim()) {
       showAlert("Required", "Please specify your industry.");

@@ -20,7 +20,7 @@ import Footer from "../components/Footer";
 
 // ─── Bind to Environment Variables ──────────────────────────────────────────────
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE;
-const API_URL = `${API_BASE}/member`;
+const API_URL = `${API_BASE}/alumni/member`;
 const isWeb = Platform.OS === "web";
 
 export default function AlumniProfileScreen() {
