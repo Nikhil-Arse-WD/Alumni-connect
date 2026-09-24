@@ -94,10 +94,13 @@ export default function PayBannerScreen() {
 
       if (res.data.success) {
         if (Platform.OS === 'web') {
+          let isResolved = false;
           const handleMessage = (event: any) => {
             const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
             if (data.type === 'PAYMENT_RETURN') {
+              isResolved = true;
               window.removeEventListener("message", handleMessage);
+              setLoading(false);
               if (data.status === 'success') {
                 verifyStatusWithServer(res.data.txnid);
               } else {
@@ -111,9 +114,23 @@ export default function PayBannerScreen() {
           if (!popup || popup.closed || typeof popup.closed === 'undefined') {
             // Popup was blocked, fallback to redirecting the main window
             window.location.href = res.data.checkout_url;
+            // Loading remains true while redirecting
+          } else {
+            // Popup opened, poll for closure
+            const timer = setInterval(() => {
+              if (popup.closed) {
+                clearInterval(timer);
+                if (!isResolved) {
+                  window.removeEventListener("message", handleMessage);
+                  setLoading(false);
+                  showAlert("Payment Cancelled", "You closed the payment gateway before completing the transaction.");
+                }
+              }
+            }, 500);
           }
         } else {
           const browserResult = await WebBrowser.openAuthSessionAsync(res.data.checkout_url, returnUrl);
+          setLoading(false);
           
           if (browserResult.type === 'success' && browserResult.url) {
             const parsed = ExpoLinking.parse(browserResult.url);
@@ -127,15 +144,15 @@ export default function PayBannerScreen() {
           }
         }
       } else {
+         setLoading(false);
          console.error("Backend returned success: false", res.data);
          showAlert("Error", res.data.message || "Failed to start payment.");
       }
     } catch (err: any) {
+      setLoading(false);
       console.error("handlePayment error caught:", err);
       const msg = err?.response?.data?.message || err.message || "Could not initiate payment";
       showAlert("Error", msg);
-    } finally {
-      setLoading(false);
     }
   };
 
