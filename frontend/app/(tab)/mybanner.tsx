@@ -71,7 +71,7 @@ export default function MyBannerRequestsScreen() {
       const raw = await AsyncStorage.getItem("user");
       if (!raw) return;
       const { email } = JSON.parse(raw);
-      const res = await axios.get(`${API_BASE}/banner-request/mine/${email}`);
+      const res = await axios.get(`${API_BASE}/banners/mine/${email}`);
       if (res.data.success) setItems(res.data.data || []);
     } catch (e) {
       console.log(e);

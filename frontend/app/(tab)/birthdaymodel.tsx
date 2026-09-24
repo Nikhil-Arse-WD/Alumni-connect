@@ -75,7 +75,7 @@ export default function BirthdayModal() {
       if (alreadyWished === "true") return; // Silently exit if already shown this year
 
       // Fetch today's birthdays from server
-      const res = await axios.get(`${API_BASE}/birthdays/today`);
+      const res = await axios.get(`${API_BASE}/alumni/birthdays/today`);
       if (!res.data.success) return;
 
       const birthdays = res.data.birthdays || [];

@@ -113,19 +113,10 @@ export default function Footer() {
               <WebView
                 style={styles.map}
                 scrollEnabled={false}
+                javaScriptEnabled={true}
+                domStorageEnabled={true}
                 source={{
-                  html: `
-                    <!DOCTYPE html>
-                    <html>
-                      <head>
-                        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-                        <style>body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; }</style>
-                      </head>
-                      <body>
-                        <iframe width="100%" height="100%" frameborder="0" style="border:0" src="https://maps.google.com/maps?q=Shri%20Vaishnav%20Institute%20of%20Management%20Indore&t=&z=15&ie=UTF8&iwloc=&output=embed" allowfullscreen></iframe>
-                      </body>
-                    </html>
-                  `,
+                  uri: "https://maps.google.com/maps?q=Shri%20Vaishnav%20Institute%20of%20Management%20Indore&t=&z=15&ie=UTF8&iwloc=&output=embed"
                 }}
               />
             )}

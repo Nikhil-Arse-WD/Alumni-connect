@@ -53,6 +53,7 @@ interface Alumni {
   organisation?: string;
   industry?: string;
   profile_photo?: string;
+  city?: string;
 }
 
 export default function AlumniDirectoryScreen() {
@@ -62,6 +63,13 @@ export default function AlumniDirectoryScreen() {
 
   const [alumni, setAlumni] = useState<Alumni[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Pagination States
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const limit = 20;
 
   // Filter States
   const [searchName, setSearchName] = useState("");
@@ -79,20 +87,56 @@ export default function AlumniDirectoryScreen() {
   const containerWidth = isWeb ? Math.min(width, 1600) : width;
   const cardWidth = (containerWidth - (SIDE_PADDING * 2) - (GAP * (numColumns - 1))) / numColumns;
 
-  const fetchAlumni = async () => {
+  const fetchAlumni = async (isLoadMore = false) => {
+    if (isLoadMore && page >= totalPages) return;
+    
     try {
-      const res = await axios.get(API_URL);
-      setAlumni(res.data.data || []);
+      if (isLoadMore) setLoadingMore(true);
+      else setLoading(true);
+      
+      setError(null);
+      const targetPage = isLoadMore ? page + 1 : 1;
+      
+      const res = await axios.get(API_URL, {
+        params: {
+          page: targetPage,
+          limit,
+          search: searchName.trim(),
+          programme: selectedCourse,
+          industry: selectedIndustry,
+        }
+      });
+      
+      const newData = res.data.data || [];
+      const pagination = res.data.pagination;
+      
+      if (isLoadMore) {
+        setAlumni((prev) => [...prev, ...newData]);
+        setPage(targetPage);
+      } else {
+        setAlumni(newData);
+        setPage(1);
+      }
+      
+      if (pagination) {
+        setTotalPages(pagination.totalPages);
+      }
     } catch (err) {
       console.log(err);
+      if (!isLoadMore) setError("Failed to load alumni directory.");
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
+  // Debounced search and filter trigger
   useEffect(() => {
-    fetchAlumni();
-  }, []);
+    const delayDebounceFn = setTimeout(() => {
+      fetchAlumni(false);
+    }, 500);
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchName, selectedCourse, selectedIndustry]);
 
   const handleClearFilters = () => {
     setSearchName("");
@@ -102,27 +146,6 @@ export default function AlumniDirectoryScreen() {
 
   const hasActiveFilters = Boolean(searchName || selectedCourse || selectedIndustry);
 
-  const filteredAlumni = useMemo(() => {
-    const qName = searchName.toLowerCase().trim();
-
-    return alumni.filter((item) => {
-      // Name / Role Search Filter
-      const matchesName = !qName ||
-        item.full_name?.toLowerCase().includes(qName) ||
-        item.designation?.toLowerCase().includes(qName) ||
-        item.organisation?.toLowerCase().includes(qName);
-
-      // Course Filter
-      const matchesCourse = !selectedCourse || item.programme === selectedCourse;
-
-      // Industry Filter
-      const matchesIndustry = !selectedIndustry ||
-        item.industry?.toLowerCase() === selectedIndustry.toLowerCase();
-
-      return matchesName && matchesCourse && matchesIndustry;
-    });
-  }, [searchName, selectedCourse, selectedIndustry, alumni]);
-
   if (loading) {
     return (
       <View style={styles.loaderWrap}>
@@ -131,13 +154,42 @@ export default function AlumniDirectoryScreen() {
     );
   }
 
+  const renderEmptyState = () => {
+    if (error) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
+          <Text style={styles.emptyText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={() => fetchAlumni(false)}>
+            <Text style={styles.retryText}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    return (
+      <View style={styles.emptyContainer}>
+        <Ionicons name="search-outline" size={48} color="#94A3B8" />
+        <Text style={styles.emptyText}>No alumni found matching your criteria.</Text>
+        {hasActiveFilters && (
+          <TouchableOpacity style={styles.retryButton} onPress={handleClearFilters}>
+            <Text style={styles.retryText}>Clear Filters</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
+
   return (
     <View style={styles.container}>
       <FlatList
         key={numColumns}
-        data={filteredAlumni}
+        data={alumni}
         numColumns={numColumns}
         contentContainerStyle={{ paddingBottom: 100 }}
+        ListEmptyComponent={renderEmptyState}
+        onEndReached={() => fetchAlumni(true)}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={loadingMore ? <ActivityIndicator size="small" color="#4F46E5" style={{ marginVertical: 20 }} /> : <View style={{height: 20}} />}
         ListHeaderComponent={
           <LinearGradient
             colors={["#312EBA", "#5B21B6", "#EC1D8F"]}
@@ -524,4 +576,8 @@ const styles = StyleSheet.create({
   label: { fontWeight: "700", color: "#64748B" },
   connectButton: { padding: 11, backgroundColor: "#EEF2FF", borderRadius: 10, alignItems: "center" },
   connectText: { color: "#4F46E5", fontWeight: "800", fontSize: 13 },
+  emptyContainer: { alignItems: "center", padding: 40, marginTop: 20 },
+  emptyText: { color: "#64748B", fontSize: 15, marginTop: 12, textAlign: "center" },
+  retryButton: { marginTop: 16, paddingHorizontal: 20, paddingVertical: 10, backgroundColor: "#EEF2FF", borderRadius: 8 },
+  retryText: { color: "#4F46E5", fontWeight: "700" },
 });

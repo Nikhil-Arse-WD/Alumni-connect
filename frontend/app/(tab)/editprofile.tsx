@@ -51,7 +51,8 @@ if (isWeb && typeof document !== "undefined") {
 const showAlert = (title: string, msg: string) =>
   isWeb ? window.alert(`${title}\n${msg}`) : Alert.alert(title, msg);
 
-const isValidMobile = (m: string) => /^\d{7,15}$/.test(m.replace(/[\s\-\+]/g, ""));
+const isValidName = (name: string) => /^[A-Za-z\s\.]{2,50}$/.test(name.trim());
+const isValidMobile = (m: string) => /^[6-9]\d{9}$/.test(m.replace(/[\s\-\+]/g, ""));
 
 // Helper function to format ISO dates cleanly into DD/MM/YYYY for presentation display fields
 const formatDisplayDate = (dateStr: string) => {
@@ -303,7 +304,7 @@ export default function EditProfileScreen() {
   const fetchUser = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${API_BASE}/member/${email}`);
+      const res = await axios.get(`${API_BASE}/alumni/member/${email}`);
       const u   = res.data.data;
       if (u.profile_photo) {
         setPhotoUrl(u.profile_photo.startsWith("http") ? u.profile_photo : `${API_BASE}/uploads/${u.profile_photo}`);
@@ -375,8 +376,13 @@ export default function EditProfileScreen() {
     let valid = true;
     let newErrors: { [key: string]: string } = {};
 
+    if (form.full_name && !isValidName(form.full_name)) {
+      newErrors.full_name = "Please enter a valid name (letters, spaces, and dots only).";
+      valid = false;
+    }
+
     if (form.mobile && !isValidMobile(form.mobile)) {
-      newErrors.mobile = "Please enter a valid mobile number.";
+      newErrors.mobile = "Please enter a valid 10-digit Indian mobile number.";
       valid = false;
     }
 
@@ -415,7 +421,7 @@ export default function EditProfileScreen() {
         }
       }
 
-      await axios.put(`${API_BASE}/member/update/${email}`, fd, {
+      await axios.put(`${API_BASE}/alumni/member/update/${email}`, fd, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 

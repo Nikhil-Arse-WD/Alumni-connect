@@ -1,4 +1,4 @@
-const mysql = require("mysql2");
+const mysql = require("mysql2/promise");
 
 // =====================================
 // MYSQL CONNECTION for multiple user base 
@@ -13,14 +13,14 @@ const db = mysql.createPool({
   queueLimit: 0
 });
 
-db.getConnection((err, connection) => {
-  if (err) { 
-    console.error("DB Pool Connection Error:", err); 
-    return; 
+(async () => {
+  try {
+    const connection = await db.getConnection();
+    console.log("MySQL Pool Connected ✅");
+    connection.release();
+  } catch (err) {
+    console.error("DB Pool Connection Error:", err);
   }
-  // Release the connection back to the pool immediately after a successful test
-  if (connection) connection.release();
-  console.log("MySQL Pool Connected ✅");
-});
+})();
 
 module.exports = db;

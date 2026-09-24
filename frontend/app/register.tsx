@@ -1,22 +1,25 @@
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Picker } from "@react-native-picker/picker";
 import axios from "axios";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import * as ExpoLinking from "expo-linking";
-import { useRouter } from "expo-router";
+import { Redirect, useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert, Image, Modal, Platform, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useUser } from "../context/UserContext";
 
 // ── STRICT ENV CHECK (No hardcoded fallback IP) ──
-const API_BASE = process.env.EXPO_PUBLIC_API_BASE; 
-const MEMBERSHIP_AMOUNT = 1100;
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE;
+const MEMBERSHIP_AMOUNT = 1;
 const isWeb = Platform.OS === "web";
 
 // ── THE MISSING FUNCTION HAS BEEN ADDED HERE ──
@@ -26,17 +29,19 @@ const showAlert = (title: string, msg: string) =>
 const currentYear = new Date().getFullYear();
 const YEAR_OPTIONS = Array.from({ length: 50 }, (_, i) => String(currentYear - i));
 
-const isValidEmail  = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
-const isValidMobile = (m: string) => /^\d{7,15}$/.test(m.replace(/[\s\-\+]/g, ""));
+const isValidName = (name: string) => /^[A-Za-z\s\.]{2,50}$/.test(name.trim());
+const isValidEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
+const isValidMobile = (m: string) => /^[6-9]\d{9}$/.test(m.replace(/[\s\-\+]/g, ""));
 
 const PROGRAMME_GROUPS = [
   { group: "Management", items: [{ label: "MBA", value: "MBA" }, { label: "BBA", value: "BBA" }] },
-  { group: "Sciences", items: [
+  {
+    group: "Sciences", items: [
       { label: "MCA", value: "MCA" }, { label: "BCA", value: "BCA" },
       { label: "M.Sc", value: "M.Sc" }, { label: "B.Sc (CS)", value: "B.Sc CS" },
       { label: "B.Sc (BI)", value: "B.Sc BI" }, { label: "B.Sc (BT)", value: "B.Sc BT" },
       { label: "B.Sc (MB)", value: "B.Sc MB" },
-    ] 
+    ]
   },
 ];
 
@@ -64,16 +69,16 @@ const PROGRAMME_FLAT = PROGRAMME_GROUPS.flatMap(g => [
 // ── Shared UI Components ──
 function WebDatePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
-    <input 
+    <input
       type="date" value={value || ""} onChange={e => onChange((e.target as HTMLInputElement).value)}
-      style={{ height: 48, borderRadius: 12, border: "1px solid #E2E8F0", paddingLeft: 12, paddingRight: 12, backgroundColor: "#F8FAFC", fontSize: 14, color: value ? "#111" : "#94A3B8", width: "100%", outline: "none", boxSizing: "border-box", fontFamily: "sans-serif" }} 
+      style={{ height: 48, borderRadius: 12, border: "1px solid #E2E8F0", paddingLeft: 12, paddingRight: 12, backgroundColor: "#F8FAFC", fontSize: 14, color: value ? "#111" : "#94A3B8", width: "100%", outline: "none", boxSizing: "border-box", fontFamily: "sans-serif" }}
     />
   );
 }
 
 function WebYearPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
-    <select 
+    <select
       value={value || ""} onChange={e => onChange((e.target as HTMLSelectElement).value)}
       style={{ height: 48, borderRadius: 12, border: "1px solid #E2E8F0", paddingLeft: 12, paddingRight: 12, backgroundColor: "#F8FAFC", fontSize: 14, color: value ? "#111" : "#94A3B8", width: "100%", outline: "none", boxSizing: "border-box", fontFamily: "sans-serif" }}
     >
@@ -150,7 +155,7 @@ function AppPicker({ label, value, onChange, items }: { label: string; value: st
   return (
     <Field label={label}>
       {Platform.OS === "web" ? (
-        <select value={value} onChange={e => onChange((e.target as HTMLSelectElement).value)} style={{ height:48, borderRadius:12, border:"1px solid #E2E8F0", paddingLeft:12, paddingRight:12, background:"#F8FAFC", fontSize:14, color:value?"#111":"#94A3B8", width:"100%", outline:"none" }}>
+        <select value={value} onChange={e => onChange((e.target as HTMLSelectElement).value)} style={{ height: 48, borderRadius: 12, border: "1px solid #E2E8F0", paddingLeft: 12, paddingRight: 12, background: "#F8FAFC", fontSize: 14, color: value ? "#111" : "#94A3B8", width: "100%", outline: "none" }}>
           <option value="">Select {label}</option>
           {items.map(i => <option key={i.value} value={i.value}>{i.label}</option>)}
         </select>
@@ -170,7 +175,7 @@ function ProgrammePicker({ value, onChange }: { value: string; onChange: (v: str
   return (
     <Field label="Programme">
       {Platform.OS === "web" ? (
-        <select value={value} onChange={e => onChange((e.target as HTMLSelectElement).value)} style={{ height:48, borderRadius:12, border:"1px solid #E2E8F0", paddingLeft:12, paddingRight:12, background:"#F8FAFC", fontSize:14, color:value?"#111":"#94A3B8", width:"100%", outline:"none" }}>
+        <select value={value} onChange={e => onChange((e.target as HTMLSelectElement).value)} style={{ height: 48, borderRadius: 12, border: "1px solid #E2E8F0", paddingLeft: 12, paddingRight: 12, background: "#F8FAFC", fontSize: 14, color: value ? "#111" : "#94A3B8", width: "100%", outline: "none" }}>
           <option value="">Select Programme</option>
           {PROGRAMME_GROUPS.map(g => (
             <optgroup key={g.group} label={g.group}>
@@ -204,17 +209,28 @@ export default function RegisterScreen() {
   const router = useRouter();
   const [image, setImage] = useState<string | null>(null);
   const [errors, setErrors] = useState<{ email?: string; mobile?: string }>({});
-  
   const [showYearPicker, setShowYearPicker] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [industrySelection, setIndustrySelection] = useState("");
-
   const [form, setForm] = useState({
     full_name: "", email: "", mobile: "", country_code: "+91", gender: "",
     dob: "", batch_year: "", programme: "", employment_type: "", organisation: "", designation: "",
     years_of_experience: "", industry: "", married: "NO", spouse_name: "", anniversary_date: "",
     address: "", city: "", country: "", payment_status: "NO",
   });
+
+  const { user, loading: userLoading, isAdminLoggedIn } = useUser();
+
+  if (userLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#F8FAFC" }}>
+        <ActivityIndicator size="large" color="#4F46E5" />
+      </View>
+    );
+  }
+
+  if (isAdminLoggedIn) return <Redirect href="/admin/dashboard" />;
+  if (user) return <Redirect href="/(tab)" />;
 
   const set = (key: string, value: string) => {
     setForm(prev => ({ ...prev, [key]: value }));
@@ -224,7 +240,7 @@ export default function RegisterScreen() {
   const handleIndustryDropdownChange = (value: string) => {
     setIndustrySelection(value);
     if (value !== "Other") set("industry", value);
-    else set("industry", ""); 
+    else set("industry", "");
   };
 
   const pickImage = async () => {
@@ -237,13 +253,17 @@ export default function RegisterScreen() {
     if (!form.full_name.trim()) {
       showAlert("Required", "Full Name is required");
       return false;
+    } else if (!isValidName(form.full_name)) {
+      showAlert("Invalid Name", "Please enter a valid name (letters, spaces, and dots only).");
+      return false;
     }
+
     if (!form.email.trim()) e.email = "Email is required";
     else if (!isValidEmail(form.email)) e.email = "Enter a valid email (e.g. rahul@gmail.com)";
-    
+
     if (!form.mobile.trim()) e.mobile = "Mobile number is required";
-    else if (!isValidMobile(form.mobile)) e.mobile = "Enter valid mobile number length";
-    
+    else if (!isValidMobile(form.mobile)) e.mobile = "Enter a valid 10-digit Indian mobile number";
+
     if (!form.industry.trim()) {
       showAlert("Required", "Please specify your industry.");
       return false;
@@ -276,7 +296,7 @@ export default function RegisterScreen() {
         }
       }
 
-      await axios.post(`${API_BASE}/register`, fd, { headers: { "Content-Type": "multipart/form-data" } });
+      await axios.post(`${API_BASE}/auth/register`, fd, { headers: { "Content-Type": "multipart/form-data" } });
 
       const returnUrl = ExpoLinking.createURL('/loginscreen');
       const rawPhone = `${form.country_code || "91"}${form.mobile || ""}`;
@@ -284,14 +304,14 @@ export default function RegisterScreen() {
       const safeName = (form.full_name || "Alumni").trim().replace(/[^a-zA-Z\s]/g, "").slice(0, 50);
 
       const initRes = await axios.post(`${API_BASE}/pay/initiate`, {
-        amount: typeof MEMBERSHIP_AMOUNT === 'number' ? MEMBERSHIP_AMOUNT : 1100, 
+        amount: typeof MEMBERSHIP_AMOUNT === 'number' ? MEMBERSHIP_AMOUNT : 1,
         firstname: safeName,
         email: form.email.trim(),
-        phone: safePhone, 
+        phone: safePhone,
         productinfo: "Alumni Registration",
-        payment_type: "REG",           
+        payment_type: "REG",
         reference_id: form.email.trim(),
-        return_url: returnUrl 
+        return_url: returnUrl
       });
 
       if (initRes.data && initRes.data.checkout_url) {
@@ -308,7 +328,7 @@ export default function RegisterScreen() {
             if (event.data?.type === 'PAYMENT_RETURN') {
               window.removeEventListener('message', handleMessage);
               setIsSubmitting(false);
-              
+
               if (event.data.status === 'success') {
                 showAlert("Registration Successful! 🎉", "Your payment is complete. Please check your email for your temporary login credentials.");
                 router.push("/loginscreen");
@@ -392,7 +412,7 @@ export default function RegisterScreen() {
               <Input label="Full Name *" placeholder="Rahul Sharma" value={form.full_name} onChange={(t: string) => set("full_name", t)} />
               <Input label="Email *" placeholder="rahul@gmail.com" value={form.email} onChange={(t: string) => set("email", t)} error={errors.email} />
             </Row2>
-            
+
             <Row2>
               <View style={{ flexDirection: "row", gap: 8, flex: 1 }}>
                 <View style={{ width: 75 }}>
@@ -414,7 +434,7 @@ export default function RegisterScreen() {
               ) : (
                 <MobileDateField label="Date of Birth" value={form.dob} onChange={v => set("dob", v)} />
               )}
-              
+
               {isWeb ? (
                 <Field label="Batch Year">
                   <WebYearPicker value={form.batch_year} onChange={v => set("batch_year", v)} />
@@ -427,7 +447,7 @@ export default function RegisterScreen() {
                 </Field>
               )}
             </Row2>
-            
+
             <ProgrammePicker value={form.programme} onChange={v => set("programme", v)} />
           </View>
 
@@ -550,7 +570,7 @@ const styles = StyleSheet.create({
   dateBtn: { backgroundColor: "#F8FAFC", borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 12, paddingHorizontal: 14, height: 48, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   dateBtnEmpty: {},
   dateBtnText: { fontSize: 14, color: "#111" },
-  dateBtnPlaceholder:{ fontSize: 14, color: "#94A3B8" },
+  dateBtnPlaceholder: { fontSize: 14, color: "#94A3B8" },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 20, backgroundColor: "#F8FAFC", borderWidth: 1.5, borderColor: "#E2E8F0" },
   chipSel: { backgroundColor: "#EEF2FF", borderColor: "#4F46E5" },

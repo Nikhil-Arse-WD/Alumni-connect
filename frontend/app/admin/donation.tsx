@@ -1,3 +1,5 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useUser } from "../../context/UserContext";
 
 import { Feather, Ionicons } from "@expo/vector-icons";
 import axios from "axios";
@@ -105,16 +107,20 @@ export default function AdminContributions() {
     )
   );
 
+  const { setIsAdminLoggedIn } = useUser();
   const handleMenu = (route: string) => {
     closeDrawer();
-    if (route === "logout") {
-      if (Platform.OS === "web") {
-        const ok = window.confirm("Are you sure you want to logout?");
-        if (ok) router.replace("/loginscreen");
+    if (route === 'logout') {
+      const doLogout = async () => {
+        await AsyncStorage.multiRemove(['admin', 'adminData', 'adminUser', 'currentAdmin', 'user']);
+        setIsAdminLoggedIn(false);
+      };
+      if (Platform.OS === 'web') {
+        if (window.confirm('Are you sure you want to logout?')) doLogout();
       } else {
-        Alert.alert("Logout", "Are you sure?", [
-          { text: "Cancel", style: "cancel" },
-          { text: "Logout", onPress: () => router.replace("/loginscreen") },
+        Alert.alert('Logout', 'Are you sure?', [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Logout', style: 'destructive', onPress: doLogout },
         ]);
       }
       return;

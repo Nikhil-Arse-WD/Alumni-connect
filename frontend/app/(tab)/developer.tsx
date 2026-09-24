@@ -578,6 +578,17 @@ export default function DeveloperScreen() {
               <Text style={listStyles.footerMadeWith}>Made with <Text style={{ color: "#EC4899" }}>♥</Text> in India</Text>
             </View>
             
+            <View style={listStyles.footerCol}>
+              <Text style={listStyles.footerColTitle}>GUIDED BY</Text>
+              <Text style={listStyles.footerColText}>Dr Kshama Paithankar</Text>
+              <Text style={[listStyles.footerMadeWith, { marginTop: 4, lineHeight: 18 }]}>HOD Department of Computer Science and Bio Science</Text>
+            </View>
+
+            <View style={listStyles.footerCol}>
+              <Text style={listStyles.footerColTitle}>MENTORED BY</Text>
+              <Text style={listStyles.footerColText}>Mr Nikhil Arse</Text>
+              <Text style={[listStyles.footerMadeWith, { marginTop: 4, lineHeight: 18 }]}>Assistant Professor Department of Computer Science and Bio Science</Text>
+            </View>
           </View>
           <View style={listStyles.footerCopyright}>
             <Text style={listStyles.footerCopyrightText}>© 2026 Alumni Connect. All Rights Reserved.</Text>

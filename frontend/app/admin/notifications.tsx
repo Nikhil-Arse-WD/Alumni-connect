@@ -1,4 +1,5 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Picker } from "@react-native-picker/picker";
 import axios from "axios";
 import { useRouter } from "expo-router";
@@ -16,11 +17,12 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useUser } from "../../context/UserContext";
 import SidebarWeb from "./components/SidebarWeb";
 import Sidebar from "./components/sidebar";
 
-const API        = process.env.EXPO_PUBLIC_API_BASE;
-const PRIMARY    = "#5B5FEF";
+const API = process.env.EXPO_PUBLIC_API_BASE;
+const PRIMARY = "#5B5FEF";
 const BREAKPOINT = 768;
 
 const TARGETS = ["All", "Approved Only", "Batch Only"];
@@ -73,34 +75,34 @@ function BatchSelector({
   }
 
   // Mobile — horizontal scroll pill list
-// Mobile — Dropdown
-return (
-  <View style={s.batchMobileWrap}>
-    <Ionicons
-      name="school-outline"
-      size={18}
-      color="#64748B"
-      style={{ marginLeft: 12 }}
-    />
+  // Mobile — Dropdown
+  return (
+    <View style={s.batchMobileWrap}>
+      <Ionicons
+        name="school-outline"
+        size={18}
+        color="#64748B"
+        style={{ marginLeft: 12 }}
+      />
 
-    <Picker
-      selectedValue={batchYear}
-      onValueChange={(itemValue) => setBatchYear(itemValue)}
-      style={s.batchPicker}
-      dropdownIconColor="#64748B"
-    >
-      <Picker.Item label="Select Batch Year" value="" />
+      <Picker
+        selectedValue={batchYear}
+        onValueChange={(itemValue) => setBatchYear(itemValue)}
+        style={s.batchPicker}
+        dropdownIconColor="#64748B"
+      >
+        <Picker.Item label="Select Batch Year" value="" />
 
-      {BATCH_YEARS.map((year) => (
-        <Picker.Item
-          key={year}
-          label={year}
-          value={year}
-        />
-      ))}
-    </Picker>
-  </View>
-);
+        {BATCH_YEARS.map((year) => (
+          <Picker.Item
+            key={year}
+            label={year}
+            value={year}
+          />
+        ))}
+      </Picker>
+    </View>
+  );
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -225,7 +227,7 @@ const PageContent = memo(
           >
             <Ionicons name="send" size={18} color="#fff" />
             <Text style={s.sendBtnText}>
-              {sending ? "Sending..." : "Send to All"}
+              {sending ? "Sending..." : target === "Batch Only" ? `Send to Batch ${batchYear || ""}`.trim() : target === "Approved Only" ? "Send to Approved" : "Send to All"}
             </Text>
           </TouchableOpacity>
         </View>
@@ -269,16 +271,16 @@ const PageContent = memo(
 // MAIN
 // ─────────────────────────────────────────────────────────────
 export default function AdminNotifications() {
-  const router     = useRouter();
-  const { width }  = useWindowDimensions();
-  const isWeb      = width >= BREAKPOINT;
+  const router = useRouter();
+  const { width } = useWindowDimensions();
+  const isWeb = width >= BREAKPOINT;
 
-  const [title,      setTitle]      = useState("");
-  const [message,    setMessage]    = useState("");
-  const [target,     setTarget]     = useState("All");
-  const [batchYear,  setBatchYear]  = useState("");
-  const [sending,    setSending]    = useState(false);
-  const [history,    setHistory]    = useState<any[]>([]);
+  const [title, setTitle] = useState("");
+  const [message, setMessage] = useState("");
+  const [target, setTarget] = useState("All");
+  const [batchYear, setBatchYear] = useState("");
+  const [sending, setSending] = useState(false);
+  const [history, setHistory] = useState<any[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const translateX = useRef(new Animated.Value(-300)).current;
 
@@ -342,15 +344,20 @@ export default function AdminNotifications() {
     Animated.timing(translateX, { toValue: -300, duration: 200, useNativeDriver: true })
       .start(() => setDrawerOpen(false));
   };
+  const { setIsAdminLoggedIn } = useUser();
   const handleMenu = (route: string) => {
     closeDrawer();
-    if (route === "logout") {
-      if (Platform.OS === "web") {
-        if (window.confirm("Are you sure you want to logout?")) router.replace("/loginscreen");
+    if (route === 'logout') {
+      const doLogout = async () => {
+        await AsyncStorage.multiRemove(['admin', 'adminData', 'adminUser', 'currentAdmin', 'user']);
+        setIsAdminLoggedIn(false);
+      };
+      if (Platform.OS === 'web') {
+        if (window.confirm('Are you sure you want to logout?')) doLogout();
       } else {
-        Alert.alert("Logout", "Are you sure?", [
-          { text: "Cancel", style: "cancel" },
-          { text: "Logout", onPress: () => router.replace("/loginscreen") },
+        Alert.alert('Logout', 'Are you sure?', [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Logout', style: 'destructive', onPress: doLogout },
         ]);
       }
       return;
@@ -403,43 +410,43 @@ export default function AdminNotifications() {
 // STYLES
 // ─────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  container:  { flex: 1, backgroundColor: "#F5F6FA" },
-  webRoot:    { flex: 1, flexDirection: "row", backgroundColor: "#f8fafc" },
+  container: { flex: 1, backgroundColor: "#F5F6FA" },
+  webRoot: { flex: 1, flexDirection: "row", backgroundColor: "#f8fafc" },
 
-  topBar:     { height: 65, backgroundColor: "#fff", flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 18, elevation: 3 },
-  topTitle:   { fontSize: 18, fontWeight: "700" },
+  topBar: { height: 65, backgroundColor: "#fff", flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 18, elevation: 3 },
+  topTitle: { fontSize: 18, fontWeight: "700" },
 
-  pageContent:    { padding: 18, paddingBottom: 60 },
+  pageContent: { padding: 18, paddingBottom: 60 },
   pageContentWeb: { padding: 28 },
 
-  pageTitle:  { fontSize: 30, fontWeight: "800", color: "#0f172a" },
+  pageTitle: { fontSize: 30, fontWeight: "800", color: "#0f172a" },
   breadcrumb: { color: "#94a3b8", marginTop: 4, marginBottom: 20, fontSize: 13 },
 
-  sendCard:    { backgroundColor: "#fff", borderRadius: 22, padding: 20, marginBottom: 24 },
+  sendCard: { backgroundColor: "#fff", borderRadius: 22, padding: 20, marginBottom: 24 },
   sendCardWeb: { padding: 28 },
-  webFormRow:  { flexDirection: "row", gap: 20 },
+  webFormRow: { flexDirection: "row", gap: 20 },
 
-  cardTitle:  { fontSize: 20, fontWeight: "800", color: "#0F172A", marginBottom: 16 },
+  cardTitle: { fontSize: 20, fontWeight: "800", color: "#0F172A", marginBottom: 16 },
   fieldLabel: { fontSize: 13, fontWeight: "700", color: "#475569", marginBottom: 8 },
 
-  chipRow:        { flexDirection: "row", gap: 8, marginBottom: 16, flexWrap: "wrap" },
-  chip:           { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: "#F8FAFC", borderWidth: 1.5, borderColor: "#E2E8F0" },
-  chipActive:     { backgroundColor: PRIMARY, borderColor: PRIMARY },
-  chipText:       { fontSize: 12, fontWeight: "600", color: "#475569" },
+  chipRow: { flexDirection: "row", gap: 8, marginBottom: 16, flexWrap: "wrap" },
+  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: "#F8FAFC", borderWidth: 1.5, borderColor: "#E2E8F0" },
+  chipActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
+  chipText: { fontSize: 12, fontWeight: "600", color: "#475569" },
   chipActiveText: { color: "#fff" },
 
   // Batch section
-  batchSection:    { backgroundColor: "#F8FAFC", borderRadius: 16, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: "#E2E8F0" },
-  batchHeaderRow:  { flexDirection: "row", alignItems: "flex-start", gap: 10, marginBottom: 12 },
-  batchIconBox:    { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  batchHint:       { fontSize: 11, color: "#94A3B8", marginTop: 1 },
-  batchWebWrap:    { flexDirection: "row", alignItems: "center", backgroundColor: "#fff", borderRadius: 10, borderWidth: 1, borderColor: "#E2E8F0", paddingHorizontal: 10, height: 44 },
+  batchSection: { backgroundColor: "#F8FAFC", borderRadius: 16, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: "#E2E8F0" },
+  batchHeaderRow: { flexDirection: "row", alignItems: "flex-start", gap: 10, marginBottom: 12 },
+  batchIconBox: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  batchHint: { fontSize: 11, color: "#94A3B8", marginTop: 1 },
+  batchWebWrap: { flexDirection: "row", alignItems: "center", backgroundColor: "#fff", borderRadius: 10, borderWidth: 1, borderColor: "#E2E8F0", paddingHorizontal: 10, height: 44 },
 
   // Batch pill (mobile)
-  batchPill:         { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: "#fff", borderWidth: 1.5, borderColor: "#E2E8F0" },
-  batchPillActive:   { backgroundColor: PRIMARY, borderColor: PRIMARY },
-  batchPillText:     { fontSize: 13, fontWeight: "600", color: "#64748B" },
-  batchPillTextActive:{ color: "#fff" },
+  batchPill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: "#fff", borderWidth: 1.5, borderColor: "#E2E8F0" },
+  batchPillActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
+  batchPillText: { fontSize: 13, fontWeight: "600", color: "#64748B" },
+  batchPillTextActive: { color: "#fff" },
   batchMobileWrap: {
     flexDirection: "row",
     alignItems: "center",
@@ -450,35 +457,35 @@ const s = StyleSheet.create({
     overflow: "hidden",
     height: 52,
   },
-  
+
   batchPicker: {
     flex: 1,
     color: "#111827",
   },
   selectedBatchBadge: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#EEF2FF", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, marginTop: 10 },
-  selectedBatchText:  { fontSize: 13, color: PRIMARY, flex: 1 },
-  clearBatch:         { padding: 2 },
+  selectedBatchText: { fontSize: 13, color: PRIMARY, flex: 1 },
+  clearBatch: { padding: 2 },
 
-  noBatchWarning:  { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#FEF3C7", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, marginTop: 10 },
-  noBatchText:     { fontSize: 12, color: "#92400E" },
+  noBatchWarning: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#FEF3C7", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, marginTop: 10 },
+  noBatchText: { fontSize: 12, color: "#92400E" },
 
-  input:         { backgroundColor: "#F8FAFC", borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 14, paddingHorizontal: 14, height: 52, fontSize: 14, color: "#111", marginBottom: 14, outlineWidth: 0, outlineStyle: "none" } as any,
-  messageInput:  { height: 120, paddingTop: 14 },
+  input: { backgroundColor: "#F8FAFC", borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 14, paddingHorizontal: 14, height: 52, fontSize: 14, color: "#111", marginBottom: 14, outlineWidth: 0, outlineStyle: "none" } as any,
+  messageInput: { height: 120, paddingTop: 14 },
 
-  sendBtn:     { backgroundColor: PRIMARY, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 8, paddingVertical: 15, borderRadius: 14 },
-  sendBtnWeb:  { alignSelf: "flex-start", paddingHorizontal: 32 },
+  sendBtn: { backgroundColor: PRIMARY, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 8, paddingVertical: 15, borderRadius: 14 },
+  sendBtnWeb: { alignSelf: "flex-start", paddingHorizontal: 32 },
   sendBtnText: { color: "#fff", fontWeight: "800", fontSize: 15 },
 
   sectionTitle: { fontSize: 18, fontWeight: "800", color: "#0F172A", marginBottom: 14 },
-  histGrid:     { flexDirection: "row", flexWrap: "wrap", gap: 14 },
-  histCard:     { backgroundColor: "#fff", borderRadius: 16, padding: 16, marginBottom: 12 },
-  histCardWeb:  { width: "47%" },
-  histTop:      { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
-  histTitle:    { fontSize: 14, fontWeight: "700", color: "#0F172A", flex: 1, marginRight: 8 },
-  histTime:     { fontSize: 11, color: "#94A3B8" },
-  histMsg:      { fontSize: 13, color: "#64748B", lineHeight: 20, marginBottom: 10 },
-  histFooter:   { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 4 },
+  histGrid: { flexDirection: "row", flexWrap: "wrap", gap: 14 },
+  histCard: { backgroundColor: "#fff", borderRadius: 16, padding: 16, marginBottom: 12 },
+  histCardWeb: { width: "47%" },
+  histTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
+  histTitle: { fontSize: 14, fontWeight: "700", color: "#0F172A", flex: 1, marginRight: 8 },
+  histTime: { fontSize: 11, color: "#94A3B8" },
+  histMsg: { fontSize: 13, color: "#64748B", lineHeight: 20, marginBottom: 10 },
+  histFooter: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 4 },
   histTargetBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#EEF2FF", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
-  histTargetText:  { fontSize: 11, color: "#4F46E5", fontWeight: "600" },
-  histCount:       { fontSize: 11, color: "#94a3b8", fontWeight: "600", marginLeft: "auto" },
+  histTargetText: { fontSize: 11, color: "#4F46E5", fontWeight: "600" },
+  histCount: { fontSize: 11, color: "#94a3b8", fontWeight: "600", marginLeft: "auto" },
 });

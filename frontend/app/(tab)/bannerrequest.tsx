@@ -28,7 +28,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 // ── STRICT ENV CHECK ──
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE;
-const API_URL  = `${API_BASE}/banner-request`;
+const API_URL  = `${API_BASE}/banners/request`;
 const isWeb    = Platform.OS === "web";
 
 const showAlert = (title: string, msg: string) =>

@@ -25,7 +25,7 @@ const isWeb = Platform.OS === "web";
 
 export default function AlumniProfileScreen() {
   const router = useRouter();
-  const { user, setUser } = useUser();
+  const { user, setUser, setIsAdminLoggedIn } = useUser();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -54,23 +54,18 @@ export default function AlumniProfileScreen() {
   );
 
   const handleLogout = () => {
+    const doLogout = async () => {
+      await AsyncStorage.clear();
+      setUser(null);
+      setIsAdminLoggedIn(false);
+    };
+
     if (isWeb) {
-      if (window.confirm("Are you sure you want to logout?")) {
-        AsyncStorage.clear();
-        router.replace("/loginscreen");
-      }
+      if (window.confirm("Are you sure you want to logout?")) doLogout();
     } else {
       Alert.alert("Logout", "Are you sure?", [
         { text: "Cancel", style: "cancel" },
-        {
-          text: "Logout",
-          style: "destructive",
-          onPress: () => {
-            AsyncStorage.clear();
-            setUser(null);
-            router.replace("/loginscreen");
-          },
-        },
+        { text: "Logout", style: "destructive", onPress: doLogout },
       ]);
     }
   };

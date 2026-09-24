@@ -42,6 +42,16 @@ export default function AdminLayout() {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }} />
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="dashboard" options={{ title: "Admin Dashboard - SVIMAA" }} />
+      <Stack.Screen name="members" options={{ title: "Manage Members - SVIMAA" }} />
+      <Stack.Screen name="event" options={{ title: "Manage Events - SVIMAA" }} />
+      <Stack.Screen name="jobs" options={{ title: "Manage Jobs - SVIMAA" }} />
+      <Stack.Screen name="donation" options={{ title: "Donations - SVIMAA" }} />
+      <Stack.Screen name="notifications" options={{ title: "Notifications - SVIMAA" }} />
+      <Stack.Screen name="Adbanner" options={{ title: "Ad Banners - SVIMAA" }} />
+      <Stack.Screen name="forum" options={{ title: "Forum - SVIMAA" }} />
+      <Stack.Screen name="add_admin" options={{ title: "Add Admin - SVIMAA" }} />
+    </Stack>
   );
 }

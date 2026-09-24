@@ -1,5 +1,6 @@
-import LoginScreen from "./loginscreen";
+import { View } from "react-native";
 
 export default function App() {
-  return <LoginScreen />;
+  // Authentication routing is now fully managed by AuthGuard in _layout.tsx
+  return <View style={{ flex: 1, backgroundColor: "#F8FAFC" }} />;
 }

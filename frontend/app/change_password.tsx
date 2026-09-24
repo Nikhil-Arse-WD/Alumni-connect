@@ -10,6 +10,7 @@ import axios from "axios";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
+import { useUser } from "../context/UserContext";
 import {
   ActivityIndicator,
   Alert,
@@ -94,6 +95,25 @@ export default function ChangePasswordScreen() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [errors, setErrors] = useState<{ current?: string; new?: string; confirm?: string }>({});
   const [loading, setLoading] = useState(false);
+  const { setUser, setIsAdminLoggedIn } = useUser();
+
+  const handleLogout = () => {
+    const doLogout = async () => {
+      await AsyncStorage.clear();
+      setUser(null);
+      setIsAdminLoggedIn(false);
+      router.replace("/loginscreen");
+    };
+
+    if (isWeb) {
+      if (window.confirm("Are you sure you want to logout?")) doLogout();
+    } else {
+      Alert.alert("Logout", "Are you sure?", [
+        { text: "Cancel", style: "cancel" },
+        { text: "Logout", style: "destructive", onPress: doLogout },
+      ]);
+    }
+  };
 
   // Strict Configuration UI Guard
   if (!BASE_URL) {
@@ -279,6 +299,15 @@ export default function ChangePasswordScreen() {
               </LinearGradient>
             </TouchableOpacity>
           </View>
+          
+          {/* LOGOUT SECTION */}
+          <View style={styles.logoutSection}>
+            <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.88}>
+              <Ionicons name="log-out-outline" size={18} color="#DC2626" />
+              <Text style={styles.logoutBtnText}>Logout</Text>
+            </TouchableOpacity>
+          </View>
+
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -345,6 +374,10 @@ const styles = StyleSheet.create({
     gap: 8, paddingVertical: 16,
   },
   submitText: { color: "#fff", fontWeight: "800", fontSize: 15 },
+  // Logout Styles
+  logoutSection: { marginTop: 24, alignItems: "center" },
+  logoutBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, paddingHorizontal: 32, backgroundColor: "#FEE2E2", borderRadius: 14, borderWidth: 1, borderColor: "#FECACA" },
+  logoutBtnText: { color: "#DC2626", fontWeight: "700", fontSize: 14 },
   // Configuration UI Guard Styles
   errorContainer: { flex: 1, justifyContent: "center", alignItems: "center", padding: 24, backgroundColor: "#fff" },
   errorTitle: { fontSize: 20, fontWeight: "800", color: "#1F2937", marginTop: 16, marginBottom: 8 },

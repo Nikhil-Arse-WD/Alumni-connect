@@ -1,3 +1,5 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useUser } from "../../context/UserContext";
 
 import { Feather, Ionicons, MaterialIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -206,6 +208,7 @@ function FormModal({ visible, onClose, onSubmit, title, form, handleChange, pick
 // ═══════════════════════════════════════════════════════════════
 export default function AdminEvents() {
   const { width } = useWindowDimensions();
+  const { setIsAdminLoggedIn } = useUser();
   const isMobile  = width < 768;   // ✅ dynamic — resize pe update
   const isWeb     = !isMobile;
   const router    = useRouter();
@@ -381,7 +384,7 @@ data.append("status", status);
 
   const openDetails = async (item: EventType) => {
     setSelectedEvent(item); setDetailsModal(true);
-    try { const r = await axios.get(`${API}/event-gallery/${item.event_id}`); setGallery(r.data.gallery||[]); } catch {}
+    try { const r = await axios.get(`${API}/events/gallery/${item.event_id}`); setGallery(r.data.gallery||[]); } catch {}
   };
 
   const pickGalleryImages = async () => {
@@ -407,9 +410,19 @@ data.append("status", status);
   const closeDrawer = () => { Animated.timing(translateX,{toValue:-300,duration:200,useNativeDriver:true}).start(()=>setDrawerOpen(false)); };
   const handleMenu  = (route: string) => {
     closeDrawer();
-    if (route==="logout") {
-      if (Platform.OS==="web") { if(window.confirm("Logout?")) router.replace("/loginscreen"); }
-      else Alert.alert("Logout","Are you sure?",[{text:"Cancel",style:"cancel"},{text:"Logout",onPress:()=>router.replace("/loginscreen")}]);
+    if (route === 'logout') {
+      const doLogout = async () => {
+        await AsyncStorage.multiRemove(['admin', 'adminData', 'adminUser', 'currentAdmin', 'user']);
+        setIsAdminLoggedIn(false);
+      };
+      if (Platform.OS === 'web') {
+        if (window.confirm('Are you sure you want to logout?')) doLogout();
+      } else {
+        Alert.alert('Logout', 'Are you sure?', [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Logout', style: 'destructive', onPress: doLogout },
+        ]);
+      }
       return;
     }
     router.push(`/admin/${route}` as any);

@@ -1,3 +1,4 @@
+import { useUser } from "../../context/UserContext";
 
 import { Feather, Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -42,6 +43,7 @@ const formatDate = (d: string) => {
 // ROOT
 // ═══════════════════════════════════════════════════════════════════
 export default function AdminsScreen() {
+  const { setIsAdminLoggedIn } = useUser();
   const { width } = useWindowDimensions();
   const router    = useRouter();
 
@@ -92,10 +94,18 @@ export default function AdminsScreen() {
   const handleMenu  = (route: string) => {
     closeDrawer();
     if (route === 'logout') {
-      const doLogout = () => router.replace('/loginscreen');
-      Platform.OS === 'web'
-        ? window.confirm('Logout?') && doLogout()
-        : Alert.alert('Logout', 'Are you sure?', [{ text: 'Cancel', style: 'cancel' }, { text: 'Logout', onPress: doLogout }]);
+      const doLogout = async () => {
+        await AsyncStorage.multiRemove(['admin', 'adminData', 'adminUser', 'currentAdmin', 'user']);
+        setIsAdminLoggedIn(false);
+      };
+      if (Platform.OS === 'web') {
+        if (window.confirm('Are you sure you want to logout?')) doLogout();
+      } else {
+        Alert.alert('Logout', 'Are you sure?', [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Logout', style: 'destructive', onPress: doLogout },
+        ]);
+      }
       return;
     }
     router.push(`/admin/${route}` as any);

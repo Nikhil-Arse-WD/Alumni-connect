@@ -84,7 +84,7 @@ export default function Header() {
   const isDesktop = width >= DESKTOP_BP;
   const isNative = Platform.OS !== "web";
 
-  const { user, loading } = useUser();
+  const { user, loading, setUser, setIsAdminLoggedIn } = useUser();
   const [unreadNotifs, setUnreadNotifs] = useState(0);
   const [unreadMsgs, setUnreadMsgs] = useState(0);
   const [moreVisible, setMoreVisible] = useState(false);
@@ -188,9 +188,10 @@ export default function Header() {
 
   const handleLogout = () => {
     setMoreVisible(false);
-    const doLogout = () => {
-      AsyncStorage.clear();
-      router.replace("/loginscreen");
+    const doLogout = async () => {
+      await AsyncStorage.clear();
+      setUser(null);
+      setIsAdminLoggedIn(false);
     };
     if (isNative) {
       Alert.alert("Logout", "Are you sure?", [

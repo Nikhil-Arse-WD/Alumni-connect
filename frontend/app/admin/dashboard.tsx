@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import SidebarWeb from "./components/SidebarWeb";
 import Sidebar from "./components/sidebar";
+import { useUser } from "../../context/UserContext";
 
 const API        = process.env.EXPO_PUBLIC_API_BASE;
 const BREAKPOINT = 768;
@@ -56,7 +57,7 @@ function AdminAvatar({ admin, size = 36 }: { admin: any; size?: number }) {
 }
 
 // ── Profile Modal ─────────────────────────────────────────────────
-function ProfileModal({ visible, onClose, admin, router }: any) {
+function ProfileModal({ visible, onClose, admin, router, setIsAdminLoggedIn }: any) {
   if (!admin) return null;
   const rm = admin.role === 'super_admin'
     ? { bg: '#EDE9FE', text: '#6D28D9', label: 'Super Admin' }
@@ -67,7 +68,7 @@ function ProfileModal({ visible, onClose, admin, router }: any) {
     onClose();
     const doLogout = async () => {
       await AsyncStorage.multiRemove(['admin', 'user', 'adminData']);
-      router.replace('/loginscreen');
+      setIsAdminLoggedIn(false);
     };
     Platform.OS === 'web'
       ? window.confirm('Logout karna chahte ho?') && doLogout()
@@ -138,6 +139,7 @@ const pm = StyleSheet.create({
 export default function Dashboard() {
   const { width } = useWindowDimensions();
   const router    = useRouter();
+  const { setIsAdminLoggedIn } = useUser();
 
   const [stats,         setStats]         = useState<any>({});
   const [recentMembers, setRecentMembers] = useState<any[]>([]);
@@ -196,15 +198,18 @@ export default function Dashboard() {
     closeDrawer();
     if (route === 'logout') {
       const doLogout = async () => {
-        await AsyncStorage.multiRemove(['admin', 'adminData', 'adminUser', 'currentAdmin']);
-        router.replace('/loginscreen');
-      };
-      Platform.OS === 'web'
-        ? window.confirm('Are you sure you want to logout?') && doLogout()
-        : Alert.alert('Logout', 'Are you sure?', [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Logout', onPress: doLogout },
-          ]);
+        await AsyncStorage.multiRemove(['admin', 'adminData', 'adminUser', 'currentAdmin', 'user']);
+        setIsAdminLoggedIn(false);
+      }
+      
+      if (Platform.OS === 'web') {
+        if (window.confirm("Are you sure you want to logout?")) doLogout();
+      } else {
+        Alert.alert('Logout', 'Are you sure?', [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Logout', style: 'destructive', onPress: doLogout },
+        ]);
+      }
       return;
     }
     router.push(`/admin/${route}` as any);
@@ -252,11 +257,12 @@ export default function Dashboard() {
           </SafeAreaView>
         )
       }
-      <ProfileModal
-        visible={profileOpen}
-        onClose={() => setProfileOpen(false)}
-        admin={currentAdmin}
+      <ProfileModal 
+        visible={profileOpen} 
+        onClose={() => setProfileOpen(false)} 
+        admin={currentAdmin} 
         router={router}
+        setIsAdminLoggedIn={setIsAdminLoggedIn} 
       />
     </>
   );

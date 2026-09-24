@@ -1,8 +1,8 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
-import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import { useRouter, Redirect } from "expo-router";
+import React, { useState, useEffect } from "react";
 import { useUser } from "../context/UserContext";
 import {
   Alert,
@@ -17,12 +17,13 @@ import {
   TouchableOpacity,
   useWindowDimensions,
   View,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 // ── Bind to Environment Variables ──
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE;
-const USER_API = `${API_BASE}/login`;
+const USER_API = `${API_BASE}/auth/login`;
 const ADMIN_API = `${API_BASE}/admin/login`;
 const isWeb = Platform.OS === "web";
 
@@ -165,7 +166,18 @@ export default function LoginScreen() {
   const [selectedRole, setSelectedRole] = useState<"user" | "admin">("user");
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
-  const { setUser } = useUser();
+  const { user, setUser, loading: userLoading, isAdminLoggedIn, setIsAdminLoggedIn } = useUser();
+
+  if (userLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#F8FAFC" }}>
+        <ActivityIndicator size="large" color="#4F46E5" />
+      </View>
+    );
+  }
+
+  // Notice we removed manual Redirects here because AuthGuard in _layout.tsx 
+  // will catch the state changes and do it automatically
 
   const handleChange = (key: string, value: string) => setForm({ ...form, [key]: value });
 
@@ -187,25 +199,19 @@ export default function LoginScreen() {
 
       const data = selectedRole === "admin" ? res.data.admin : res.data.user;
 
-      // Ensure proper role segregation in memory
+      await AsyncStorage.setItem("token", res.data.token || "dummy-token");
+      await AsyncStorage.setItem("userEmail", data.email);
+
+      // Ensure proper role segregation in memory and context
       if (selectedRole === "admin") {
         await AsyncStorage.setItem("admin", JSON.stringify(data));
+        setIsAdminLoggedIn(true);
       } else {
         await AsyncStorage.setItem("user", JSON.stringify(data));
         setUser(data);
       }
-
-      await AsyncStorage.setItem("token", res.data.token || "dummy-token");
-      await AsyncStorage.setItem("userEmail", data.email);
-
-      // ───────────────────────────────────────────────────────────────
-      // First-login password change check (user role only)
-      // ───────────────────────────────────────────────────────────────
-      if (selectedRole === "user" && data.is_password_changed === 0) {
-        router.replace("/change_password");
-      } else {
-        router.replace(selectedRole === "admin" ? "/admin/dashboard" : "/(tab)");
-      }
+      
+      // AuthGuard will handle the redirect once the context updates.
     } catch (error: any) {
       showAlert("Login Failed", error?.response?.data?.message || "Unable to connect to the server. Please check your internet connection.");
     } finally {
