@@ -1,5 +1,4 @@
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Picker } from "@react-native-picker/picker";
 import axios from "axios";
@@ -8,7 +7,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as ExpoLinking from "expo-linking";
 import { Redirect, useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   Alert, Image, Modal, Platform, ScrollView,
@@ -19,7 +18,7 @@ import { useUser } from "../context/UserContext";
 
 // ── STRICT ENV CHECK (No hardcoded fallback IP) ──
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE;
-const MEMBERSHIP_AMOUNT = 1;
+const MEMBERSHIP_AMOUNT = 1100;
 const isWeb = Platform.OS === "web";
 
 // ── THE MISSING FUNCTION HAS BEEN ADDED HERE ──
@@ -305,7 +304,7 @@ export default function RegisterScreen() {
       const safeName = (form.full_name || "Alumni").trim().replace(/[^a-zA-Z\s]/g, "").slice(0, 50);
 
       const initRes = await axios.post(`${API_BASE}/pay/initiate`, {
-        amount: typeof MEMBERSHIP_AMOUNT === 'number' ? MEMBERSHIP_AMOUNT : 1,
+        amount: typeof MEMBERSHIP_AMOUNT === 'number' ? MEMBERSHIP_AMOUNT : 1100,
         firstname: safeName,
         email: form.email.trim(),
         phone: safePhone,

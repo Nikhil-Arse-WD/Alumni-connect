@@ -22,6 +22,7 @@ const notificationRoutes = require("./routes/notificationRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 
 const app = express();
+app.set("trust proxy", 1);
 const server = http.createServer(app);
 
 // Initialize Socket.io
