@@ -366,7 +366,7 @@ export default function JobBoardScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 120 }}
+        contentContainerStyle={{ paddingBottom: isWeb ? (isMobile ? 120 : 0) : 80 }}
         ListHeaderComponent={
           <>
             {/* HERO BANNER */}

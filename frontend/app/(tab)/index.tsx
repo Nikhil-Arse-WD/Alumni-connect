@@ -254,7 +254,7 @@ export default function HomeScreen() {
       <Animated.ScrollView
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: isWeb ? 0 : 110 }}
+        contentContainerStyle={{ paddingBottom: (isWeb && isMobile) ? 120 : (isWeb ? 0 : 110) }}
         onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: false })}
       >
         {/* ══════════════ HERO ══════════════ */}

@@ -343,7 +343,9 @@ function ProfileDetail({ member, onClose, openLink }: {
                 </View>
               </Animated.View>
 
-              <Leaf style={{ position: "absolute", right: Platform.OS === "web" ? 75 : 4, bottom: Platform.OS === "web" ? 4 : -10, transform: [{ rotate: "40deg" }] }} />
+              {Platform.OS !== "web" && (
+                <Leaf style={{ position: "absolute", right: 4, bottom: -10, transform: [{ rotate: "40deg" }] }} />
+              )}
 
               <View style={styles.personBadge}>
                 <Ionicons name="person" size={17} color="#fff" />
@@ -490,7 +492,7 @@ export default function DeveloperScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: "#F0F4FA", marginBottom: Platform.OS === "web" ? 0 : 50 }}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 0 }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: Platform.OS === "web" ? ((typeof window !== "undefined" && window.innerWidth < 768) ? 120 : 0) : 60 }}>
 
         {/* ══ HERO HEADER ══ */}
         <LinearGradient
@@ -705,8 +707,8 @@ const listStyles = StyleSheet.create({
   viewProfileBtn: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 10, alignSelf: "flex-start", paddingHorizontal: 12, paddingVertical: 7, backgroundColor: "#EEF2FF", borderRadius: 8 },
   viewProfileText: { fontSize: 12, fontWeight: "700", color: "#3B4FDB" },
   cardDivider: { height: 1, backgroundColor: "#EEF2FF", marginHorizontal: 20 },
-  contactRow: { flexDirection: "row", paddingVertical: 18, paddingHorizontal: 12, justifyContent: "space-around" },
-  contactItem: { alignItems: "center", flex: 1, gap: 4 },
+  contactRow: { flexDirection: "row", paddingVertical: 18, paddingHorizontal: 12, justifyContent: "space-around", ...(Platform.OS === "web" ? { flexWrap: "wrap", rowGap: 16 } : {}) },
+  contactItem: { alignItems: "center", flex: 1, gap: 4, ...(Platform.OS === "web" ? { minWidth: "45%", flex: 0 } : {}) },
   contactIcon: { width: 42, height: 42, borderRadius: 21, alignItems: "center", justifyContent: "center", marginBottom: 4 },
   contactLabel: { fontSize: 9, color: "#374151", textAlign: "center", fontWeight: "600" },
   contactSub: { fontSize: 9, color: "#9CA3AF", textAlign: "center" },
@@ -724,7 +726,7 @@ const listStyles = StyleSheet.create({
   footer: { marginTop: 28, paddingTop: 36 },
   footerInner: { gap: 28 },
   footerInnerDesktop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  footerCol: { flex: 1, minWidth: 100 },
+  footerCol: { flex: 1, minWidth: 100, ...(Platform.OS === "web" && { marginBottom: 24 }) },
   footerLogoCircle: { width: 52, height: 52, borderRadius: 26, backgroundColor: "#1E40AF", alignItems: "center", justifyContent: "center", marginBottom: 14 },
   footerColTitle: { fontSize: 13, fontWeight: "800", color: "#60A5FA", letterSpacing: 1, marginBottom: 10 },
   footerColText: { fontSize: 12, color: "#CBD5E1", lineHeight: 20 },

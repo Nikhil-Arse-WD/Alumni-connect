@@ -402,7 +402,7 @@ const styles = StyleSheet.create({
   webTabActive: { backgroundColor: "rgba(255,255,255,0.15)" },
   webTabText: { color: "rgba(255,255,255,0.75)", fontWeight: "600" },
   webTabTextActive: { color: "#fff", fontWeight: "800" },
-  right: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 8 },
+  right: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 8, ...(Platform.OS === "web" && { gap: 12 }) },
   rightDesktop: { flex: 0.7 },
   glassBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.12)", justifyContent: "center", alignItems: "center" },
   profileImg: { width: 42, height: 42, borderRadius: 21, borderWidth: 2, borderColor: "rgba(255,255,255,0.3)" },

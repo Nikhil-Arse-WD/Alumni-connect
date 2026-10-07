@@ -185,7 +185,7 @@ export default function AlumniDirectoryScreen() {
         key={numColumns}
         data={alumni}
         numColumns={numColumns}
-        contentContainerStyle={{ paddingBottom: 100 }}
+        contentContainerStyle={{ paddingBottom: Platform.OS === "web" ? ((typeof window !== "undefined" && window.innerWidth < 768) ? 120 : 0) : 100 }}
         ListEmptyComponent={renderEmptyState}
         onEndReached={() => fetchAlumni(true)}
         onEndReachedThreshold={0.5}
@@ -458,9 +458,13 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   dropdownButtonMobile: {
-    flex: 0,
+    flexGrow: 0,
+    flexShrink: 0,
+    flexBasis: "auto",
     width: "100%",
-    height: 42,
+    height: 44,
+    marginBottom: 10,
+    ...(Platform.OS === "web" && { backgroundColor: "#ffffff", zIndex: 10 }),
   },
   activeDropdown: {
     borderWidth: 1.5,

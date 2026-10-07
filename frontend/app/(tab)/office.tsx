@@ -5,6 +5,7 @@ import Footer from "../components/Footer";
 import {
   Dimensions,
   Image,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -65,6 +66,7 @@ export default function OfficeBearersScreen() {
     <ScrollView
       style={styles.container}
       showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ paddingBottom: Platform.OS === "web" ? (isMobile ? 120 : 0) : 60 }}
     >
       {/* HERO SECTION */}
       <LinearGradient
@@ -185,7 +187,7 @@ const styles = StyleSheet.create({
    */
   presidentImageWrapper: {
     width: isMobile ? "100%" : 340,
-    height: isMobile ? 440 : 380,
+    height: isMobile ? 320 : 380,
     overflow: "hidden",
     position: "relative",
   },
@@ -199,6 +201,7 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
     resizeMode: "cover",
+    ...(Platform.OS === "web" ? { objectPosition: "top" } : {} as any),
   },
 
   presidentContent: {
@@ -234,7 +237,7 @@ const styles = StyleSheet.create({
   /* Same fix for member cards */
   cardImageWrapper: {
     width: isMobile ? "100%" : 250,
-    height: isMobile ? 430 : 300,
+    height: isMobile ? 280 : 300,
     overflow: "hidden",
     position: "relative",
   },
@@ -244,10 +247,11 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    bottom: 30,
+    bottom: 0,
     width: "100%",
     height: "100%",
     resizeMode: "cover",
+    ...(Platform.OS === "web" ? { objectPosition: "top" } : {} as any),
   },
 
   cardContent: {

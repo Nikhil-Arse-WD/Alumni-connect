@@ -98,7 +98,7 @@ export default function AboutScreen() {
       style={styles.container}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{
-        paddingBottom: 30,
+        paddingBottom: Platform.OS === "web" ? ((typeof window !== "undefined" && window.innerWidth < 768) ? 120 : 0) : 30,
       }}
     >
       {/* HERO */}

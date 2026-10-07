@@ -94,8 +94,7 @@ export default function AlumniProfileScreen() {
     <View style={styles.container}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        // ── FIXED: Reduced padding to eliminate the huge white space ──
-        contentContainerStyle={{ paddingBottom: isWeb ? 20 : 80 }}
+        contentContainerStyle={{ paddingBottom: isWeb ? ((typeof window !== "undefined" && window.innerWidth < 768) ? 120 : 0) : 80 }}
       >
         {/* TOP PROFILE SECTION */}
         <LinearGradient
@@ -238,13 +237,13 @@ const styles = StyleSheet.create({
 
   actionRow: {
     flexDirection: "row",
-    flexWrap: isWeb ? "nowrap" : "wrap", // Web: inline, Mobile: grid
+    flexWrap: "wrap",
     justifyContent: "center",
-    alignItems: "center",
-    gap: 16,
+    alignItems: "stretch",
+    gap: 12,
     marginTop: -25,
     marginBottom: 20,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
   },
 
   actionBtn: {
@@ -252,7 +251,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 14,
-    paddingHorizontal: isWeb ? 26 : 6,
+    paddingHorizontal: 12,
     borderRadius: 16,
     borderWidth: 1,
     shadowColor: "#000",
@@ -260,12 +259,8 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
     elevation: 4,
-
-    // Restores your mobile 2x2 layout
-    ...(!isWeb && {
-      width: "46%",
-      marginBottom: 0,
-    }),
+    minWidth: 160,
+    flex: 1,
   },
 
   editBtn: { backgroundColor: "#EEF6FF", borderColor: "#BFDBFE" },
