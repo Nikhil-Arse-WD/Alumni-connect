@@ -116,7 +116,24 @@ export default function Footer() {
                 javaScriptEnabled={true}
                 domStorageEnabled={true}
                 source={{
-                  uri: "https://maps.google.com/maps?q=Shri%20Vaishnav%20Institute%20of%20Management%20Indore&t=&z=15&ie=UTF8&iwloc=&output=embed"
+                  html: `
+                    <!DOCTYPE html>
+                    <html>
+                      <head>
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+                        <style>
+                          body { margin: 0; padding: 0; overflow: hidden; background-color: #1E293B; }
+                          iframe { width: 100vw; height: 100vh; border: none; }
+                        </style>
+                      </head>
+                      <body>
+                        <iframe 
+                          src="https://maps.google.com/maps?q=Shri%20Vaishnav%20Institute%20of%20Management%20Indore&t=&z=15&ie=UTF8&iwloc=&output=embed" 
+                          allowfullscreen>
+                        </iframe>
+                      </body>
+                    </html>
+                  `
                 }}
               />
             )}

@@ -352,6 +352,20 @@ export default function RegisterScreen() {
           const browserResult = await WebBrowser.openAuthSessionAsync(checkoutUrl, returnUrl);
           setIsSubmitting(false);
 
+          try {
+            const verifyRes = await axios.get(`${API_BASE}/pay/verify/${initRes.data.txnid}`);
+            if (verifyRes.data.status === 'Success') {
+              showAlert("Registration Successful! 🎉", "Your payment is complete. Please check your email for your temporary login credentials.");
+              router.push("/loginscreen");
+              return;
+            } else if (verifyRes.data.status === 'Failed') {
+              showAlert("Payment Failed", "The transaction was cancelled or failed. Please tap 'Register & Pay' to retry.");
+              return;
+            }
+          } catch (e) {
+            console.log("Verification error", e);
+          }
+
           if (browserResult.type === 'success' && browserResult.url) {
             const parsed = ExpoLinking.parse(browserResult.url);
             if (parsed.queryParams?.status === 'success') {

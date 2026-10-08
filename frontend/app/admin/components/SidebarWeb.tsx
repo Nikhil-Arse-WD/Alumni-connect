@@ -18,6 +18,18 @@ const menuItems = [
 
 export default function SidebarWeb({ handleMenu }: any) {
   const pathname = usePathname();
+  const [roleText, setRoleText] = React.useState("ADMIN");
+
+  React.useEffect(() => {
+    import("@react-native-async-storage/async-storage").then(({ default: AsyncStorage }) => {
+      AsyncStorage.getItem("admin").then(res => {
+        if (res) {
+          const parsed = JSON.parse(res);
+          setRoleText(parsed.role === "super_admin" ? "SUPER ADMIN" : "ADMIN");
+        }
+      });
+    });
+  }, []);
 
   const isActive = (route: string) => pathname.includes(route);
 
@@ -25,7 +37,7 @@ export default function SidebarWeb({ handleMenu }: any) {
     <View style={styles.container}>
 
       <Text style={styles.title}>Alumni Admin</Text>
-      <Text style={styles.subtitle}>SUPER ADMIN</Text>
+      <Text style={styles.subtitle}>{roleText}</Text>
 
       {menuItems.map((item, i) => {
         const active = isActive(item.route);

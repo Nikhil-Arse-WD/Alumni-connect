@@ -84,15 +84,17 @@ function useMembers() {
     } catch (err) { console.log(err); }
   };
 
-  const filtered = members.filter((m) => {
-    const q = search.toLowerCase();
-    const matchSearch = m.full_name?.toLowerCase().includes(q) || m.email?.toLowerCase().includes(q);
-    const matchFilter =
-      filter === "All"      ? true :
-      filter === "Pending"  ? m.approved === 0 :
-      filter === "Approved" ? m.approved === 1 : m.approved === 2;
-    return matchSearch && matchFilter;
-  });
+  const filtered = React.useMemo(() => {
+    return members.filter((m) => {
+      const q = search.toLowerCase();
+      const matchSearch = m.full_name?.toLowerCase().includes(q) || m.email?.toLowerCase().includes(q);
+      const matchFilter =
+        filter === "All"      ? true :
+        filter === "Pending"  ? m.approved === 0 :
+        filter === "Approved" ? m.approved === 1 : m.approved === 2;
+      return matchSearch && matchFilter;
+    });
+  }, [members, search, filter]);
 
   const handleApprove = async (id: number, status: number) => {
     try {
@@ -119,12 +121,12 @@ function useMembers() {
     }
   };
 
-  const counts = {
+  const counts = React.useMemo(() => ({
     All:      members.length,
     Approved: members.filter(m => m.approved === 1).length,
     Pending:  members.filter(m => m.approved === 0).length,
     Rejected: members.filter(m => m.approved === 2).length,
-  };
+  }), [members]);
 
   return {
     members, filtered, search, setSearch,
@@ -569,9 +571,11 @@ function WebLayout() {
                           <Feather name="check" size={16} color={C.green} />
                         </Pressable>
                       )}
-                      <Pressable onPress={() => handleDelete(m.id)}>
-                        <Feather name="trash-2" size={16} color={C.red} />
-                      </Pressable>
+                      {role === 'super_admin' && (
+                        <Pressable onPress={() => handleDelete(m.id)}>
+                          <Feather name="trash-2" size={16} color={C.red} />
+                        </Pressable>
+                      )}
                     </View>
                   </View>
                 </View>

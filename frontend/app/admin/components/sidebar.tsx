@@ -42,6 +42,19 @@ export default function Sidebar({
   closeDrawer,
   handleMenu,
 }: SidebarProps) {
+  const [roleText, setRoleText] = React.useState("ADMIN");
+
+  React.useEffect(() => {
+    import("@react-native-async-storage/async-storage").then(({ default: AsyncStorage }) => {
+      AsyncStorage.getItem("admin").then(res => {
+        if (res) {
+          const parsed = JSON.parse(res);
+          setRoleText(parsed.role === "super_admin" ? "SUPER ADMIN" : "ADMIN");
+        }
+      });
+    });
+  }, []);
+
   return (
     <>
       {/* OVERLAY */}
@@ -77,7 +90,7 @@ export default function Sidebar({
           </Text>
 
           <Text style={styles.role}>
-            SUPER ADMIN
+            {roleText}
           </Text>
         </View>
 

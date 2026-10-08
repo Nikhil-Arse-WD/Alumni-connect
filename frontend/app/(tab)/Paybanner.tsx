@@ -132,6 +132,20 @@ export default function PayBannerScreen() {
           const browserResult = await WebBrowser.openAuthSessionAsync(res.data.checkout_url, returnUrl);
           setLoading(false);
           
+          try {
+            const verifyRes = await axios.get(`${API_BASE}/pay/verify/${res.data.txnid}`);
+            if (verifyRes.data.status === 'Success') {
+              showAlert("Payment Successful", "Your banner is live!");
+              router.replace("/mybanner" as any);
+              return;
+            } else if (verifyRes.data.status === 'Failed') {
+              showAlert("Payment Failed", "Transaction was cancelled or failed.");
+              return;
+            }
+          } catch (e) {
+            console.log("Verification error", e);
+          }
+
           if (browserResult.type === 'success' && browserResult.url) {
             const parsed = ExpoLinking.parse(browserResult.url);
             if (parsed.queryParams?.status === 'success') {

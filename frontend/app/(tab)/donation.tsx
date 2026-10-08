@@ -309,6 +309,21 @@ export default function ContributionsScreen() {
             const browserResult = await WebBrowser.openAuthSessionAsync(checkoutUrl, returnUrl);
             setIsSubmitting(false);
 
+            try {
+              const verifyRes = await axios.get(`${API_BASE}/pay/verify/${initRes.data.txnid}`);
+              if (verifyRes.data.status === 'Success') {
+                showAlert("Donation Successful! 💛", "Thank you for your generous contribution to your alma mater.");
+                setSelectedAmount(""); setCustomAmount(""); setDonationMsg("");
+                fetchMyData(user.id);
+                return;
+              } else if (verifyRes.data.status === 'Failed') {
+                showAlert("Payment Failed", "The transaction was cancelled or failed. Please try again.");
+                return;
+              }
+            } catch (e) {
+              console.log("Verification error", e);
+            }
+
             if (browserResult.type === 'success' && browserResult.url) {
               const parsed = ExpoLinking.parse(browserResult.url);
               if (parsed.queryParams?.status === 'success') {
