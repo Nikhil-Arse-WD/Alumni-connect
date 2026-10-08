@@ -307,35 +307,47 @@ export default function ContributionsScreen() {
 
           } else {
             const browserResult = await WebBrowser.openAuthSessionAsync(checkoutUrl, returnUrl);
-            setIsSubmitting(false);
-
-            try {
-              const verifyRes = await axios.get(`${API_BASE}/pay/verify/${initRes.data.txnid}`);
-              if (verifyRes.data.status === 'Success') {
-                showAlert("Donation Successful! 💛", "Thank you for your generous contribution to your alma mater.");
-                setSelectedAmount(""); setCustomAmount(""); setDonationMsg("");
-                fetchMyData(user.id);
-                return;
-              } else if (verifyRes.data.status === 'Failed') {
-                showAlert("Payment Failed", "The transaction was cancelled or failed. Please try again.");
-                return;
-              }
-            } catch (e) {
-              console.log("Verification error", e);
-            }
-
+            
             if (browserResult.type === 'success' && browserResult.url) {
+              setIsSubmitting(false);
               const parsed = ExpoLinking.parse(browserResult.url);
               if (parsed.queryParams?.status === 'success') {
                 showAlert("Donation Successful! 💛", "Thank you for your generous contribution to your alma mater.");
                 setSelectedAmount(""); setCustomAmount(""); setDonationMsg("");
                 fetchMyData(user.id);
-              } else {
+                return;
+              } else if (parsed.queryParams?.status === 'failed') {
                 showAlert("Payment Failed", "The transaction was cancelled or failed. Please try again.");
+                return;
               }
-            } else {
-              showAlert("Payment Cancelled", "You closed the gateway before completing the payment.");
             }
+
+            // Start polling in case WebBrowser closed due to UPI Intent
+            setIsSubmitting(false);
+            let attempts = 0;
+            const maxAttempts = 12; // Poll every 5 seconds for 1 minute
+            
+            const pollInterval = setInterval(async () => {
+              attempts++;
+              try {
+                const verifyRes = await axios.get(`${API_BASE}/pay/verify/${initRes.data.txnid}`);
+                if (verifyRes.data.status === 'Success') {
+                  clearInterval(pollInterval);
+                  showAlert("Donation Successful! 💛", "Thank you for your generous contribution to your alma mater.");
+                  setSelectedAmount(""); setCustomAmount(""); setDonationMsg("");
+                  fetchMyData(user.id);
+                } else if (verifyRes.data.status === 'Failed' || attempts >= maxAttempts) {
+                  clearInterval(pollInterval);
+                  if (attempts >= maxAttempts && verifyRes.data.status === 'Pending') {
+                    showAlert("Payment Verification Timeout", "We could not verify your payment status in time. If money was deducted, it will be updated automatically.");
+                  } else {
+                    showAlert("Payment Failed", "The transaction was cancelled or failed. Please try again.");
+                  }
+                }
+              } catch (e) {
+                console.log("Verification error", e);
+              }
+            }, 5000);
           }
           return;
         }

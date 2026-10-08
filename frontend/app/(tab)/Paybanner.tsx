@@ -130,32 +130,45 @@ export default function PayBannerScreen() {
           }
         } else {
           const browserResult = await WebBrowser.openAuthSessionAsync(res.data.checkout_url, returnUrl);
-          setLoading(false);
           
-          try {
-            const verifyRes = await axios.get(`${API_BASE}/pay/verify/${res.data.txnid}`);
-            if (verifyRes.data.status === 'Success') {
-              showAlert("Payment Successful", "Your banner is live!");
-              router.replace("/mybanner" as any);
-              return;
-            } else if (verifyRes.data.status === 'Failed') {
-              showAlert("Payment Failed", "Transaction was cancelled or failed.");
-              return;
-            }
-          } catch (e) {
-            console.log("Verification error", e);
-          }
-
           if (browserResult.type === 'success' && browserResult.url) {
+            setLoading(false);
             const parsed = ExpoLinking.parse(browserResult.url);
             if (parsed.queryParams?.status === 'success') {
               verifyStatusWithServer(res.data.txnid);
-            } else {
+              return;
+            } else if (parsed.queryParams?.status === 'failed') {
               showAlert("Payment Failed", "Transaction was cancelled or failed.");
+              return;
             }
-          } else {
-            showAlert("Payment Cancelled", "You closed the gateway before completing the payment.");
           }
+
+          // Start polling in case WebBrowser closed due to UPI Intent
+          setLoading(false);
+          let attempts = 0;
+          const maxAttempts = 12; // Poll every 5 seconds for 1 minute
+          
+          // Using a local state flag since we don't have isVerifyingPayment
+          const pollInterval = setInterval(async () => {
+            attempts++;
+            try {
+              const verifyRes = await axios.get(`${API_BASE}/pay/verify/${res.data.txnid}`);
+              if (verifyRes.data.status === 'Success') {
+                clearInterval(pollInterval);
+                showAlert("Payment Successful", "Your banner is live!");
+                router.replace("/mybanner" as any);
+              } else if (verifyRes.data.status === 'Failed' || attempts >= maxAttempts) {
+                clearInterval(pollInterval);
+                if (attempts >= maxAttempts && verifyRes.data.status === 'Pending') {
+                  showAlert("Payment Verification Timeout", "We could not verify your payment status in time. If money was deducted, it will be updated automatically.");
+                } else {
+                  showAlert("Payment Failed", "Transaction was cancelled or failed.");
+                }
+              }
+            } catch (e) {
+              console.log("Verification error", e);
+            }
+          }, 5000);
         }
       } else {
          setLoading(false);

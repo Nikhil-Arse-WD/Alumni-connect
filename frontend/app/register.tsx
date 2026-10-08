@@ -211,6 +211,7 @@ export default function RegisterScreen() {
   const [showYearPicker, setShowYearPicker] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [industrySelection, setIndustrySelection] = useState("");
+  const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
   const [form, setForm] = useState({
     full_name: "", email: "", mobile: "", country_code: "+91", gender: "",
     dob: "", batch_year: "", programme: "", employment_type: "", organisation: "", designation: "",
@@ -350,33 +351,50 @@ export default function RegisterScreen() {
         } else {
           // ── MOBILE: In-App Browser ──
           const browserResult = await WebBrowser.openAuthSessionAsync(checkoutUrl, returnUrl);
-          setIsSubmitting(false);
-
-          try {
-            const verifyRes = await axios.get(`${API_BASE}/pay/verify/${initRes.data.txnid}`);
-            if (verifyRes.data.status === 'Success') {
-              showAlert("Registration Successful! 🎉", "Your payment is complete. Please check your email for your temporary login credentials.");
-              router.push("/loginscreen");
-              return;
-            } else if (verifyRes.data.status === 'Failed') {
-              showAlert("Payment Failed", "The transaction was cancelled or failed. Please tap 'Register & Pay' to retry.");
-              return;
-            }
-          } catch (e) {
-            console.log("Verification error", e);
-          }
-
+          
           if (browserResult.type === 'success' && browserResult.url) {
+            setIsSubmitting(false);
             const parsed = ExpoLinking.parse(browserResult.url);
             if (parsed.queryParams?.status === 'success') {
               showAlert("Registration Successful! 🎉", "Your payment is complete. Please check your email for your temporary login credentials.");
               router.push("/loginscreen");
-            } else {
+              return;
+            } else if (parsed.queryParams?.status === 'failed') {
               showAlert("Payment Failed", "The transaction was cancelled or failed. Please tap 'Register & Pay' to retry.");
+              return;
             }
-          } else {
-            showAlert("Payment Cancelled", "You closed the gateway before completing the payment.");
           }
+
+          // Start polling in case WebBrowser closed due to UPI Intent
+          setIsSubmitting(false);
+          setIsVerifyingPayment(true);
+          
+          let attempts = 0;
+          const maxAttempts = 12; // Poll every 5 seconds for 1 minute
+          
+          const pollInterval = setInterval(async () => {
+            attempts++;
+            try {
+              const verifyRes = await axios.get(`${API_BASE}/pay/verify/${initRes.data.txnid}`);
+              if (verifyRes.data.status === 'Success') {
+                clearInterval(pollInterval);
+                setIsVerifyingPayment(false);
+                showAlert("Registration Successful! 🎉", "Your payment is complete. Please check your email for your temporary login credentials.");
+                router.push("/loginscreen");
+              } else if (verifyRes.data.status === 'Failed' || attempts >= maxAttempts) {
+                clearInterval(pollInterval);
+                setIsVerifyingPayment(false);
+                if (attempts >= maxAttempts && verifyRes.data.status === 'Pending') {
+                  showAlert("Payment Verification Timeout", "We could not verify your payment status in time. If money was deducted, it will be updated automatically.");
+                } else {
+                  showAlert("Payment Failed", "The transaction was cancelled or failed. Please tap 'Register & Pay' to retry.");
+                }
+              }
+            } catch (e) {
+              console.log("Verification error", e);
+            }
+          }, 5000);
+          
         }
       }
     } catch (err: any) {
