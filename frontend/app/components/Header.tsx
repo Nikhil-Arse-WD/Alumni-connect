@@ -161,6 +161,7 @@ export default function Header() {
   };
 
   const handleProfilePress = async () => {
+    if (pathname.includes("/profile")) return;
     try {
       const email = await AsyncStorage.getItem("userEmail");
       router.push(email ? { pathname: "/profile", params: { email } } : "/loginscreen");
@@ -173,7 +174,7 @@ export default function Header() {
       const id = await getUserId();
       if (id) await axios.patch(`${API}/notifications/mark-read/${id}`);
     } catch { }
-    router.push("/notification");
+    if (!pathname.includes("/notification")) router.push("/notification");
   };
 
   const handleMsgPress = async () => {
@@ -183,7 +184,7 @@ export default function Header() {
       const id = await getUserId();
       if (id) axios.post(`${API}/forum/seen/${id}`).catch(() => { });
     } catch { }
-    router.push("/form");
+    if (!pathname.includes("/form")) router.push("/form");
   };
 
   const handleLogout = () => {
@@ -205,6 +206,7 @@ export default function Header() {
 
   const handleMoreNav = (route: string) => {
     setMoreVisible(false);
+    if (pathname === route || pathname.includes(route) && route !== "/") return;
     setTimeout(() => router.push(route as any), 200);
   };
 
@@ -328,7 +330,10 @@ export default function Header() {
                     <TouchableOpacity
                       key={i}
                       style={[styles.webTab, active && styles.webTabActive]}
-                      onPress={() => tab.name === "More" ? setMoreVisible(true) : router.push(tab.route as any)}
+                      onPress={() => {
+                        if (tab.name === "More") { setMoreVisible(true); return; }
+                        if (!active) router.push(tab.route as any);
+                      }}
                     >
                       <Ionicons name={tab.icon as any} size={17} color={active ? "#fff" : "rgba(255,255,255,0.75)"} />
                       <Text style={[styles.webTabText, active && styles.webTabTextActive, { fontSize: tabSize }]}>
@@ -337,6 +342,24 @@ export default function Header() {
                     </TouchableOpacity>
                   );
                 })}
+
+                {Platform.OS === 'web' && (
+                  <TouchableOpacity
+                    style={styles.downloadBtnApp}
+                    onPress={() => window.open(`${API}/assets/image/andr_apk/svimaa-connect.apk`, "_blank")}
+                  >
+                    <LinearGradient
+                      colors={["#FBBF24", "#F59E0B"]}
+                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                      style={styles.downloadBtnAppInner}
+                    >
+                      <Ionicons name="logo-android" size={18} color="#fff" />
+                      <Text style={[styles.downloadBtnAppText, { fontSize: tabSize }]}>
+                        Get App
+                      </Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                )}
               </View>
             )}
 
@@ -369,10 +392,13 @@ export default function Header() {
           {TABS.map((tab, i) => {
             const active = pathname === tab.route;
             return (
-              <TouchableOpacity
+                <TouchableOpacity
                 key={i}
                 style={styles.mobileTab}
-                onPress={() => tab.name === "More" ? setMoreVisible(true) : router.push(tab.route as any)}
+                onPress={() => {
+                  if (tab.name === "More") { setMoreVisible(true); return; }
+                  if (!active) router.push(tab.route as any);
+                }}
               >
                 <View style={styles.mobileTabInner}>
                   {active && <View style={styles.mobileTabBg} />}
@@ -402,6 +428,9 @@ const styles = StyleSheet.create({
   webTabActive: { backgroundColor: "rgba(255,255,255,0.15)" },
   webTabText: { color: "rgba(255,255,255,0.75)", fontWeight: "600" },
   webTabTextActive: { color: "#fff", fontWeight: "800" },
+  downloadBtnApp: { marginLeft: 12, shadowColor: "#F59E0B", shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 6 },
+  downloadBtnAppInner: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, gap: 6 },
+  downloadBtnAppText: { color: "#fff", fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.5 },
   right: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 8, ...(Platform.OS === "web" && { gap: 12 }) },
   rightDesktop: { flex: 0.7 },
   glassBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.12)", justifyContent: "center", alignItems: "center" },

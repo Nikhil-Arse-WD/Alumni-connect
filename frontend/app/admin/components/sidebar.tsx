@@ -12,6 +12,7 @@ import {
 import {
   Ionicons
 } from "@expo/vector-icons";
+import { usePathname } from "expo-router";
 
 const SCREEN_WIDTH =
   Dimensions.get("window").width;
@@ -43,6 +44,7 @@ export default function Sidebar({
   handleMenu,
 }: SidebarProps) {
   const [roleText, setRoleText] = React.useState("ADMIN");
+  const pathname = usePathname();
 
   React.useEffect(() => {
     import("@react-native-async-storage/async-storage").then(({ default: AsyncStorage }) => {
@@ -54,6 +56,8 @@ export default function Sidebar({
       });
     });
   }, []);
+
+  const isActive = (route: string) => pathname.includes(route);
 
   return (
     <>
@@ -96,25 +100,32 @@ export default function Sidebar({
 
         {/* MENU */}
 
-        {menuItems.map((item, i) => (
-          <TouchableOpacity
-            key={i}
-            onPress={() =>
-              handleMenu(item.route)
-            }
-            style={styles.menuItem}
-          >
-            <Ionicons
-              name={item.icon as any}
-              size={20}
-              color="#fff"
-            />
+        {menuItems.map((item, i) => {
+          const active = isActive(item.route);
+          return (
+            <TouchableOpacity
+              key={i}
+              onPress={() => {
+                if (active && item.route !== 'logout') {
+                  closeDrawer();
+                  return;
+                }
+                handleMenu(item.route);
+              }}
+              style={[styles.menuItem, active && { backgroundColor: "rgba(255,255,255,0.2)" }]}
+            >
+              <Ionicons
+                name={item.icon as any}
+                size={20}
+                color="#fff"
+              />
 
-            <Text style={styles.menuText}>
-              {item.title}
-            </Text>
-          </TouchableOpacity>
-        ))}
+              <Text style={styles.menuText}>
+                {item.title}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </Animated.View>
     </>
   );

@@ -246,6 +246,16 @@ export default function LoginScreen() {
               <Text style={styles.webSub}>
                 Bridging the gap between students,{'\n'}alumni, and administration in one unified platform.
               </Text>
+
+              {isWeb && (
+                <TouchableOpacity
+                  style={styles.webDownloadBtn}
+                  onPress={() => window.open(`${API_BASE}/assets/image/andr_apk/svimaa-connect.apk`, "_blank")}
+                >
+                  <Ionicons name="logo-android" size={24} color="#4F46E5" />
+                  <Text style={styles.webDownloadBtnText}>Download Android App</Text>
+                </TouchableOpacity>
+              )}
             </View>
 
             {/* RIGHT SIDE (Form) */}
@@ -283,6 +293,16 @@ export default function LoginScreen() {
           contentContainerStyle={styles.mobileScroll}
         >
           <View style={styles.mobileHero}>
+            {isWeb && (
+              <TouchableOpacity
+                style={styles.mobileDownloadBtn}
+                onPress={() => window.open(`${API_BASE}/assets/image/andr_apk/svimaa-connect.apk`, "_blank")}
+              >
+                <Ionicons name="logo-android" size={20} color="#fff" />
+                <Text style={styles.mobileDownloadBtnText}>Download Android App</Text>
+              </TouchableOpacity>
+            )}
+
             <View style={styles.mobileAvatar}>
               <Image source={require("../assets/Alumni_Pics/logo.png")} style={styles.logoImg} resizeMode="contain" />
             </View>
@@ -334,6 +354,8 @@ const styles = StyleSheet.create({
   logoImg: { width: "70%", height: "70%" },
   webTitle: { color: "#fff", fontSize: 34, fontWeight: "900", textAlign: "center", letterSpacing: -0.5 },
   webSub: { color: "#E0E7FF", textAlign: "center", marginTop: 14, fontSize: 15, lineHeight: 26, fontWeight: "500" },
+  webDownloadBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: 'rgba(255,255,255,0.95)', paddingVertical: 14, paddingHorizontal: 24, borderRadius: 12, marginTop: 40 },
+  webDownloadBtnText: { color: "#4F46E5", fontSize: 16, fontWeight: "800" },
   
   rightSide: { flex: 1.1, paddingHorizontal: 60, justifyContent: "center" },
   avatarCircle: {
@@ -346,6 +368,8 @@ const styles = StyleSheet.create({
   // ================= MOBILE STYLES =================
   mobileScroll: { flexGrow: 1, paddingBottom: 40 },
   mobileHero: { alignItems: "center", paddingTop: 40, paddingBottom: 10 },
+  mobileDownloadBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#4F46E5', paddingVertical: 12, paddingHorizontal: 20, borderRadius: 12, marginBottom: 24 },
+  mobileDownloadBtnText: { color: "#fff", fontSize: 14, fontWeight: "700" },
   mobileAvatar: {
     width: 110, height: 110, borderRadius: 55, backgroundColor: "#fff",
     justifyContent: "center", alignItems: "center",

@@ -34,6 +34,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(generalLimiter);
 app.use("/api/uploads", express.static(path.join(__dirname, "../uploads")));
+app.use("/api/assets", express.static(path.join(__dirname, "../assets")));
 
 // Health Check
 app.get("/", (req, res) => {

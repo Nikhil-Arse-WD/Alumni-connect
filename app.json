@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "6b93cc29-e541-4016-a47f-93f6e1067462"
+      }
+    },
+    "android": {
+      "package": "svimsaa.ver1"
+    }
+  }
+}

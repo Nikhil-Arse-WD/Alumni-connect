@@ -45,7 +45,10 @@ export default function SidebarWeb({ handleMenu }: any) {
         return (
           <TouchableOpacity
             key={i}
-            onPress={() => handleMenu(item.route)}
+            onPress={() => {
+              if (active && item.route !== 'logout') return;
+              handleMenu(item.route);
+            }}
             style={[
               styles.item,
               active && styles.activeItem,
