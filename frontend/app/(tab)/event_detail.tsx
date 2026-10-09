@@ -179,7 +179,7 @@ export default function App() {
       };
 
       await axios.post(
-        `${API}/rsvp`,
+        `${API}/events/rsvp`,
         payload
       );
 
@@ -233,7 +233,7 @@ export default function App() {
 
       const res =
         await axios.get(
-          `${API}/rsvp/${user.id}`
+          `${API}/events/rsvp/${user.id}`
         );
 
       setAllRSVPs(
@@ -540,7 +540,7 @@ useEffect(() => {
                 setSelectedEvent(item);
               } else {
                 setSelectedPastEvent(item);
-                axios.get(`${API}/event-gallery/${item.event_id}`)
+                axios.get(`${API}/events/gallery/${item.event_id}`)
                   .then(res => setPastEventGallery(res.data.gallery || []))
                   .catch(err => console.log(err));
               }
@@ -856,7 +856,7 @@ useEffect(() => {
             setSelectedPastEvent(item);
 
             const res = await axios.get(
-              `${API}/event-gallery/${item.event_id}`
+              `${API}/events/gallery/${item.event_id}`
             );
 
             setPastEventGallery(

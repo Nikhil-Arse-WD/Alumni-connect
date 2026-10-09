@@ -34,7 +34,9 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(generalLimiter);
 app.use("/api/uploads", express.static(path.join(__dirname, "../uploads")));
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 app.use("/api/assets", express.static(path.join(__dirname, "../assets")));
+app.use("/assets", express.static(path.join(__dirname, "../assets")));
 
 // Health Check
 app.get("/", (req, res) => {
@@ -52,6 +54,18 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/banners", bannerRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/pay", paymentRoutes);
+
+// Backward Compatibility Route Aliases
+const authController = require("./controllers/authController");
+const alumniController = require("./controllers/alumniController");
+const eventController = require("./controllers/eventController");
+app.post("/api/change-password", authController.changePassword);
+app.get("/api/birthdays/today", alumniController.getBirthdaysAndAnniversaries);
+app.put("/api/privacy/:email", alumniController.updatePrivacy);
+app.post("/api/rsvp", eventController.updateRsvp);
+app.get("/api/rsvp/:alumni_id", eventController.getRsvpsByAlumni);
+app.get("/api/rsvp/summary/:event_id", eventController.getRsvpSummary);
+app.get("/api/event-gallery/:event_id", eventController.getEventGallery);
 
 // Global Error Handler
 app.use(errorHandler);

@@ -224,7 +224,7 @@ export default function HomeScreen() {
     try {
       const [evR, jbR, stR, bnR, bdR] = await Promise.allSettled([
         axios.get(`${API}/events`), axios.get(`${API}/jobs`), axios.get(`${API}/admin/stats`),
-        axios.get(`${API}/banners/active`), axios.get(`${API}/birthdays/today`),
+        axios.get(`${API}/banners/active`), axios.get(`${API}/alumni/birthdays/today`),
       ]);
       if (evR.status === "fulfilled") setEvents((evR.value.data.events || []).filter((e: any) => e.status === "Upcoming").slice(0, 6));
       if (jbR.status === "fulfilled") setJobs((jbR.value.data.jobs || []).filter((j: any) => !j.is_closed).slice(0, 6));

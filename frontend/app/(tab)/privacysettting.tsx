@@ -20,7 +20,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 // ── STRICT ENV CHECK ──
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE;
-const API_URL = `${API_BASE}/privacy`;
+const API_URL = `${API_BASE}/alumni/privacy`;
 const isWeb = Platform.OS === "web";
 
 export default function PrivacySettingsScreen() {

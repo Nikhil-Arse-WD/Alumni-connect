@@ -110,7 +110,7 @@ export default function AdminBannerRequests() {
   const [items, setItems] = useState<BannerReq[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [filter, setFilter] = useState<(typeof FILTERS)[number]>("Pending");
+  const [filter, setFilter] = useState<(typeof FILTERS)[number]>("All");
 
   // Payment modal
   const [payModalFor, setPayModalFor] = useState<BannerReq | null>(null);
@@ -127,7 +127,7 @@ export default function AdminBannerRequests() {
 
   const fetchData = async () => {
     try {
-      const res = await axios.get(`${API}/admin/banner-requests`);
+      const res = await axios.get(`${API}/banners/admin`);
       if (res.data.success) setItems(res.data.data);
     } catch (e) {
       console.log("Error fetching banner requests:", e);
@@ -160,7 +160,7 @@ export default function AdminBannerRequests() {
       return showAlert("Amount required", "Please enter a valid amount to charge.");
     try {
       setSavingPay(true);
-      await axios.put(`${API}/admin/banner-request/request-payment/${payModalFor.id}`, {
+      await axios.put(`${API}/banners/admin/request-payment/${payModalFor.id}`, {
         amount: Number(amount),
         payment_note: note,
       });
@@ -177,7 +177,7 @@ export default function AdminBannerRequests() {
   const approve = async (item: BannerReq) => {
     try {
       setBusyId(item.id);
-      await axios.put(`${API}/admin/banner-request/approve/${item.id}`);
+      await axios.put(`${API}/banners/admin/approve/${item.id}`);
       fetchData();
       showAlert("Approved ✅", "Banner deployment complete. Advertisement is now live.");
     } catch {
@@ -196,7 +196,7 @@ export default function AdminBannerRequests() {
     if (!rejectModalFor) return;
     try {
       setSavingReject(true);
-      await axios.put(`${API}/admin/banner-request/reject/${rejectModalFor.id}`, {
+      await axios.put(`${API}/banners/admin/reject/${rejectModalFor.id}`, {
         admin_remarks: remarks,
       });
       setRejectModalFor(null);
@@ -213,7 +213,7 @@ export default function AdminBannerRequests() {
     const doDelete = async () => {
       try {
         setBusyId(item.id);
-        await axios.delete(`${API}/admin/banner-request/${item.id}`);
+        await axios.delete(`${API}/banners/admin/${item.id}`);
         fetchData();
       } catch {
         showAlert("Error", "Failed to delete.");

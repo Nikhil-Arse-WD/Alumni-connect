@@ -294,7 +294,7 @@ export default function AdminEvents() {
   // rsvp
   useEffect(() => {
     if (!selectedEvent) return;
-    fetch(`${API}/rsvp/summary/${selectedEvent.event_id}`)
+    fetch(`${API}/events/rsvp/summary/${selectedEvent.event_id}`)
       .then(r => r.json()).then(json => {
         if (json.success && Array.isArray(json.data)) {
           let going=0, maybe=0, notGoing=0, total=0;

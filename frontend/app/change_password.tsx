@@ -25,7 +25,7 @@ import {
 } from "react-native";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_BASE;
-const API_URL = BASE_URL ? `${BASE_URL}/change-password` : "";
+const API_URL = BASE_URL ? `${BASE_URL}/auth/change-password` : "";
 const isWeb = Platform.OS === "web";
 
 const showAlert = (title: string, message: string) => {
