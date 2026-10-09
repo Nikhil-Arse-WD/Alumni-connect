@@ -26,6 +26,8 @@ import { useUser } from "../../context/UserContext";
 const API = process.env.EXPO_PUBLIC_API_BASE;
 const socket = io(API);
 const DESKTOP_BP = 768;
+const APK_DOWNLOAD_URL = "https://svimaa.svimi.org/assets/image/andr_apk/svimaa-connect.apk";
+
 
 function useResponsiveWidth(): number {
   const { width: rnWidth } = useWindowDimensions();
@@ -346,7 +348,7 @@ export default function Header() {
                 {Platform.OS === 'web' && (
                   <TouchableOpacity
                     style={styles.downloadBtnApp}
-                    onPress={() => window.open(`${API}/assets/image/andr_apk/svimaa-connect.apk`, "_blank")}
+                    onPress={() => window.open(APK_DOWNLOAD_URL, "_blank")}
                   >
                     <LinearGradient
                       colors={["#FBBF24", "#F59E0B"]}

@@ -26,6 +26,8 @@ const API_BASE = process.env.EXPO_PUBLIC_API_BASE;
 const USER_API = `${API_BASE}/auth/login`;
 const ADMIN_API = `${API_BASE}/admin/login`;
 const isWeb = Platform.OS === "web";
+const APK_DOWNLOAD_URL = "https://svimaa.svimi.org/assets/image/andr_apk/svimaa-connect.apk";
+
 
 const showAlert = (title: string, message: string) => {
   if (isWeb) {
@@ -250,7 +252,7 @@ export default function LoginScreen() {
               {isWeb && (
                 <TouchableOpacity
                   style={styles.webDownloadBtn}
-                  onPress={() => window.open(`${API_BASE}/assets/image/andr_apk/svimaa-connect.apk`, "_blank")}
+                  onPress={() => window.open(APK_DOWNLOAD_URL, "_blank")}
                 >
                   <Ionicons name="logo-android" size={24} color="#4F46E5" />
                   <Text style={styles.webDownloadBtnText}>Download Android App</Text>
@@ -296,7 +298,7 @@ export default function LoginScreen() {
             {isWeb && (
               <TouchableOpacity
                 style={styles.mobileDownloadBtn}
-                onPress={() => window.open(`${API_BASE}/assets/image/andr_apk/svimaa-connect.apk`, "_blank")}
+                onPress={() => window.open(APK_DOWNLOAD_URL, "_blank")}
               >
                 <Ionicons name="logo-android" size={20} color="#fff" />
                 <Text style={styles.mobileDownloadBtnText}>Download Android App</Text>
