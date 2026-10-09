@@ -9,7 +9,7 @@ import { Redirect, useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import React, { useState } from "react";
 import {
-  ActivityIndicator,
+  ActivityIndicator, AppState,
   Alert, Image, Modal, Platform, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View
 } from "react-native";
@@ -370,19 +370,24 @@ export default function RegisterScreen() {
           setIsVerifyingPayment(true);
           
           let attempts = 0;
-          const maxAttempts = 12; // Poll every 5 seconds for 1 minute
+          const maxAttempts = 60; // Poll every 5 seconds for 5 minutes
           
-          const pollInterval = setInterval(async () => {
+          let pollInterval: any;
+          let appStateSubscription: any;
+
+          const checkPayment = async () => {
             attempts++;
             try {
               const verifyRes = await axios.get(`${API_BASE}/pay/verify/${initRes.data.txnid}`);
               if (verifyRes.data.status === 'Success') {
                 clearInterval(pollInterval);
+                appStateSubscription?.remove();
                 setIsVerifyingPayment(false);
                 showAlert("Registration Successful! 🎉", "Your payment is complete. Please check your email for your temporary login credentials.");
                 router.push("/loginscreen");
               } else if (verifyRes.data.status === 'Failed' || attempts >= maxAttempts) {
                 clearInterval(pollInterval);
+                appStateSubscription?.remove();
                 setIsVerifyingPayment(false);
                 if (attempts >= maxAttempts && verifyRes.data.status === 'Pending') {
                   showAlert("Payment Verification Timeout", "We could not verify your payment status in time. If money was deducted, it will be updated automatically.");
@@ -393,7 +398,15 @@ export default function RegisterScreen() {
             } catch (e) {
               console.log("Verification error", e);
             }
-          }, 5000);
+          };
+
+          pollInterval = setInterval(checkPayment, 5000);
+          
+          appStateSubscription = AppState.addEventListener('change', nextAppState => {
+            if (nextAppState === 'active') {
+              checkPayment();
+            }
+          });
           
         }
       }

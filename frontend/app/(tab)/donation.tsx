@@ -8,7 +8,7 @@ import { useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import React, { useEffect, useState } from "react";
 import {
-  Alert, Modal, Platform, ScrollView,
+  Alert, AppState, Modal, Platform, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View
 } from "react-native";
 
@@ -325,19 +325,24 @@ export default function ContributionsScreen() {
             // Start polling in case WebBrowser closed due to UPI Intent
             setIsSubmitting(false);
             let attempts = 0;
-            const maxAttempts = 12; // Poll every 5 seconds for 1 minute
+            const maxAttempts = 60; // Poll every 5 seconds for 5 minutes
             
-            const pollInterval = setInterval(async () => {
+            let pollInterval: any;
+            let appStateSubscription: any;
+
+            const checkPayment = async () => {
               attempts++;
               try {
                 const verifyRes = await axios.get(`${API_BASE}/pay/verify/${initRes.data.txnid}`);
                 if (verifyRes.data.status === 'Success') {
                   clearInterval(pollInterval);
+                  appStateSubscription?.remove();
                   showAlert("Donation Successful! 💛", "Thank you for your generous contribution to your alma mater.");
                   setSelectedAmount(""); setCustomAmount(""); setDonationMsg("");
                   fetchMyData(user.id);
                 } else if (verifyRes.data.status === 'Failed' || attempts >= maxAttempts) {
                   clearInterval(pollInterval);
+                  appStateSubscription?.remove();
                   if (attempts >= maxAttempts && verifyRes.data.status === 'Pending') {
                     showAlert("Payment Verification Timeout", "We could not verify your payment status in time. If money was deducted, it will be updated automatically.");
                   } else {
@@ -347,7 +352,15 @@ export default function ContributionsScreen() {
               } catch (e) {
                 console.log("Verification error", e);
               }
-            }, 5000);
+            };
+
+            pollInterval = setInterval(checkPayment, 5000);
+            
+            appStateSubscription = AppState.addEventListener('change', nextAppState => {
+              if (nextAppState === 'active') {
+                checkPayment();
+              }
+            });
           }
           return;
         }

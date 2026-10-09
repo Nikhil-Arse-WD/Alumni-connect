@@ -7,7 +7,7 @@ import React, { useState } from "react";
 import * as WebBrowser from "expo-web-browser";
 import * as ExpoLinking from "expo-linking";
 import {
-  ActivityIndicator,
+  ActivityIndicator, AppState,
   Alert,
   Platform,
   ScrollView,
@@ -146,19 +146,23 @@ export default function PayBannerScreen() {
           // Start polling in case WebBrowser closed due to UPI Intent
           setLoading(false);
           let attempts = 0;
-          const maxAttempts = 12; // Poll every 5 seconds for 1 minute
+          const maxAttempts = 60; // Poll every 5 seconds for 5 minutes
           
-          // Using a local state flag since we don't have isVerifyingPayment
-          const pollInterval = setInterval(async () => {
+          let pollInterval: any;
+          let appStateSubscription: any;
+
+          const checkPayment = async () => {
             attempts++;
             try {
               const verifyRes = await axios.get(`${API_BASE}/pay/verify/${res.data.txnid}`);
               if (verifyRes.data.status === 'Success') {
                 clearInterval(pollInterval);
+                appStateSubscription?.remove();
                 showAlert("Payment Successful", "Your banner is live!");
                 router.replace("/mybanner" as any);
               } else if (verifyRes.data.status === 'Failed' || attempts >= maxAttempts) {
                 clearInterval(pollInterval);
+                appStateSubscription?.remove();
                 if (attempts >= maxAttempts && verifyRes.data.status === 'Pending') {
                   showAlert("Payment Verification Timeout", "We could not verify your payment status in time. If money was deducted, it will be updated automatically.");
                 } else {
@@ -168,7 +172,15 @@ export default function PayBannerScreen() {
             } catch (e) {
               console.log("Verification error", e);
             }
-          }, 5000);
+          };
+
+          pollInterval = setInterval(checkPayment, 5000);
+          
+          appStateSubscription = AppState.addEventListener('change', nextAppState => {
+            if (nextAppState === 'active') {
+              checkPayment();
+            }
+          });
         }
       } else {
          setLoading(false);
