@@ -63,7 +63,7 @@ const MENTOR_FEATURES = [
 ];
 
 const OFFICE_BEARERS = [
-  { role: "President",       name: "Dr. George Thomas",   img: require("../../assets/Alumni_Pics/director.jpg")       },
+  { role: "President",       name: "Dr. George Thomas",   img: require("../../assets/Alumni_Pics/Dr George Thomas.jpeg") },
   { role: "Chairman",        name: "Mr. Sujeet Singhal",  img: require("../../assets/Alumni_Pics/Chairman.jpeg")      },
   { role: "Secretary",       name: "Mr. Upendra Jain",    img: require("../../assets/Alumni_Pics/Secretary.jpeg")     },
   { role: "Joint Secretary", name: "Mr. Sanjay Agrawal",  img: require("../../assets/Alumni_Pics/JointSecretary.jpeg")},
