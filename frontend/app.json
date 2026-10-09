@@ -1,12 +1,12 @@
 {
   "expo": {
     "name": "Alumni Connect",
-    "slug": "svimsaa",
+    "slug": "svimaa",
     "version": "1.0.0",
     "jsEngine": "hermes",
     "orientation": "portrait",
     "icon": "./assets/images/logo.png",
-    "scheme": "svimsaa",
+    "scheme": "svimaa",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {

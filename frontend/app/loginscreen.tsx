@@ -308,7 +308,7 @@ export default function LoginScreen() {
             <View style={styles.mobileAvatar}>
               <Image source={require("../assets/Alumni_Pics/logo.png")} style={styles.logoImg} resizeMode="contain" />
             </View>
-            <Text style={styles.mobileTitle}>SVIMSAA Connect</Text>
+            <Text style={styles.mobileTitle}>SVIMAA Connect</Text>
             <Text style={styles.mobileSub}>Welcome back to your network</Text>
           </View>
 

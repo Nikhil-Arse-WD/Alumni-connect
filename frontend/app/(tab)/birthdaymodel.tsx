@@ -123,7 +123,7 @@ export default function BirthdayModal() {
             </Text>
 
             <Text style={styles.message}>
-              Wishing you a fantastic day filled with joy and success from your entire SVIMSAA alumni family.
+              Wishing you a fantastic day filled with joy and success from your entire SVIMAA alumni family.
             </Text>
 
             <TouchableOpacity

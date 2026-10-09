@@ -279,7 +279,7 @@ export default function BannerRequestScreen() {
               </TouchableOpacity>
               <View style={{ flex: 1 }}>
                 <Text style={styles.headerTitle}>Advertisement Request</Text>
-                <Text style={styles.headerSub}>Submit a promotional banner for placement on the SVIMSAA dashboard.</Text>
+                <Text style={styles.headerSub}>Submit a promotional banner for placement on the SVIMAA dashboard.</Text>
               </View>
             </View>
           </LinearGradient>
