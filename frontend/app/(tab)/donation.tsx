@@ -4,7 +4,7 @@ import axios from "axios";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import * as ExpoLinking from "expo-linking";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import React, { useEffect, useState } from "react";
 import {
@@ -148,6 +148,16 @@ export default function ContributionsScreen() {
   const [activeTab, setActiveTab] = useState("Donate");
   const [communityData, setCommunityData] = useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { status } = useLocalSearchParams<{ status?: string }>();
+
+  useEffect(() => {
+    if (status === 'success') {
+      showAlert("Donation Successful! 💛", "Thank you for your generous contribution to your alma mater.");
+      if (user?.id) fetchMyData(user.id);
+    } else if (status === 'failed') {
+      showAlert("Payment Failed", "The donation transaction was cancelled or failed.");
+    }
+  }, [status, user?.id]);
 
   // Lecture States
   const [topic, setTopic] = useState("");
@@ -257,7 +267,9 @@ export default function ContributionsScreen() {
       });
 
       if (donationType === "Money" && res.data.donation_id) {
-        const returnUrl = ExpoLinking.createURL(""); 
+        const returnUrl = Platform.OS === 'web'
+          ? (typeof window !== 'undefined' ? window.location.href : "")
+          : ExpoLinking.createURL("");
         const safeName = (user.full_name || "Alumni").trim().replace(/[^a-zA-Z\s]/g, "").slice(0, 50);
         const safePhone = user.mobile ? user.mobile.replace(/\D/g, "").slice(-10) : "9999999999";
 
@@ -276,17 +288,16 @@ export default function ContributionsScreen() {
           const checkoutUrl = initRes.data.checkout_url;
 
           if (isWeb) {
-            const width = 500; const height = 750;
-            const left = (window.innerWidth - width) / 2;
-            const top = (window.innerHeight - height) / 2;
-            const popup = window.open(checkoutUrl, "Payment", `width=${width},height=${height},left=${left},top=${top}`);
+            let isResolved = false;
 
-            const handleMessage = (event: any) => {
-              if (event.data?.type === 'PAYMENT_RETURN') {
+            const handleMessage = async (event: any) => {
+              const data = typeof event.data === 'string' ? (() => { try { return JSON.parse(event.data); } catch { return {}; } })() : event.data;
+              if (data?.type === 'PAYMENT_RETURN') {
+                isResolved = true;
                 window.removeEventListener('message', handleMessage);
                 setIsSubmitting(false);
                 
-                if (event.data.status === 'success') {
+                if (data.status === 'success') {
                   showAlert("Donation Successful! 💛", "Thank you for your generous contribution to your alma mater.");
                   setSelectedAmount(""); setCustomAmount(""); setDonationMsg("");
                   fetchMyData(user.id);
@@ -297,13 +308,35 @@ export default function ContributionsScreen() {
             };
             window.addEventListener('message', handleMessage);
 
-            const checkClosed = setInterval(() => {
-              if (popup?.closed) {
-                clearInterval(checkClosed);
-                setIsSubmitting(false);
-                window.removeEventListener('message', handleMessage);
-              }
-            }, 1000);
+            const width = 500; const height = 750;
+            const left = (window.innerWidth - width) / 2;
+            const top = (window.innerHeight - height) / 2;
+            const popup = window.open(checkoutUrl, "Payment", `width=${width},height=${height},left=${left},top=${top}`);
+
+            if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+              // Popup blocked by browser, fallback to redirecting main window
+              window.location.href = checkoutUrl;
+            } else {
+              const checkClosed = setInterval(async () => {
+                if (popup?.closed) {
+                  clearInterval(checkClosed);
+                  if (!isResolved) {
+                    window.removeEventListener('message', handleMessage);
+                    try {
+                      const verifyRes = await axios.get(`${API_BASE}/pay/verify/${initRes.data.txnid}`);
+                      if (verifyRes.data.status === 'Success') {
+                        setIsSubmitting(false);
+                        showAlert("Donation Successful! 💛", "Thank you for your generous contribution to your alma mater.");
+                        setSelectedAmount(""); setCustomAmount(""); setDonationMsg("");
+                        fetchMyData(user.id);
+                        return;
+                      }
+                    } catch {}
+                    setIsSubmitting(false);
+                  }
+                }
+              }, 1000);
+            }
 
           } else {
             const browserResult = await WebBrowser.openAuthSessionAsync(checkoutUrl, returnUrl);

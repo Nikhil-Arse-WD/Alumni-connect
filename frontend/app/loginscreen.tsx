@@ -1,7 +1,7 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
-import { useRouter, Redirect } from "expo-router";
+import { useRouter, Redirect, useLocalSearchParams } from "expo-router";
 import React, { useState, useEffect } from "react";
 import { useUser } from "../context/UserContext";
 import {
@@ -169,6 +169,15 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
   const { user, setUser, loading: userLoading, isAdminLoggedIn, setIsAdminLoggedIn } = useUser();
+  const { status } = useLocalSearchParams<{ status?: string }>();
+
+  useEffect(() => {
+    if (status === 'success') {
+      showAlert("Registration Successful! 🎉", "Your payment is complete. Please check your email for your temporary login credentials.");
+    } else if (status === 'failed') {
+      showAlert("Payment Failed", "The registration transaction was cancelled or failed. Please try registering again.");
+    }
+  }, [status]);
 
   if (userLoading) {
     return (

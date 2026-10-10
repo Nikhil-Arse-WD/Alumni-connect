@@ -166,20 +166,22 @@ export default function ChangePasswordScreen() {
       });
 
       if (res.data.success) {
-        if (userData) {
-          const user = JSON.parse(userData);
-          await AsyncStorage.setItem("user", JSON.stringify({
-            ...user,
-            is_password_changed: 1,
-          }));
-        }
-
-        showAlert("Success ✅", "Password changed successfully!");
-
         if (showHeader) {
-          router.back();
+          if (userData) {
+            const user = JSON.parse(userData);
+            await AsyncStorage.setItem("user", JSON.stringify({
+              ...user,
+              is_password_changed: 1,
+            }));
+          }
+          showAlert("Success ✅", "Password changed successfully!");
+          router.replace("/(tab)/profile");
         } else {
-          router.replace("/");
+          await AsyncStorage.clear();
+          setUser(null);
+          setIsAdminLoggedIn(false);
+          showAlert("Success ✅", "Password changed successfully! Please login again with your new password.");
+          router.replace("/loginscreen");
         }
       } else {
         showAlert("Error", res.data.message || "Failed to change password");

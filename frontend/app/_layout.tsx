@@ -14,7 +14,6 @@ const ROUTE_MAP: Record<string, string> = {
   "mybanner": "My Banners - SVIMAA",
   "bannerdetail": "Banner Detail - SVIMAA",
   "editprofile": "Edit Profile - SVIMAA",
-  "privacysettting": "Privacy Settings - SVIMAA",
   "livead": "Live Ads - SVIMAA",
 };
 

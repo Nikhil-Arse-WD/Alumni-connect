@@ -66,20 +66,20 @@ const PROGRAMME_FLAT = PROGRAMME_GROUPS.flatMap(g => [
 ]);
 
 // ── Shared UI Components ──
-function WebDatePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function WebDatePicker({ value, onChange, error }: { value: string; onChange: (v: string) => void; error?: string; }) {
   return (
     <input
       type="date" value={value || ""} onChange={e => onChange((e.target as HTMLInputElement).value)}
-      style={{ height: 48, borderRadius: 12, border: "1px solid #E2E8F0", paddingLeft: 12, paddingRight: 12, backgroundColor: "#F8FAFC", fontSize: 14, color: value ? "#111" : "#94A3B8", width: "100%", outline: "none", boxSizing: "border-box", fontFamily: "sans-serif" }}
+      style={{ height: 48, borderRadius: 12, border: error ? "1px solid #DC2626" : "1px solid #E2E8F0", paddingLeft: 12, paddingRight: 12, backgroundColor: "#F8FAFC", fontSize: 14, color: value ? "#111" : "#94A3B8", width: "100%", outline: "none", boxSizing: "border-box", fontFamily: "sans-serif" }}
     />
   );
 }
 
-function WebYearPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function WebYearPicker({ value, onChange, error }: { value: string; onChange: (v: string) => void; error?: string; }) {
   return (
     <select
       value={value || ""} onChange={e => onChange((e.target as HTMLSelectElement).value)}
-      style={{ height: 48, borderRadius: 12, border: "1px solid #E2E8F0", paddingLeft: 12, paddingRight: 12, backgroundColor: "#F8FAFC", fontSize: 14, color: value ? "#111" : "#94A3B8", width: "100%", outline: "none", boxSizing: "border-box", fontFamily: "sans-serif" }}
+      style={{ height: 48, borderRadius: 12, border: error ? "1px solid #DC2626" : "1px solid #E2E8F0", paddingLeft: 12, paddingRight: 12, backgroundColor: "#F8FAFC", fontSize: 14, color: value ? "#111" : "#94A3B8", width: "100%", outline: "none", boxSizing: "border-box", fontFamily: "sans-serif" }}
     >
       <option value="">Select year</option>
       {YEAR_OPTIONS.map(year => <option key={year} value={year}>{year}</option>)}
@@ -87,11 +87,11 @@ function WebYearPicker({ value, onChange }: { value: string; onChange: (v: strin
   );
 }
 
-function MobileDateField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void; }) {
+function MobileDateField({ label, value, onChange, error }: { label: string; value: string; onChange: (v: string) => void; error?: string; }) {
   const [show, setShow] = useState(false);
   return (
-    <Field label={label}>
-      <TouchableOpacity style={[styles.dateBtn, !value && styles.dateBtnEmpty]} onPress={() => setShow(true)}>
+    <Field label={label} error={error}>
+      <TouchableOpacity style={[styles.dateBtn, !value && styles.dateBtnEmpty, !!error && { borderColor: "#DC2626", borderWidth: 1 }]} onPress={() => setShow(true)}>
         <Text style={value ? styles.dateBtnText : styles.dateBtnPlaceholder}>{value || `Select ${label.toLowerCase()}`}</Text>
         <Ionicons name="calendar-outline" size={18} color="#64748B" />
       </TouchableOpacity>
@@ -150,11 +150,11 @@ function Section({ title, icon }: { title: string; icon: string }) {
   );
 }
 
-function AppPicker({ label, value, onChange, items }: { label: string; value: string; onChange: (v: string) => void; items: { label: string; value: string }[]; }) {
+function AppPicker({ label, value, onChange, items, error }: { label: string; value: string; onChange: (v: string) => void; items: { label: string; value: string }[]; error?: string; }) {
   return (
-    <Field label={label}>
+    <Field label={label} error={error}>
       {Platform.OS === "web" ? (
-        <select value={value} onChange={e => onChange((e.target as HTMLSelectElement).value)} style={{ height: 48, borderRadius: 12, border: "1px solid #E2E8F0", paddingLeft: 12, paddingRight: 12, background: "#F8FAFC", fontSize: 14, color: value ? "#111" : "#94A3B8", width: "100%", outline: "none" }}>
+        <select value={value} onChange={e => onChange((e.target as HTMLSelectElement).value)} style={{ height: 48, borderRadius: 12, border: error ? "1px solid #DC2626" : "1px solid #E2E8F0", paddingLeft: 12, paddingRight: 12, background: "#F8FAFC", fontSize: 14, color: value ? "#111" : "#94A3B8", width: "100%", outline: "none" }}>
           <option value="">Select {label}</option>
           {items.map(i => <option key={i.value} value={i.value}>{i.label}</option>)}
         </select>
@@ -207,7 +207,7 @@ function Row2({ children }: { children: React.ReactNode }) {
 export default function RegisterScreen() {
   const router = useRouter();
   const [image, setImage] = useState<string | null>(null);
-  const [errors, setErrors] = useState<{ email?: string; mobile?: string }>({});
+  const [errors, setErrors] = useState<{ [key: string]: string | undefined }>({});
   const [showYearPicker, setShowYearPicker] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [industrySelection, setIndustrySelection] = useState("");
@@ -234,7 +234,7 @@ export default function RegisterScreen() {
 
   const set = (key: string, value: string) => {
     setForm(prev => ({ ...prev, [key]: value }));
-    if (key === "email" || key === "mobile") setErrors(prev => ({ ...prev, [key]: undefined }));
+    setErrors(prev => ({ ...prev, [key]: undefined }));
   };
 
   const handleIndustryDropdownChange = (value: string) => {
@@ -249,14 +249,10 @@ export default function RegisterScreen() {
   };
 
   const validate = (): boolean => {
-    const e: { email?: string; mobile?: string } = {};
-    if (!form.full_name.trim()) {
-      showAlert("Required", "Full Name is required");
-      return false;
-    } else if (!isValidName(form.full_name)) {
-      showAlert("Invalid Name", "Please enter a valid name (letters, spaces, and dots only).");
-      return false;
-    }
+    const e: { [key: string]: string } = {};
+
+    if (!form.full_name.trim()) e.full_name = "Full Name is required";
+    else if (!isValidName(form.full_name)) e.full_name = "Please enter a valid name";
 
     if (!form.email.trim()) e.email = "Email is required";
     else if (!isValidEmail(form.email)) e.email = "Enter a valid email (e.g. rahul@gmail.com)";
@@ -265,13 +261,32 @@ export default function RegisterScreen() {
     else if (form.country_code === "+91" && !isValidMobile(form.mobile)) e.mobile = "Enter a valid 10-digit Indian mobile number";
     else if (form.country_code !== "+91" && form.mobile.replace(/[\s\-\+]/g, "").length < 7) e.mobile = "Enter a valid mobile number";
 
+    if (!form.dob) {
+      e.dob = "Please specify your Date of Birth";
+    }
+
+    if (!form.batch_year) {
+      e.batch_year = "Please specify your Year of Passing";
+    }
+
+    if (form.dob && form.batch_year) {
+      const dobYear = new Date(form.dob).getFullYear();
+      const passingYear = parseInt(form.batch_year, 10);
+      if (passingYear < dobYear) {
+        e.batch_year = "Year of passing cannot be earlier than your DOB year";
+      }
+    }
+
     if (!form.industry.trim()) {
-      showAlert("Required", "Please specify your industry.");
-      return false;
+      e.industry = "Please specify your industry";
     }
 
     setErrors(e);
-    return Object.keys(e).length === 0;
+    if (Object.keys(e).length > 0) {
+      showAlert("Validation Error", "Please check the highlighted fields and correct the errors before proceeding.");
+      return false;
+    }
+    return true;
   };
 
   // ── UNIFIED REGISTER & PAY FUNCTION ──
@@ -299,7 +314,9 @@ export default function RegisterScreen() {
 
       await axios.post(`${API_BASE}/auth/register`, fd, { headers: { "Content-Type": "multipart/form-data" } });
 
-      const returnUrl = ExpoLinking.createURL('/loginscreen');
+      const returnUrl = Platform.OS === 'web'
+        ? (typeof window !== 'undefined' ? `${window.location.origin}/loginscreen` : '/loginscreen')
+        : ExpoLinking.createURL('/loginscreen');
       const rawPhone = `${form.country_code || "91"}${form.mobile || ""}`;
       const safePhone = rawPhone.replace(/\D/g, "").slice(0, 15) || "9999999999";
       const safeName = (form.full_name || "Alumni").trim().replace(/[^a-zA-Z\s]/g, "").slice(0, 50);
@@ -319,18 +336,17 @@ export default function RegisterScreen() {
         const checkoutUrl = initRes.data.checkout_url;
 
         if (isWeb) {
-          // ── WEB: Open Mini Window Popup ──
-          const width = 500; const height = 750;
-          const left = (window.innerWidth - width) / 2;
-          const top = (window.innerHeight - height) / 2;
-          const popup = window.open(checkoutUrl, "Payment", `width=${width},height=${height},left=${left},top=${top}`);
+          // ── WEB: Open Mini Window Popup with Fallback ──
+          let isResolved = false;
 
           const handleMessage = (event: any) => {
-            if (event.data?.type === 'PAYMENT_RETURN') {
+            const data = typeof event.data === 'string' ? (() => { try { return JSON.parse(event.data); } catch { return {}; } })() : event.data;
+            if (data?.type === 'PAYMENT_RETURN') {
+              isResolved = true;
               window.removeEventListener('message', handleMessage);
               setIsSubmitting(false);
 
-              if (event.data.status === 'success') {
+              if (data.status === 'success') {
                 showAlert("Registration Successful! 🎉", "Your payment is complete. Please check your email for your temporary login credentials.");
                 router.push("/loginscreen");
               } else {
@@ -340,13 +356,34 @@ export default function RegisterScreen() {
           };
           window.addEventListener('message', handleMessage);
 
-          const checkClosed = setInterval(() => {
-            if (popup?.closed) {
-              clearInterval(checkClosed);
-              setIsSubmitting(false);
-              window.removeEventListener('message', handleMessage);
-            }
-          }, 1000);
+          const width = 500; const height = 750;
+          const left = (window.innerWidth - width) / 2;
+          const top = (window.innerHeight - height) / 2;
+          const popup = window.open(checkoutUrl, "Payment", `width=${width},height=${height},left=${left},top=${top}`);
+
+          if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+            // Popup blocked by browser, fallback to redirecting main window
+            window.location.href = checkoutUrl;
+          } else {
+            const checkClosed = setInterval(async () => {
+              if (popup?.closed) {
+                clearInterval(checkClosed);
+                if (!isResolved) {
+                  window.removeEventListener('message', handleMessage);
+                  try {
+                    const verifyRes = await axios.get(`${API_BASE}/pay/verify/${initRes.data.txnid}`);
+                    if (verifyRes.data.status === 'Success') {
+                      setIsSubmitting(false);
+                      showAlert("Registration Successful! 🎉", "Your payment is complete. Please check your email for your temporary login credentials.");
+                      router.push("/loginscreen");
+                      return;
+                    }
+                  } catch {}
+                  setIsSubmitting(false);
+                }
+              }
+            }, 1000);
+          }
 
         } else {
           // ── MOBILE: In-App Browser ──
@@ -454,7 +491,7 @@ export default function RegisterScreen() {
           <Section title="Personal Information" icon="person-outline" />
           <View style={styles.card}>
             <Row2>
-              <Input label="Full Name *" placeholder="Rahul Sharma" value={form.full_name} onChange={(t: string) => set("full_name", t)} />
+              <Input label="Full Name *" placeholder="Rahul Sharma" value={form.full_name} onChange={(t: string) => set("full_name", t)} error={errors.full_name} />
               <Input label="Email *" placeholder="rahul@gmail.com" value={form.email} onChange={(t: string) => set("email", t)} error={errors.email} />
             </Row2>
 
@@ -473,20 +510,20 @@ export default function RegisterScreen() {
 
             <Row2>
               {isWeb ? (
-                <Field label="Date of Birth">
-                  <WebDatePicker value={form.dob} onChange={v => set("dob", v)} />
+                <Field label="Date of Birth" error={errors.dob}>
+                  <WebDatePicker value={form.dob} onChange={v => set("dob", v)} error={errors.dob} />
                 </Field>
               ) : (
-                <MobileDateField label="Date of Birth" value={form.dob} onChange={v => set("dob", v)} />
+                <MobileDateField label="Date of Birth" value={form.dob} onChange={v => set("dob", v)} error={errors.dob} />
               )}
 
               {isWeb ? (
-                <Field label="Batch Year">
-                  <WebYearPicker value={form.batch_year} onChange={v => set("batch_year", v)} />
+                <Field label="Batch Year" error={errors.batch_year}>
+                  <WebYearPicker value={form.batch_year} onChange={v => set("batch_year", v)} error={errors.batch_year} />
                 </Field>
               ) : (
-                <Field label="Batch Year">
-                  <TouchableOpacity style={[styles.input, { justifyContent: "center" }]} activeOpacity={0.7} onPress={() => setShowYearPicker(true)}>
+                <Field label="Batch Year" error={errors.batch_year}>
+                  <TouchableOpacity style={[styles.input, { justifyContent: "center" }, !!errors.batch_year && styles.inputError]} activeOpacity={0.7} onPress={() => setShowYearPicker(true)}>
                     <Text style={{ color: form.batch_year ? "#111" : "#94A3B8", fontSize: 14 }}>{form.batch_year ? form.batch_year : "Select year"}</Text>
                   </TouchableOpacity>
                 </Field>
@@ -507,7 +544,7 @@ export default function RegisterScreen() {
               <AppPicker label="Experience" value={form.years_of_experience} onChange={v => set("years_of_experience", v)} items={[{ label: "0–1 year", value: "1" }, { label: "1–3 years", value: "3" }, { label: "3–5 years", value: "5" }, { label: "5+ years", value: "10" }]} />
             </Row2>
             <Row2>
-              <AppPicker label="Industry *" value={industrySelection} onChange={handleIndustryDropdownChange} items={[...INDUSTRY_OPTIONS, { label: "Other / Specify Custom...", value: "Other" }]} />
+              <AppPicker label="Industry *" value={industrySelection} onChange={handleIndustryDropdownChange} items={[...INDUSTRY_OPTIONS, { label: "Other / Specify Custom...", value: "Other" }]} error={errors.industry} />
               {industrySelection === "Other" && <Input label="Specify Custom Industry *" placeholder="e.g. Aerospace, Renewable Energy" value={form.industry} onChange={(t: string) => set("industry", t)} />}
             </Row2>
           </View>

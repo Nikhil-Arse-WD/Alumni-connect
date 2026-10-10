@@ -36,7 +36,7 @@ export default function AdminJobs() {
   const fetchJobs = async () => {
     try {
       const res = await axios.get(`${API}/admin/jobs`);
-      if (res.data.success) setJobs(res.data.data);
+      if (res.data.success) setJobs(res.data.jobs || res.data.data || []);
     } catch (err) { console.log(err); }
   };
 
@@ -91,7 +91,7 @@ export default function AdminJobs() {
     ]);
   };
 
-  const filtered = jobs.filter(j => {
+  const filtered = (jobs || []).filter(j => {
     const matchSearch = j.title?.toLowerCase().includes(search.toLowerCase()) ||
       j.company?.toLowerCase().includes(search.toLowerCase());
     const matchFilter =

@@ -30,7 +30,7 @@ import Sidebar from "./components/sidebar";
 import SidebarWeb from "./components/SidebarWeb";
 
 // Dynamically use the central backend endpoint from environment variables
-const API = process.env.EXPO_PUBLIC_API_BASE || "http://127.0.0.1:2000";
+const API = process.env.EXPO_PUBLIC_API_BASE;
 const isWeb = Platform.OS === "web";
 
 const showAlert = (title: string, msg: string) =>

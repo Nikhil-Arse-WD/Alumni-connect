@@ -135,7 +135,7 @@ export default function AlumniProfileScreen() {
 
             <TouchableOpacity
               style={[styles.actionBtn, styles.passwordBtn]}
-              onPress={() => router.push({ pathname: "../change_password", params: { fromProfile: "true" } })}
+              onPress={() => router.push({ pathname: "/change_password" as any, params: { fromProfile: "true" } })}
             >
               <Ionicons name="shield-checkmark-outline" size={18} color="#047857" />
               <Text style={[styles.actionText, { color: "#047857" }]}>Manage Password</Text>

@@ -3,7 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import * as WebBrowser from "expo-web-browser";
 import * as ExpoLinking from "expo-linking";
 import {
@@ -28,9 +28,18 @@ const showAlert = (title: string, msg: string) => {
 
 export default function PayBannerScreen() {
   const router = useRouter();
-  const { id, amount, title, name: pName, email: pEmail, phone: pPhone } = useLocalSearchParams<{ id: string; amount: string; title: string, name?: string, email?: string, phone?: string }>();
+  const { id, amount, title, name: pName, email: pEmail, phone: pPhone, status } = useLocalSearchParams<{ id?: string; amount?: string; title?: string; name?: string; email?: string; phone?: string; status?: string }>();
   const [loading, setLoading] = useState(false);
   const [verifying, setVerifying] = useState(false);
+
+  useEffect(() => {
+    if (status === 'success') {
+      showAlert("Payment Successful", "Your banner is live!");
+      router.replace("/mybanner" as any);
+    } else if (status === 'failed') {
+      showAlert("Payment Failed", "The banner payment transaction was cancelled or failed.");
+    }
+  }, [status]);
 
   // ── FOOLPROOF VERIFICATION LOGIC ──
   const verifyStatusWithServer = async (txnid: string) => {
@@ -123,7 +132,7 @@ export default function PayBannerScreen() {
                 if (!isResolved) {
                   window.removeEventListener("message", handleMessage);
                   setLoading(false);
-                  showAlert("Payment Cancelled", "You closed the payment gateway before completing the transaction.");
+                  verifyStatusWithServer(res.data.txnid);
                 }
               }
             }, 500);
