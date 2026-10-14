@@ -47,3 +47,7 @@ app-example
 
 # backend ignore files 
 /backend
+
+# Documentation and office exports
+SVIMAA_Documentation_Plan.docx
+*.docx
