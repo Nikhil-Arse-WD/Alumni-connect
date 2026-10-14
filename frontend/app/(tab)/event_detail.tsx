@@ -69,6 +69,8 @@ export default function App() {
 
   const [pastEventGallery, setPastEventGallery] =
     useState<any[]>([]);
+  const [lightboxImage, setLightboxImage] =
+    useState<string | null>(null);
 
   const [loading, setLoading] =
     useState(false);
@@ -877,16 +879,23 @@ useEffect(() => {
         <View style={styles.heroOverlay} />
 
         <View style={styles.heroCardContent}>
-          <View style={styles.completedBadge}>
-            <Ionicons
-              name="checkmark-circle"
-              size={14}
-              color="#fff"
-            />
-
-            <Text style={styles.completedText}>
-              COMPLETED
-            </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <View style={styles.completedBadge}>
+              <Ionicons
+                name="checkmark-circle"
+                size={14}
+                color="#fff"
+              />
+              <Text style={styles.completedText}>
+                COMPLETED
+              </Text>
+            </View>
+            {Number(item.gallery_count || 0) > 0 && (
+              <View style={{ backgroundColor: "rgba(99, 102, 241, 0.9)", paddingHorizontal: 9, paddingVertical: 4, borderRadius: 20, flexDirection: "row", alignItems: "center", gap: 4 }}>
+                <Ionicons name="images" size={12} color="#fff" />
+                <Text style={{ color: "#fff", fontSize: 11, fontWeight: "700" }}>{item.gallery_count} Photos</Text>
+              </View>
+            )}
           </View>
 
           <Text
@@ -1202,41 +1211,47 @@ useEffect(() => {
                 }
               </Text>
               
-              <Text
-                style={
-                  styles.responseTitle
-                }
-              >
-                Event Gallery
-              </Text>
-
-              <View
-                style={
-                  styles.galleryGrid
-                }
-              >
-                {pastEventGallery.map(
-                  (
-                    img,
-                    index
-                  ) => (
-                    <Image
-                      key={index}
-                      source={{
-                        uri:
-                          img.photo_url?.startsWith(
-                            "http"
-                          )
-                            ? img.photo_url
-                            : `${API}${img.photo_url}`,
-                      }}
-                      style={
-                        styles.galleryImage
-                      }
-                    />
-                  )
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 15, marginBottom: 8 }}>
+                <Text style={styles.responseTitle}>Event Gallery</Text>
+                {pastEventGallery.length > 0 && (
+                  <Text style={{ fontSize: 12, color: "#64748B", fontWeight: "600" }}>
+                    {pastEventGallery.length} photos
+                  </Text>
                 )}
               </View>
+
+              {pastEventGallery.length === 0 ? (
+                <View style={{ backgroundColor: "#F8FAFC", borderRadius: 16, padding: 24, alignItems: "center", borderWidth: 1, borderColor: "#E2E8F0", marginVertical: 10 }}>
+                  <Ionicons name="images-outline" size={36} color="#94A3B8" />
+                  <Text style={{ fontSize: 14, fontWeight: "600", color: "#64748B", marginTop: 8 }}>
+                    No photos uploaded yet
+                  </Text>
+                  <Text style={{ fontSize: 12, color: "#94A3B8", marginTop: 4, textAlign: "center" }}>
+                    Photos captured during this event will be published here by the alumni committee.
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.galleryGrid}>
+                  {pastEventGallery.map((img, index) => {
+                    const photoUri = img.photo_url?.startsWith("http")
+                      ? img.photo_url
+                      : `${API}${img.photo_url}`;
+                    return (
+                      <TouchableOpacity
+                        key={img.gallery_id || index}
+                        activeOpacity={0.85}
+                        onPress={() => setLightboxImage(photoUri)}
+                        style={{ borderRadius: 12, overflow: "hidden" }}
+                      >
+                        <Image
+                          source={{ uri: photoUri }}
+                          style={styles.galleryImage}
+                        />
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
 
               <TouchableOpacity
                 style={
@@ -1263,6 +1278,30 @@ useEffect(() => {
             </View>
           </ScrollView>
         )}
+      </Modal>
+
+      {/* FULLSCREEN LIGHTBOX MODAL */}
+      <Modal
+        visible={lightboxImage !== null}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setLightboxImage(null)}
+      >
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.92)", justifyContent: "center", alignItems: "center" }}>
+          <TouchableOpacity
+            style={{ position: "absolute", top: 40, right: 20, zIndex: 99, backgroundColor: "rgba(255,255,255,0.2)", width: 44, height: 44, borderRadius: 22, justifyContent: "center", alignItems: "center" }}
+            onPress={() => setLightboxImage(null)}
+          >
+            <Ionicons name="close" size={28} color="#fff" />
+          </TouchableOpacity>
+          {lightboxImage && (
+            <Image
+              source={{ uri: lightboxImage }}
+              style={{ width: "95%", height: "80%" }}
+              contentFit="contain"
+            />
+          )}
+        </View>
       </Modal>
     </SafeAreaView>
   );

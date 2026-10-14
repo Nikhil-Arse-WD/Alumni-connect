@@ -35,6 +35,7 @@ interface EventType {
   event_id: number; title: string; description: string;
   venue: string; event_date: string; event_time: string;
   capacity: number; cover_photo: string; status: string;
+  gallery_count?: number;
 }
 
 // ── Detail Row ────────────────────────────────────────────────
@@ -112,6 +113,9 @@ function EventCard({ item, onPress, onEdit, onDelete }: {
           <View style={styles.meta}><Feather name="clock" size={13} color={C.muted} /><Text style={styles.metaText}>{item.event_time}</Text></View>
         </View>
         <View style={styles.actionsRow}>
+          <Pressable style={[styles.actionBtn, { backgroundColor: "#f1f5f9", borderWidth: 1, borderColor: "#cbd5e1" }]} onPress={onPress}>
+            <Feather name="image" size={13} color="#475569" /><Text style={{ color: "#475569", fontSize: 12, fontWeight: "600", marginLeft: 4 }}>Gallery ({item.gallery_count || 0})</Text>
+          </Pressable>
           <Pressable style={[styles.actionBtn, styles.editBtnCard]} onPress={onEdit}>
             <Feather name="edit-2" size={13} color="#fff" /><Text style={styles.editBtnText}>Edit</Text>
           </Pressable>
@@ -186,6 +190,35 @@ function FormModal({ visible, onClose, onSubmit, title, form, handleChange, pick
         <TextInput placeholder="Venue" style={styles.input} value={form.venue} onChangeText={t => handleChange("venue", t)} />
         <DateFields form={form} handleChange={handleChange} showDate={showDate} setShowDate={setShowDate} showTime={showTime} setShowTime={setShowTime} />
         <TextInput placeholder="Capacity" keyboardType="numeric" style={styles.input} value={form.capacity} onChangeText={t => handleChange("capacity", t)} />
+
+        {/* Status Selector */}
+        <Text style={{ fontSize: 13, fontWeight: "600", color: "#374151", marginBottom: 6 }}>Event Status</Text>
+        <View style={{ flexDirection: "row", gap: 10, marginBottom: 16 }}>
+          <TouchableOpacity
+            style={{
+              flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 6,
+              backgroundColor: form.status === "Upcoming" ? PRIMARY : "#f1f5f9",
+              borderWidth: 1, borderColor: form.status === "Upcoming" ? PRIMARY : "#e2e8f0"
+            }}
+            onPress={() => handleChange("status", "Upcoming")}
+          >
+            <Feather name="clock" size={15} color={form.status === "Upcoming" ? "#fff" : "#64748b"} />
+            <Text style={{ fontWeight: "700", fontSize: 13, color: form.status === "Upcoming" ? "#fff" : "#64748b" }}>Upcoming</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={{
+              flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 6,
+              backgroundColor: form.status === "Completed" ? "#059669" : "#f1f5f9",
+              borderWidth: 1, borderColor: form.status === "Completed" ? "#059669" : "#e2e8f0"
+            }}
+            onPress={() => handleChange("status", "Completed")}
+          >
+            <Feather name="check-circle" size={15} color={form.status === "Completed" ? "#fff" : "#64748b"} />
+            <Text style={{ fontWeight: "700", fontSize: 13, color: form.status === "Completed" ? "#fff" : "#64748b" }}>Completed</Text>
+          </TouchableOpacity>
+        </View>
+
         <TouchableOpacity style={styles.imagePickBtn} onPress={pickImage}>
           <Ionicons name="image-outline" size={20} color={PRIMARY} />
           <Text style={styles.imagePickText}>Select Cover Photo</Text>
@@ -225,36 +258,56 @@ export default function AdminEvents() {
   const [editingEventId, setEditingEventId] = useState<number | null>(null);
   const [selectedEvent,  setSelectedEvent]  = useState<EventType | null>(null);
   const [gallery,        setGallery]        = useState<any[]>([]);
+  const [uploadingGallery, setUploadingGallery] = useState(false);
   const [showDate,       setShowDate]       = useState(false);
   const [showTime,       setShowTime]       = useState(false);
   const [rsvp,           setRsvp]           = useState({ going: 0, maybe: 0, notGoing: 0, total: 0 });
   const [countdown,      setCountdown]      = useState({ days: "00", hours: "00", minutes: "00", seconds: "00" });
-  const [form, setForm] = useState({ title: "", description: "", venue: "", event_date: "", event_time: "", capacity: "", cover_photo: "" });
+  const [form, setForm] = useState({ title: "", description: "", venue: "", event_date: "", event_time: "", capacity: "", cover_photo: "", status: "Upcoming" });
 
   const fetchEvents = async () => {
     try { const res = await axios.get(`${API}/events`); setEvents(res.data.events || []); }
     catch (err) { console.log(err); }
   };
   useEffect(() => { fetchEvents(); }, []);
-  const markEventCompleted =
-  async (eventId: number) => {
+  const toggleEventStatus = async (eventId: number, newStatus: string) => {
     try {
-      await axios.put(
-        `${API}/admin/update-event-status/${eventId}`,
-        {
-          status: "Completed",
-        }
-      );
+      await axios.put(`${API}/admin/update-event-status/${eventId}`, { status: newStatus });
+      setSelectedEvent((prev: any) => prev ? { ...prev, status: newStatus } : null);
+      fetchEvents();
+      Platform.OS === "web" ? window.alert(`Event marked as ${newStatus} ✅`) : Alert.alert("Success", `Event marked as ${newStatus}`);
+    } catch {
+      Platform.OS === "web" ? window.alert("Failed to update status") : Alert.alert("Error", "Failed to update status");
+    }
+  };
 
-      // LOCAL UPDATE
-      setSelectedEvent((prev: any) => ({
-        ...prev,
-        status: "Completed",
-      }));
-
+  const markEventCompleted = async (eventId: number) => {
+    try {
+      await axios.put(`${API}/admin/update-event-status/${eventId}`, { status: "Completed" });
+      setSelectedEvent((prev: any) => prev ? { ...prev, status: "Completed" } : null);
       fetchEvents();
     } catch (err) {
+      console.log("Auto complete event error:", err);
+    }
+  };
+
+  const deleteGalleryPhoto = async (galleryId: number) => {
+    const ok = Platform.OS === "web"
+      ? window.confirm("Delete this photo from gallery?")
+      : await new Promise<boolean>(res => Alert.alert("Delete Photo", "Are you sure you want to delete this photo?", [{ text: "Cancel", onPress: () => res(false) }, { text: "Delete", style: "destructive", onPress: () => res(true) }]));
+    if (!ok) return;
+
+    try {
+      await axios.delete(`${API}/admin/delete-gallery/${galleryId}`);
+      if (selectedEvent) {
+        const r = await axios.get(`${API}/events/gallery/${selectedEvent.event_id}`);
+        setGallery(r.data.gallery || []);
+      }
+      fetchEvents();
+      Platform.OS === "web" ? window.alert("Photo deleted ✅") : Alert.alert("Success", "Photo deleted");
+    } catch (err) {
       console.log(err);
+      Platform.OS === "web" ? window.alert("Failed to delete photo") : Alert.alert("Error", "Failed to delete photo");
     }
   };
   // countdown
@@ -310,7 +363,7 @@ export default function AdminEvents() {
   }, [selectedEvent]);
 
   const handleChange = (key: string, value: string) => setForm(f => ({ ...f, [key]: value }));
-  const resetForm    = () => { setForm({ title:"", description:"", venue:"", event_date:"", event_time:"", capacity:"", cover_photo:"" }); setEditingEventId(null); };
+  const resetForm    = () => { setForm({ title:"", description:"", venue:"", event_date:"", event_time:"", capacity:"", cover_photo:"", status: "Upcoming" }); setEditingEventId(null); };
 
   const pickImage = async () => {
     try {
@@ -325,16 +378,9 @@ export default function AdminEvents() {
       data.append("title", form.title); data.append("description", form.description);
       data.append("venue", form.venue); data.append("event_date", form.event_date);
       data.append("event_time", form.event_time); data.append("capacity", form.capacity);
-      const eventDateTime = new Date(`${form.event_date}T${form.event_time}`);
-
-const status =
-  new Date().getTime() > eventDateTime.getTime()
-    ? "Completed"
-    : "Upcoming";
-
-data.append("status", status);
+      data.append("status", form.status || "Upcoming");
      // data.append("status", Date.now() >= new Date(`${form.event_date}T${form.event_time}`).getTime() ? "Completed" : "Upcoming");
-     //data.append("status", new Date()>new Date(`${form.event_date}T${form.event_time}`)?"Completed":"Upcoming");
+     //data.append("status", form.status || "Upcoming");
       if (form.cover_photo) {
         if (Platform.OS === "web") { const blob = await fetch(form.cover_photo).then(r => r.blob()); data.append("cover_photo", blob, "event.jpg"); }
         else { const fn = form.cover_photo.split("/").pop()||"photo.jpg"; const m=/\.(\w+)$/.exec(fn); data.append("cover_photo",{uri:form.cover_photo,name:fn,type:m?`image/${m[1]}`:"image"} as any); }
@@ -354,7 +400,7 @@ data.append("status", status);
       data.append("title",form.title); data.append("description",form.description);
       data.append("venue",form.venue); data.append("event_date",form.event_date);
       data.append("event_time",form.event_time); data.append("capacity",form.capacity);
-      data.append("status", new Date()>new Date(`${form.event_date}T${form.event_time}`)?"Completed":"Upcoming");
+      data.append("status", form.status || "Upcoming");
       if (form.cover_photo && !form.cover_photo.startsWith("http")) {
         if (Platform.OS==="web") { const blob=await fetch(form.cover_photo).then(r=>r.blob()); data.append("cover_photo",blob,"event.jpg"); }
         else { const fn=form.cover_photo.split("/").pop()||"event.jpg"; const m=/\.(\w+)$/.exec(fn); data.append("cover_photo",{uri:form.cover_photo,name:fn,type:m?`image/${m[1]}`:"image"} as any); }
@@ -378,7 +424,7 @@ data.append("status", status);
     setEditingEventId(item.event_id);
     setForm({ title:item.title, description:item.description, venue:item.venue,
       event_date:item.event_date, event_time:item.event_time,
-      capacity:item.capacity.toString(), cover_photo:API+item.cover_photo });
+      capacity:item.capacity.toString(), cover_photo:API+item.cover_photo, status: item.status || "Upcoming" });
     setEditModal(true);
   };
 
@@ -395,15 +441,42 @@ data.append("status", status);
   };
 
   const uploadGallery = async (images: any[]) => {
-    const data = new FormData();
-    for (let i=0;i<images.length;i++) {
-      const img=images[i];
-      if (Platform.OS==="web") data.append("gallery_images",img.file);
-      else data.append("gallery_images",{uri:img.uri,name:img.name||`g_${i}.jpg`,type:img.mimeType||"image/jpeg"} as any);
+    if (!images || images.length === 0) return;
+    try {
+      setUploadingGallery(true);
+      const data = new FormData();
+      for (let i = 0; i < images.length; i++) {
+        const img = images[i];
+        if (Platform.OS === "web") {
+          if (img.file) {
+            data.append("gallery_images", img.file);
+          } else {
+            const blob = await fetch(img.uri).then(r => r.blob());
+            data.append("gallery_images", blob, img.name || `gallery_${Date.now()}_${i}.jpg`);
+          }
+        } else {
+          const fn = img.name || img.uri.split("/").pop() || `g_${i}.jpg`;
+          const m = /\.(\w+)$/.exec(fn);
+          data.append("gallery_images", {
+            uri: img.uri,
+            name: fn,
+            type: img.mimeType || (m ? `image/${m[1]}` : "image/jpeg"),
+          } as any);
+        }
+      }
+      await axios.post(`${API}/admin/upload-gallery/${selectedEvent?.event_id}`, data, { headers: { "Content-Type": "multipart/form-data" } });
+      Platform.OS === "web" ? window.alert("Photos Uploaded Successfully ✅") : Alert.alert("Success", "Photos Uploaded Successfully");
+      if (selectedEvent) {
+        const r = await axios.get(`${API}/events/gallery/${selectedEvent.event_id}`);
+        setGallery(r.data.gallery || []);
+      }
+      fetchEvents();
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || "Failed to upload gallery";
+      Platform.OS === "web" ? window.alert(msg) : Alert.alert("Error", msg);
+    } finally {
+      setUploadingGallery(false);
     }
-    await axios.post(`${API}/admin/upload-gallery/${selectedEvent?.event_id}`, data, { headers:{"Content-Type":"multipart/form-data"} });
-    Platform.OS==="web"?window.alert("Uploaded ✅"):Alert.alert("Success","Gallery Uploaded");
-    if (selectedEvent) openDetails(selectedEvent);
   };
 
   const openDrawer  = () => { setDrawerOpen(true); Animated.timing(translateX,{toValue:0,duration:250,useNativeDriver:true}).start(); };
@@ -577,7 +650,7 @@ data.append("status", status);
                   {item.capacity}
                 </Text>
               
-                <View style={{ width: 120 }}>
+                <View style={{ width: 140 }}>
                   <View
                     style={[
                       styles.statusBadge,
@@ -590,15 +663,25 @@ data.append("status", status);
                       {item.status}
                     </Text>
                   </View>
+                  <Text style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>
+                    📷 {item.gallery_count || 0} photos
+                  </Text>
                 </View>
               
                 <View
                   style={{
-                    width: 150,
+                    width: 200,
                     flexDirection: "row",
-                    gap: 8,
+                    gap: 6,
                   }}
                 >
+                  <TouchableOpacity
+                    style={[styles.editBtnCard, { backgroundColor: "#f1f5f9", borderWidth: 1, borderColor: "#cbd5e1" }]}
+                    onPress={() => openDetails(item)}
+                  >
+                    <Text style={{ color: "#334155", fontWeight: "600", fontSize: 11 }}>Gallery</Text>
+                  </TouchableOpacity>
+
                   <TouchableOpacity
                     style={styles.editBtnCard}
                     onPress={() => openEditModal(item)}
@@ -680,6 +763,34 @@ data.append("status", status);
                   </View>
                 </View>
 
+                {/* Status Toggle Quick Action */}
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginHorizontal: 16, marginTop: 10, padding: 12, backgroundColor: "#fff", borderRadius: 14, borderWidth: 1, borderColor: "#e2e8f0" }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <Ionicons name={selectedEvent.status === "Upcoming" ? "time-outline" : "checkmark-done-circle-outline"} size={22} color={selectedEvent.status === "Upcoming" ? PRIMARY : "#059669"} />
+                    <View>
+                      <Text style={{ fontSize: 13, fontWeight: "700", color: "#1e293b" }}>
+                        Event Status: {selectedEvent.status}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: "#64748b" }}>
+                        {selectedEvent.status === "Upcoming" ? "Currently live in upcoming events feed" : "Archived in past events directory"}
+                      </Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={{
+                      paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10,
+                      backgroundColor: selectedEvent.status === "Upcoming" ? "#059669" : PRIMARY,
+                      flexDirection: "row", alignItems: "center", gap: 6
+                    }}
+                    onPress={() => toggleEventStatus(selectedEvent.event_id, selectedEvent.status === "Upcoming" ? "Completed" : "Upcoming")}
+                  >
+                    <Feather name={selectedEvent.status === "Upcoming" ? "check" : "rotate-ccw"} size={14} color="#fff" />
+                    <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>
+                      {selectedEvent.status === "Upcoming" ? "Mark Completed" : "Mark Upcoming"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
                 <View style={styles.quickInfoRow}>
                   {[
                     {icon:"calendar-outline",text:new Date(selectedEvent.event_date).toLocaleDateString()},
@@ -727,27 +838,66 @@ data.append("status", status);
                   <Text style={styles.rsvpTotal}>Total responses: {rsvp.total} / {selectedEvent.capacity}</Text>
                 </View>
 
-                {selectedEvent.status==="Completed" && (
-                  <>
-                    <View style={styles.sectionCard}>
-                      <Text style={styles.sectionCardTitle}>Upload Event Photos</Text>
-                      <TouchableOpacity style={styles.uploadBox} onPress={pickGalleryImages}>
-                        <Ionicons name="cloud-upload-outline" size={36} color={PRIMARY}/>
-                        <Text style={styles.uploadTitle}>Upload Photos</Text>
-                        <Text style={styles.uploadSub}>Tap to select images</Text>
-                      </TouchableOpacity>
+                {/* Event Gallery Manager Section */}
+                <View style={styles.sectionCard}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                    <View>
+                      <Text style={styles.sectionCardTitle}>Event Gallery</Text>
+                      <Text style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
+                        {gallery.length} photos uploaded
+                      </Text>
                     </View>
-                    {gallery.length>0 && (
-                      <View style={styles.sectionCard}>
-                        <Text style={styles.sectionCardTitle}>Event Gallery</Text>
-                        <FlatList horizontal data={gallery} keyExtractor={i=>i.gallery_id.toString()}
-                          renderItem={({item})=><Image source={{uri:API+item.photo_url}} style={styles.galleryImage}/>}
-                          showsHorizontalScrollIndicator={false}
-                        />
-                      </View>
-                    )}
-                  </>
-                )}
+                    <TouchableOpacity
+                      style={{
+                        flexDirection: "row", alignItems: "center", gap: 6,
+                        backgroundColor: PRIMARY, paddingHorizontal: 14, paddingVertical: 8,
+                        borderRadius: 10
+                      }}
+                      onPress={pickGalleryImages}
+                      disabled={uploadingGallery}
+                    >
+                      {uploadingGallery ? (
+                        <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>Uploading...</Text>
+                      ) : (
+                        <>
+                          <Feather name="upload" size={14} color="#fff" />
+                          <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>Upload Photos</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+
+                  {gallery.length === 0 ? (
+                    <TouchableOpacity style={styles.uploadBox} onPress={pickGalleryImages} disabled={uploadingGallery}>
+                      <Ionicons name="images-outline" size={36} color={PRIMARY} />
+                      <Text style={styles.uploadTitle}>No Photos in Gallery</Text>
+                      <Text style={styles.uploadSub}>Tap here to upload event photos & memories</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 8 }}>
+                      {gallery.map((img: any) => (
+                        <View key={img.gallery_id || img.id} style={{ width: isWeb ? 130 : "30%", height: 110, borderRadius: 12, overflow: "hidden", position: "relative", borderWidth: 1, borderColor: "#e2e8f0" }}>
+                          <Image
+                            source={{ uri: img.photo_url?.startsWith("http") ? img.photo_url : API + img.photo_url }}
+                            style={{ width: "100%", height: "100%" }}
+                            resizeMode="cover"
+                          />
+                          <TouchableOpacity
+                            style={{
+                              position: "absolute", top: 6, right: 6,
+                              backgroundColor: "rgba(220, 38, 38, 0.85)",
+                              width: 26, height: 26, borderRadius: 13,
+                              justifyContent: "center", alignItems: "center"
+                            }}
+                            onPress={() => deleteGalleryPhoto(img.gallery_id || img.id)}
+                          >
+                            <Feather name="trash-2" size={13} color="#fff" />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </View>
 
                 <View style={[styles.sectionCard,{marginBottom:40}]}>
                   <Text style={styles.sectionCardTitle}>Event Timeline</Text>
