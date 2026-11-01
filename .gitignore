@@ -43,7 +43,6 @@ app-example
 /android
 
 # Local environment variables
-.env
 
 # backend ignore files 
 /backend
@@ -51,3 +50,4 @@ app-example
 # Documentation and office exports
 SVIMAA_Documentation_Plan.docx
 *.docx
+config.bat

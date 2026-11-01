@@ -4,8 +4,8 @@
   "description": "SVIMAA Backend API",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "nodemon src/server.js",
+    "start": "node init && node src/server.js",
+    "dev": "node init && nodemon src/server.js",
     "clean-orphans": "node scripts/cleanOrphans.js",
     "clean-orphans:dry": "node scripts/cleanOrphans.js --dry"
   },
